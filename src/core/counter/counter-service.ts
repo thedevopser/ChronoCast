@@ -255,8 +255,14 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
 
       if (!config.counter.resumeOnStartup && state.status === 'running') {
         state = applyPause(state, { now: clock.now() });
-        await persist(state);
       }
+
+      // L'état est écrit dès le démarrage, y compris sur une installation neuve.
+      // Sans cela le fichier n'existerait qu'après la première mutation : le
+      // répertoire de données ne décrirait pas l'application, et un crash
+      // survenant dans les premières secondes effacerait la valeur de départ
+      // que l'utilisateur venait de choisir.
+      await persist(state);
 
       lastTickAt = clock.monotonicMs();
       lastPersistAt = clock.monotonicMs();

@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 1er août 2026, après fusion de la PR #4 (fin de la Phase 3).
+**Dernière mise à jour :** 1er août 2026, fin de la Phase 4 sur la branche `feat/serveurs-locaux`. Phases 0 à 4 terminées, Phase 5 à commencer.
 
 ---
 
@@ -100,7 +100,7 @@ Ces décisions ont été validées par l'utilisateur. **Ne pas les rouvrir.**
 Conséquences directes, et raison d'être de tout le reste :
 
 - l'intégralité de la logique se vérifie dans un Node nu, sans Chromium ni serveur graphique — indispensable puisque la toolchain est en conteneur Linux alors que la cible est Windows ;
-- un point d'entrée `src/headless/index.ts` (à écrire, Phase 4) lancera l'application complète sans Electron, rendant la vérification bout en bout possible en conteneur ;
+- le point d'entrée `src/headless/index.ts` (Phase 4) lance l'application complète sans Electron, ce qui rend la vérification bout en bout possible en conteneur ;
 - `src/main/**` (à écrire, Phase 6) sera une coquille Electron mince : cycle de vie, fenêtre, tray, et implémentations concrètes des ports.
 
 De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodatages, qui peut reculer lors d'un changement d'heure, et `monotonicMs()` pour mesurer des durées, qui ne recule jamais. C'est `monotonicMs()` qui fait décompter le compteur, faute de quoi le passage à l'heure d'hiver offrirait une heure de subathon.
@@ -109,32 +109,38 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente. Les quatre PR des Phases 0 à 3 sont fusionnées en squash.
+**Branche courante : `feat/serveurs-locaux`**, Phase 4 terminée et non encore fusionnée. Les cinq PR précédentes sont fusionnées en squash dans `main`.
 
 ```
-6da9bfd Module Twitch : OAuth, Helix, EventSub, conversion et déduplication (#4)   <- main
+28cf0c4 docs: ajouter le document de reprise et rendre docs/ versionnable (#5)   <- main
+6da9bfd Module Twitch : OAuth, Helix, EventSub, conversion et déduplication (#4)
 c7d5c64 Métier du compteur : réducteurs purs, barème et service (#3)
 b93615c Fondations du noyau : journalisation, persistance, configuration (#2)
 ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**394 tests, 18 fichiers. Lint, typecheck et `npm audit --audit-level=high` sans erreur.**
+**797 tests, 33 fichiers. Lint, typecheck et `npm audit --audit-level=high` sans erreur.**
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # doit afficher main
-git pull --ff-only origin main
+git branch --show-current    # feat/serveurs-locaux tant que la PR n'est pas fusionnée
 ./scripts/dc.sh verify       # doit être intégralement vert
-git checkout -b feat/serveurs-locaux
 ```
 
-La Phase 4 peut alors commencer, en TDD, en suivant la section 8.
+Une fois la Phase 4 fusionnée :
+
+```bash
+git checkout main && git pull --ff-only origin main
+git checkout -b feat/interfaces-web
+```
+
+La Phase 5 peut alors commencer, en TDD, en suivant la section 8.
 
 ---
 
-## 7. Ce qui est fait — Phases 0 à 3
+## 7. Ce qui est fait — Phases 0 à 4
 
 ### Phase 0 — Socle d'outillage (PR #1, fusionnée)
 
@@ -216,50 +222,66 @@ Conventions à connaître :
 - `channel.follow` est en **version 2**, la v1 étant dépréciée.
 - Tous les tests injectent transport, minuteurs, `fetch` et horloge : **aucun accès réseau, aucune attente réelle**.
 
+### Phase 4 — Serveurs locaux et point d'entrée headless (branche `feat/serveurs-locaux`, 403 tests, 797 au total)
+
+| Fichier | Rôle |
+| --- | --- |
+| `core/server/http-types.ts` | Requête et réponse normalisées : la frontière entre l'adaptateur `node:http` et tout le reste du serveur |
+| `core/server/security/host-guard.ts` | Refus de tout `Host` non loopback, correspondance exacte et sans tolérance |
+| `core/server/security/csrf.ts` | Jeton de 32 octets, comparaison à temps constant, contrôle d'`Origin` pour le WebSocket |
+| `core/server/security/headers.ts` | CSP stricte sans `unsafe-inline`, `nosniff`, `no-referrer`, aucun CORS |
+| `core/server/static-handler.ts` | Résolution puis contrôle du chemin canonique, canonisation des liens symboliques, liste blanche d'extensions |
+| `core/server/routes/pages.ts` | `/overlay`, `/admin`, `/setup` ; substitution du jeton dans les deux dernières seulement |
+| `core/server/router.ts` | Aiguillage pur : gardes, puis API, pages, statique. En-têtes de sécurité en sortie |
+| `core/server/http-server.ts` | Adaptateur `node:http` : bind loopback, plafond de corps, repli de port |
+| `core/server/protocol.ts` | Contrat WebSocket partagé. La Phase 5 le ré-exportera depuis `web/shared/` |
+| `core/server/ws-hub.ts` | Diffusion, lissage du décompte, ping/pong, filtrage par canal |
+| `core/server/ws-adapter.ts` | Seul fichier important `ws`. Garde d'`Host` sur la poignée de main |
+| `core/server/routes/api.ts` | Dix-huit routes : état, configuration, compteur, Twitch, historique, journaux, test d'overlay |
+| `core/history/event-history-service.ts` | Historique JSONL, y compris des événements non crédités |
+| `core/app/system-clock.ts`, `system-ticker.ts` | Implémentations réelles de `Clock` et `Ticker`, partagées avec la future coquille Electron |
+| `core/app/application.ts` | Composition root : câble le pipeline complet |
+| `core/twitch/ws-socket-adapter.ts` | Fabrique de sockets EventSub sur `ws` |
+| `headless/fs-path-provider.ts`, `aes-secret-store.ts`, `index.ts` | Ports concrets et point d'entrée sans Electron |
+
+**Décisions prises pendant cette phase, à ne pas rouvrir :**
+
+- **Le routage est une fonction pure.** `HttpRequest` → `HttpResponse`. L'intégralité des routes et des trois gardes se teste sans ouvrir un socket ; `http-server.ts` n'est qu'un adaptateur.
+- **Le jeton CSRF est injecté dans le HTML**, par substitution du marqueur `__CHRONOCAST_CSRF__` dans une balise `meta`, jamais exposé par une route. Une page tierce ne peut donc ni le lire ni le deviner. L'overlay ne le reçoit pas.
+- **Le WebSocket est en lecture seule.** Il diffuse, il ne commande pas ; seuls `ping` et `subscribe` sont acceptés en entrée. Toute mutation passe par l'API HTTP avec jeton.
+- **La garde d'`Host` est posée deux fois** : dans le routeur et dans l'adaptateur WebSocket. Une poignée de main `upgrade` ne traverse pas le routeur.
+- **Le secret client Twitch est frère de `config` dans le corps du `PATCH`, jamais son enfant.** Il va dans le magasin chiffré, est déclaré au rédacteur avant d'être écrit, et ne ressort ni par `GET`, ni par l'export, ni par les journaux. L'exclusion est structurelle, pas une exception à ne pas oublier.
+- **Une panne Twitch devient un `502`**, pas un `500` : le streamer doit savoir de quel côté chercher.
+- **La garde CSRF passe avant la résolution de route.** Une mutation non authentifiée sur une route inexistante répond `403` et non `404` : sinon la carte de l'API se dessine à qui la demande.
+- **Le décompte n'est diffusé qu'une fois par seconde** (`server.websocket.stateBroadcastIntervalMs`), l'overlay interpolant localement. Les mutations, elles, partent immédiatement.
+- **Le compteur et la configuration sont écrits dès le démarrage.** Le répertoire de données décrit alors l'application, une migration de schéma se matérialise sur le disque, et un répertoire non inscriptible se signale au démarrage plutôt qu'en pleine diffusion.
+- **Le magasin de secrets headless est honnêtement dégradé** : AES-256-GCM, clé dérivée par scrypt depuis `CHRONOCAST_SECRET_PASSPHRASE` ou depuis `secret.key` (mode `0600`). `isEncryptionAvailable()` renvoie **faux** et un avertissement explicite est journalisé. La vraie protection viendra de `safeStorage` en Phase 6.
+
+**Quatre réglages ont été ajoutés au schéma** : `server.maxBodyBytes`, `server.websocket.stateBroadcastIntervalMs`, `server.websocket.maxMessageBytes`, et rien d'autre — le reste existait déjà.
+
+**Tests d'intégration** (`tests/integration/application.test.ts`, 24 scénarios) : l'application entière démarre sur un répertoire temporaire, reçoit de vraies charges utiles EventSub, et l'on observe le crédit, l'écriture disque immédiate, l'entrée d'historique et la diffusion à un vrai client WebSocket. Le rejeu du même `message_id`, le don annoncé deux fois et le Prime vu par deux flux ne créditent qu'une fois. Après arrêt et redémarrage, le temps restant est identique et le temps hors ligne n'est pas décompté.
+
 ---
 
-## 8. Ce qui reste à faire — Phases 4 à 8
+## 8. Ce qui reste à faire — Phases 5 à 8
 
-### Phase 4 — Serveurs locaux et point d'entrée headless — **prochaine étape**
-
-Branche suggérée : `feat/serveurs-locaux`.
-
-**`core/server/http-server.ts`** — `node:http`, sans framework. Bind strict `127.0.0.1`. Sert `/overlay`, `/admin`, `/setup`, les assets et l'API JSON. Détection `EADDRINUSE` avec essai des `portFallbackAttempts` ports suivants.
-
-**`core/server/security/`** — trois gardes, chacune couverte par des tests dans `tests/security/` :
-- `host-guard.ts` : rejet si l'en-tête `Host` n'est pas loopback. Sans cela, un site web visité par le streamer pourrait piloter son compteur (DNS rebinding).
-- `csrf.ts` : toute mutation exige l'en-tête `X-ChronoCast-Token`, jeton généré au démarrage et injecté dans la page admin. L'overlay reste en lecture seule sans jeton, pour que OBS charge l'URL telle quelle. Vérification de l'`Origin` sur les connexions WS admin.
-- `headers.ts` : CSP stricte **sans `unsafe-inline`**, `X-Content-Type-Options`, `Referrer-Policy`. Aucun en-tête CORS permissif.
-
-**`core/server/static-handler.ts`** — résolution puis vérification que le chemin canonique reste sous la racine, liste blanche d'extensions, aucun listing de répertoire.
-
-**`core/server/ws-hub.ts`** — WebSocket sur `/ws`, mode `shared` (même port que HTTP) par défaut. Diffuse `hello`, `state`, `counter`, `twitch:status`, `event`, `log`, `config`, `error`. Heartbeat ping/pong 30 s, sockets morts terminés, messages entrants validés par Zod, taille de message plafonnée.
-
-**`core/server/routes/`** — API : état, configuration (GET/PATCH/import/export), actions compteur (pause, reprise, ajout, retrait, reset, valeur de départ), Twitch (statut, connexion, révocation, souscriptions), historique, logs, test d'overlay.
-
-**`core/app/application.ts`** — composition root. Câble tout : magasins, logger et ses puits, configuration, compteur, chaîne Twitch, serveurs. C'est ici que le pipeline complet est assemblé : `EventSubClient.onNotification` → cache de déduplication sur `message_id` → `mapNotification` → cache sémantique via `semanticKey` → `CounterService.applyEvent` → historique JSONL → diffusion WebSocket.
-
-**`core/history/event-history-service.ts`** — historique des événements sur `JsonlStore`, avec purge.
-
-**`headless/index.ts`, `headless/fs-path-provider.ts`, `headless/aes-secret-store.ts`** — point d'entrée sans Electron. Le magasin de secrets de repli utilise AES-256-GCM avec clé dérivée par scrypt, et **journalise un avertissement explicite** indiquant que ce n'est pas de niveau coffre-fort.
-
-**Tests d'intégration** (`tests/integration/`) : application headless démarrée en conteneur, injection d'une notification EventSub simulée, assertion sur l'incrément du compteur, l'écriture immédiate de l'état, l'entrée d'historique et le message diffusé au client WS. Rejeu du **même `message_id`** → aucun second incrément. Arrêt puis redémarrage → état restauré à l'identique.
-
-### Phase 5 — Interfaces web
+### Phase 5 — Interfaces web — **prochaine étape**
 
 Branche suggérée : `feat/interfaces-web`.
 
 **Première action : réintégrer `tsconfig.web.json` dans `npm run typecheck`.** C'est tracé et ne doit pas être oublié.
 
-**`web/shared/`** — `protocol.ts` (contrat WS partagé), `ws-client.ts` (reconnexion avec backoff), `time-format.ts`, `safe-dom.ts` (**seul point autorisé à toucher le DOM**, via `textContent`).
+**`web/shared/`** — `protocol.ts` (qui se contente de **ré-exporter les types de `src/core/server/protocol.ts`** : le contrat existe déjà, le dupliquer le désynchroniserait), `ws-client.ts` (reconnexion avec backoff), `time-format.ts`, `safe-dom.ts` (**seul point autorisé à toucher le DOM**, via `textContent`).
 
 **`web/overlay/`** — fond transparent, **aucun asset distant** (polices embarquées : l'application doit fonctionner hors ligne, et une CDN violerait la CSP). Le serveur ne diffuse l'état qu'**une fois par seconde** ; l'overlay interpole localement en `requestAnimationFrame`. **Point critique OBS** : les Browser Sources ne sont pas rechargées automatiquement, donc l'overlay continue à décompter en local pendant une coupure et se resynchronise seul au retour. Personnalisation par variables CSS injectées depuis la configuration. Le pseudo est inséré **via `textContent`** — c'est du contenu hostile par défaut.
 
 **`web/admin/`** — vues : tableau de bord, barème, apparence (aperçu live en iframe), Twitch, historique, logs, paramètres, import/export.
 
+Les pages `admin.html` et `setup.html` doivent contenir `<meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__">` : le serveur y substitue le jeton au moment de servir la page. L'overlay ne doit pas porter ce marqueur.
+
 **Assistant de première configuration** — six étapes : explication et lien vers la console développeur Twitch avec la redirect URI exacte à copier, saisie Client ID et Secret, bouton de connexion, chaîne détectée automatiquement avec vérification des portées, valeur initiale et barème, URL de l'overlay à coller dans OBS. Reprise possible à l'étape interrompue.
 
-**Serveur loopback OAuth** — port fixe `37771`, actif uniquement pendant le flux, usage unique, expiration 5 min, `state` de 32 octets vérifié en comparaison à temps constant.
+**Serveur loopback OAuth** — port fixe `37771`, actif uniquement pendant le flux, usage unique, expiration 5 min, `state` de 32 octets vérifié en comparaison à temps constant. Le `state` est déjà engendré par `POST /api/twitch/connect` et se récupère par `Application.takePendingOAuthState()`, qui ne le rend qu'une fois. Les constantes `OAUTH_REDIRECT_PORT` et `OAUTH_REDIRECT_URI` sont exportées par `core/app/application.ts`.
 
 ### Phase 6 — Coquille Electron
 
