@@ -34,6 +34,33 @@ export interface CounterPersistFailedPayload {
   readonly error: unknown;
 }
 
+/** États successifs de la connexion EventSub. */
+export type TwitchConnectionStatus =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'ready'
+  | 'reconnecting';
+
+export interface TwitchStatusPayload {
+  readonly status: TwitchConnectionStatus;
+  /** Précision destinée à l'affichage, par exemple la cause d'une reconnexion. */
+  readonly detail?: string;
+}
+
+export interface TwitchRevocationPayload {
+  readonly subscriptionType: string;
+  /** Motif rapporté par Twitch : `authorization_revoked`, `user_removed`… */
+  readonly status: string;
+}
+
+export interface TwitchSubscriptionFailedPayload {
+  readonly subscriptionType: string;
+  /** Vrai si l'absence de cette souscription compromet le fonctionnement. */
+  readonly required: boolean;
+  readonly error: unknown;
+}
+
 /**
  * Catalogue complet.
  *
@@ -57,4 +84,18 @@ export interface AppEvents extends Record<string, unknown> {
    * pouvoir alerter l'utilisateur sans que le subathon ne s'interrompe.
    */
   readonly 'counter:persist-failed': CounterPersistFailedPayload;
+
+  /** La connexion EventSub a changé d'état. */
+  readonly 'twitch:status': TwitchStatusPayload;
+
+  /**
+   * Twitch a retiré une souscription.
+   *
+   * Sans notification, ce cas est invisible : la connexion reste ouverte, mais
+   * les événements concernés cessent silencieusement d'arriver.
+   */
+  readonly 'twitch:revocation': TwitchRevocationPayload;
+
+  /** Une souscription n'a pas pu être créée. */
+  readonly 'twitch:subscription-failed': TwitchSubscriptionFailedPayload;
 }
