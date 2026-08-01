@@ -24,6 +24,13 @@ coverage/
 # Destinés au copier-coller dans GitHub, ils n'ont pas à être versionnés.
 PR-*.md
 
+# Le gitignore global de cette machine exclut « docs/* ». Or la documentation
+# est un livrable du projet : architecture, guide utilisateur, procédure de
+# build, modèle de menace. On la réintègre explicitement, sans quoi elle ne
+# serait jamais versionnée et disparaîtrait au premier clone ailleurs.
+!docs/
+!docs/**
+
 # Fichiers propres aux éditeurs et aux systèmes d'exploitation
 .vscode/*
 !.vscode/extensions.json
