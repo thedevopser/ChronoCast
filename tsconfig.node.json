@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": [
+    "Cible Node : noyau métier, coquille Electron et point d'entrée headless.",
+    "L'absence de la bibliothèque DOM est délibérée et structurante : elle rend",
+    "impossible l'usage accidentel d'une API navigateur dans le backend.",
+    "C'est cette configuration qui fait foi pour le code livré."
+  ],
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/core/**/*.ts", "src/main/**/*.ts", "src/headless/**/*.ts"]
+}

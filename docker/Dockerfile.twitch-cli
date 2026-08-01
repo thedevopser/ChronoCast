@@ -1,0 +1,35 @@
+# Twitch CLI, utilisée pour simuler des événements EventSub sans attendre de
+# vrais événements sur la chaîne.
+#
+# Elle expose un serveur EventSub WebSocket factice (`twitch event websocket
+# start-server`) vers lequel ChronoCast peut être pointé via la configuration
+# `twitch.eventsubUrl`. Voir docs/TESTING-TWITCH-CLI.md.
+FROM debian:bookworm-slim
+
+# Version figée : une mise à jour de la CLI ne doit jamais casser la suite de
+# tests sans décision explicite. Les sommes de contrôle publiées par le projet
+# sont vérifiées ci-dessous.
+ARG TWITCH_CLI_VERSION=1.1.24
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && cd /tmp \
+    && archive="twitch-cli_${TWITCH_CLI_VERSION}_Linux_x86_64.tar.gz" \
+    && base="https://github.com/twitchdev/twitch-cli/releases/download/v${TWITCH_CLI_VERSION}" \
+    && curl --fail --silent --show-error --location --output "${archive}" "${base}/${archive}" \
+    && curl --fail --silent --show-error --location --output checksums.txt "${base}/checksums.txt" \
+    && grep " ${archive}\$" checksums.txt | sha256sum --check --strict - \
+    && tar --extract --gzip --file "${archive}" \
+    && install -m 0755 "twitch-cli_${TWITCH_CLI_VERSION}_Linux_x86_64/twitch" /usr/local/bin/twitch \
+    && rm -rf /tmp/* \
+    && twitch version
+
+# La CLI écrit sa configuration dans le répertoire personnel ; un utilisateur non
+# privilégié suffit et évite des fichiers appartenant à root dans les volumes.
+RUN useradd --create-home --uid 1000 twitch
+USER twitch
+WORKDIR /home/twitch
+
+ENTRYPOINT ["twitch"]
+CMD ["version"]

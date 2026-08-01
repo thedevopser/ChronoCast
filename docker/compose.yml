@@ -1,0 +1,64 @@
+# Services Docker de ChronoCast.
+#
+# Aucun binaire Node n'est installé sur l'hôte : toutes les commandes de
+# développement passent par ces services, pilotés par ./scripts/dc.sh.
+#
+# Le dossier node_modules est un volume nommé et non un bind-mount. Deux raisons :
+#   - les performances d'E/S sur un bind-mount WSL2 sont médiocres pour des
+#     arborescences de dizaines de milliers de fichiers ;
+#   - node_modules contient des artefacts compilés pour Linux, qui n'ont rien à
+#     faire dans l'arborescence d'un projet dont la cible est Windows.
+
+name: chronocast
+
+services:
+  # Service principal : lint, typecheck, tests, installation des dépendances.
+  dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    working_dir: /app
+    volumes:
+      - ..:/app
+      - node_modules:/app/node_modules
+    environment:
+      # Répertoire de données isolé pour les tests, hors du volume projet, afin
+      # qu'un test ne puisse jamais écrire dans les sources.
+      CHRONOCAST_DATA_DIR: /tmp/chronocast-data
+    init: true
+    # Le conteneur reste disponible pour des exécutions successives via `run`.
+    command: ["sleep", "infinity"]
+
+  # Packaging de l'installeur Windows NSIS via Wine.
+  # Isolé derrière un profil : cette image pèse plusieurs gigaoctets et n'a pas à
+  # être construite pour un simple cycle de test.
+  build-win:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.build
+    working_dir: /project
+    volumes:
+      - ..:/project
+      # node_modules distinct de celui du service `dev` : le packaging a besoin du
+      # runtime Electron, que l'image de développement ne télécharge délibérément pas.
+      - node_modules_win:/project/node_modules
+      - electron_cache:/root/.cache/electron
+      - electron_builder_cache:/root/.cache/electron-builder
+    profiles: ["build"]
+
+  # Serveur EventSub factice fourni par la Twitch CLI, utilisé par les tests
+  # d'intégration et par ./scripts/twitch-mock.sh.
+  twitch-cli:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.twitch-cli
+    ports:
+      - "127.0.0.1:8080:8080"
+    profiles: ["twitch"]
+    command: ["event", "websocket", "start-server", "--port", "8080", "--ssl=false"]
+
+volumes:
+  node_modules:
+  node_modules_win:
+  electron_cache:
+  electron_builder_cache:
