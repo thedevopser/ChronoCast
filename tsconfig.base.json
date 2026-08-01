@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": [
+    "Options communes à toutes les cibles de compilation.",
+    "Ce fichier ne compile rien par lui-même : il centralise la rigueur.",
+    "Les configurations dérivées (node / web / racine) définissent les fichiers."
+  ],
+  "compilerOptions": {
+    "target": "ES2023",
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+
+    /* Rigueur maximale : chaque option ci-dessous a déjà évité une classe de bug. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+
+    /* Le code mort est un défaut de qualité, pas un avertissement. */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    /* Interopérabilité et cohérence des modules. */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+
+    /* Diagnostic : indispensable pour analyser un crash en production. */
+    "sourceMap": true,
+    "declaration": false,
+    "removeComments": false,
+
+    "skipLibCheck": true
+  }
+}

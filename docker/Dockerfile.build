@@ -1,0 +1,21 @@
+# Image de packaging Windows.
+#
+# `electronuserland/builder:wine` embarque Node, electron-builder et Wine, ce qui
+# permet de produire un installeur NSIS `.exe` depuis un hôte Linux. C'est la
+# seule cible de distribution de la V1 (voir docs/BUILD.md).
+#
+# Note : cette image ne peut pas produire de binaire macOS — la toolchain Apple
+# exige un hôte macOS. C'est un choix assumé, hors périmètre V1.
+FROM electronuserland/builder:wine
+
+WORKDIR /project
+
+# Le cache d'electron-builder est monté en volume par docker/compose.yml afin que
+# les runtimes Electron et les binaires NSIS ne soient pas retéléchargés à chaque
+# construction (plusieurs centaines de mégaoctets).
+ENV ELECTRON_CACHE=/root/.cache/electron \
+    ELECTRON_BUILDER_CACHE=/root/.cache/electron-builder \
+    npm_config_fund=false \
+    CI=true
+
+CMD ["npx", "electron-builder", "--windows", "--publish", "never"]
