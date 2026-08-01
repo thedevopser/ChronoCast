@@ -1,0 +1,301 @@
+/*
+ * Assistant de première configuration.
+ *
+ * Ne consomme que les tokens de `shared/theme.css` : aucune valeur littérale de
+ * couleur ni d'espacement ici. C'est ce qui permettra à la PR C de rebaser les
+ * tokens sur Open Props sans toucher à une seule de ces règles.
+ *
+ * Servie en fichier, jamais en ligne : `style-src 'self'` interdit la balise
+ * `<style>` comme l'attribut `style=`.
+ */
+
+.wizard {
+  max-width: var(--cc-measure);
+  margin: 0 auto;
+  padding: var(--cc-space-5) var(--cc-space-3);
+}
+
+.wizard__title {
+  margin: 0;
+  font-size: var(--cc-text-xl);
+}
+
+.wizard__subtitle {
+  margin: var(--cc-space-1) 0 0;
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Fil des étapes                                                              */
+/* -------------------------------------------------------------------------- */
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cc-space-2);
+  margin: var(--cc-space-4) 0;
+}
+
+.steps__item {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+  padding: var(--cc-space-2) var(--cc-space-3);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface);
+  color: var(--cc-text-muted);
+  font: inherit;
+  font-size: var(--cc-text-sm);
+  cursor: pointer;
+}
+
+.steps__item[aria-current="step"] {
+  border-color: var(--cc-accent);
+  background: var(--cc-surface-raised);
+  color: var(--cc-text);
+}
+
+/*
+ * Une étape hors d'atteinte reste visible mais inerte.
+ *
+ * La masquer ferait sauter la numérotation d'un affichage à l'autre et
+ * donnerait l'impression que l'assistant change de forme en cours de route.
+ */
+.steps__item:disabled {
+  color: var(--cc-text-faint);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.steps__index {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--cc-border);
+  color: var(--cc-text);
+  font-size: var(--cc-text-sm);
+}
+
+.steps__item[aria-current="step"] .steps__index {
+  background: var(--cc-accent);
+  color: var(--cc-accent-text);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Panneau                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.panel {
+  padding: var(--cc-space-4);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  background: var(--cc-surface);
+  box-shadow: var(--cc-shadow);
+}
+
+.step[hidden] {
+  display: none;
+}
+
+.step h2 {
+  margin: 0 0 var(--cc-space-3);
+  font-size: var(--cc-text-lg);
+}
+
+.guide {
+  padding-left: var(--cc-space-4);
+  color: var(--cc-text-muted);
+}
+
+.guide li {
+  margin-bottom: var(--cc-space-2);
+}
+
+.note {
+  margin-top: var(--cc-space-3);
+  padding: var(--cc-space-3);
+  border-left: 3px solid var(--cc-border);
+  background: var(--cc-surface-raised);
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Champs                                                                      */
+/* -------------------------------------------------------------------------- */
+
+.field {
+  display: block;
+  margin-bottom: var(--cc-space-3);
+}
+
+.field__label {
+  display: block;
+  margin-bottom: var(--cc-space-1);
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+.field__input {
+  width: 100%;
+  padding: var(--cc-space-2) var(--cc-space-3);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-base);
+}
+
+.field__hint {
+  display: block;
+  margin-top: var(--cc-space-1);
+  color: var(--cc-text-faint);
+  font-size: var(--cc-text-sm);
+}
+
+.field--compact .field__input {
+  font-family: var(--cc-font);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--cc-space-3);
+  margin: 0 0 var(--cc-space-3);
+  padding: var(--cc-space-3);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Boutons et actions                                                          */
+/* -------------------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--cc-space-2);
+  margin-top: var(--cc-space-4);
+}
+
+.button {
+  padding: var(--cc-space-2) var(--cc-space-4);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-raised);
+  color: var(--cc-text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--cc-text-faint);
+}
+
+.button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.button--primary {
+  border-color: var(--cc-accent);
+  background: var(--cc-accent);
+  color: var(--cc-accent-text);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--cc-accent-hover);
+  border-color: var(--cc-accent-hover);
+}
+
+.button--ghost {
+  padding: var(--cc-space-1) var(--cc-space-3);
+  font-size: var(--cc-text-sm);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Valeurs à recopier                                                          */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Chasse fixe pour tout ce qui se recopie ailleurs.
+ *
+ * Une redirect URI ou une URL d'overlay se relit caractère par caractère avant
+ * d'être collée dans Twitch ou dans OBS : la confusion entre « l » et « 1 » y
+ * coûte une demi-heure de recherche.
+ */
+.copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+  padding: var(--cc-space-1) var(--cc-space-2);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-bg);
+}
+
+.copyable--wide {
+  display: flex;
+  justify-content: space-between;
+}
+
+.copyable code {
+  font-family: var(--cc-font-mono);
+  word-break: break-all;
+}
+
+/* -------------------------------------------------------------------------- */
+/* États                                                                       */
+/* -------------------------------------------------------------------------- */
+
+.banner {
+  margin: 0 0 var(--cc-space-3);
+  padding: var(--cc-space-3);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-raised);
+  border-left: 3px solid var(--cc-accent);
+}
+
+.banner[hidden] {
+  display: none;
+}
+
+.banner--error {
+  border-left-color: var(--cc-danger);
+}
+
+.banner--success {
+  border-left-color: var(--cc-success);
+}
+
+.status {
+  padding: var(--cc-space-2) var(--cc-space-3);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-raised);
+}
+
+.status--ok {
+  border-left: 3px solid var(--cc-success);
+}
+
+.status--warning {
+  border-left: 3px solid var(--cc-warning);
+}
+
+.detected__login {
+  color: var(--cc-accent-hover);
+  font-family: var(--cc-font-mono);
+}
+
+.scopes {
+  padding-left: var(--cc-space-4);
+  color: var(--cc-text-muted);
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-sm);
+}

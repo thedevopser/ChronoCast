@@ -1,0 +1,95 @@
+/*
+ * Tokens sémantiques de l'interface d'administration.
+ *
+ * Feuille partagée par l'assistant et, plus tard, par le panneau. Elle ne
+ * contient **que** des variables : aucun sélecteur de composant, aucune règle
+ * de mise en page. Les feuilles de chaque page consomment ces noms et ne
+ * connaissent aucune valeur littérale.
+ *
+ * C'est ce qui permettra à la PR C de glisser Open Props en dessous sans
+ * toucher à une seule règle de composant : seules les valeurs ci-dessous
+ * changeront, pour référencer les primitives vendorées.
+ *
+ * Thème sombre assumé et unique. Un outil qu'on garde ouvert sur un second
+ * écran pendant six heures de direct n'a pas à éclairer la pièce, et proposer
+ * deux thèmes doublerait la surface à vérifier pour un bénéfice nul.
+ */
+
+:root {
+  /* Surfaces, du fond le plus profond au plus proche. */
+  --cc-bg: #0e0e10;
+  --cc-surface: #18181b;
+  --cc-surface-raised: #1f1f23;
+  --cc-border: #2f2f35;
+
+  /* Texte, par ordre d'importance décroissante. */
+  --cc-text: #efeff1;
+  --cc-text-muted: #adadb8;
+  --cc-text-faint: #7d7d87;
+
+  /* Accent Twitch, et ses déclinaisons d'état. */
+  --cc-accent: #9146ff;
+  --cc-accent-hover: #a970ff;
+  --cc-accent-text: #ffffff;
+
+  /* Sémantique d'état. */
+  --cc-success: #00c389;
+  --cc-warning: #ffb224;
+  --cc-danger: #ff5c5c;
+
+  /* Échelle d'espacement. Un seul rapport, pour que rien ne flotte. */
+  --cc-space-1: 0.25rem;
+  --cc-space-2: 0.5rem;
+  --cc-space-3: 1rem;
+  --cc-space-4: 1.5rem;
+  --cc-space-5: 2.5rem;
+
+  --cc-radius: 6px;
+  --cc-radius-lg: 10px;
+
+  --cc-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  /* Police à chasse fixe pour les identifiants et les URL, qu'on relit lettre
+     à lettre avant de les coller ailleurs. */
+  --cc-font-mono: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+
+  --cc-text-sm: 0.85rem;
+  --cc-text-base: 1rem;
+  --cc-text-lg: 1.25rem;
+  --cc-text-xl: 1.75rem;
+
+  --cc-shadow: 0 2px 12px rgb(0 0 0 / 40%);
+
+  /* Largeur de lecture confortable : au-delà, l'œil perd la ligne. */
+  --cc-measure: 46rem;
+}
+
+/*
+ * Réinitialisation minimale.
+ *
+ * Volontairement courte : ce n'est pas une page publique à rendre identique sur
+ * quinze navigateurs, mais une page servie en local à Chromium.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font-family: var(--cc-font);
+  font-size: var(--cc-text-base);
+  line-height: 1.55;
+}
+
+a {
+  color: var(--cc-accent-hover);
+}
+
+/* Le focus reste visible : l'assistant se parcourt entièrement au clavier. */
+:focus-visible {
+  outline: 2px solid var(--cc-accent-hover);
+  outline-offset: 2px;
+}

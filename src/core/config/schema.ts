@@ -422,6 +422,30 @@ const historySchema = z
 /* Configuration complète                                                      */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/* Assistant de première configuration                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * État de l'assistant.
+ *
+ * Volontairement réduit à un booléen. L'assistant dérive son étape de reprise
+ * de l'état réel — client ID présent, secret enregistré, jeton obtenu, portées
+ * accordées — plutôt que d'un numéro d'étape qui finirait par mentir sur ce qui
+ * est réellement configuré.
+ *
+ * Une seule chose ne se déduit de rien : le fait que l'utilisateur soit allé au
+ * bout. La valeur de départ du compteur a toujours une valeur par défaut, on ne
+ * peut donc pas distinguer « laissée telle quelle » de « jamais vue ». C'est ce
+ * booléen, et rien d'autre, qui évite de renvoyer indéfiniment le streamer à
+ * l'étape du barème.
+ */
+const setupSchema = z
+  .object({
+    completed: z.boolean().default(false),
+  })
+  .strip();
+
 export const configSchema = z
   .object({
     /**
@@ -439,6 +463,7 @@ export const configSchema = z
     overlay: overlaySchema.default({}),
     logging: loggingSchema.default({}),
     history: historySchema.default({}),
+    setup: setupSchema.default({}),
   })
   .strip();
 
@@ -453,3 +478,4 @@ export type ServerConfig = ChronoCastConfig['server'];
 export type OverlayConfig = ChronoCastConfig['overlay'];
 export type LoggingConfig = ChronoCastConfig['logging'];
 export type HistoryConfig = ChronoCastConfig['history'];
+export type SetupConfig = ChronoCastConfig['setup'];

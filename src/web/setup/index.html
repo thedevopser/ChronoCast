@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChronoCast — Première configuration</title>
+
+    <!--
+      Jeton CSRF, substitué par `routes/pages.ts` au moment de servir la page.
+      Il n'est exposé par aucune route : une page tierce ne peut ni le lire ni
+      le deviner, et c'est ce qui protège toutes les mutations de l'API.
+    -->
+    <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
+
+    <link rel="stylesheet" href="/shared/theme.css" />
+    <link rel="stylesheet" href="/setup/setup.css" />
+  </head>
+
+  <body>
+    <div class="wizard">
+      <header class="wizard__header">
+        <h1 class="wizard__title">Configuration de ChronoCast</h1>
+        <p class="wizard__subtitle" id="resume-hint"></p>
+      </header>
+
+      <!--
+        Aucun `<form>` : `form-action 'none'` interdit toute soumission. Les
+        boutons sont en `type="button"` et tout passe par `fetch`.
+      -->
+      <nav class="steps" id="steps" aria-label="Étapes de la configuration"></nav>
+
+      <p class="banner" id="banner" hidden></p>
+
+      <main class="panel">
+        <!-- 1 -->
+        <section class="step" id="step-intro" hidden>
+          <h2>Créer une application Twitch</h2>
+          <p>
+            ChronoCast a besoin d'une application Twitch qui lui appartienne. Elle se crée en une
+            minute, gratuitement, et ne sert qu'à cette installation.
+          </p>
+          <ol class="guide">
+            <li>
+              Ouvrez la
+              <a href="https://dev.twitch.tv/console/apps/create" target="_blank" rel="noreferrer">
+                console développeur Twitch </a
+              >, puis <em>Enregistrer votre application</em>.
+            </li>
+            <li>Donnez-lui le nom que vous voulez, par exemple « ChronoCast ».</li>
+            <li>
+              Dans <em>URL de redirection OAuth</em>, collez exactement cette adresse :
+              <span class="copyable">
+                <code id="redirect-uri">http://127.0.0.1:37771/callback</code>
+                <button class="button button--ghost" type="button" data-copy="redirect-uri">
+                  Copier
+                </button>
+              </span>
+            </li>
+            <li>Catégorie : <em>Application Chat Bot</em>. Type : <em>Confidentiel</em>.</li>
+            <li>Créez l'application, puis gardez la page ouverte : l'étape suivante en a besoin.</li>
+          </ol>
+          <p class="note">
+            Cette adresse doit être recopiée au caractère près. Twitch la compare exactement, et un
+            écart fait échouer la connexion sans expliquer pourquoi.
+          </p>
+          <div class="actions">
+            <button class="button button--primary" type="button" data-goto="credentials">
+              J'ai créé l'application
+            </button>
+          </div>
+        </section>
+
+        <!-- 2 -->
+        <section class="step" id="step-credentials" hidden>
+          <h2>Identifiants de l'application</h2>
+          <p>
+            Sur la page de votre application Twitch, relevez le <em>Client ID</em>, puis générez un
+            <em>Client Secret</em>.
+          </p>
+
+          <label class="field">
+            <span class="field__label">Client ID</span>
+            <input class="field__input" id="client-id" type="text" autocomplete="off" spellcheck="false" />
+          </label>
+
+          <label class="field">
+            <span class="field__label">Client Secret</span>
+            <input class="field__input" id="client-secret" type="password" autocomplete="off" />
+            <span class="field__hint" id="secret-hint"></span>
+          </label>
+
+          <p class="note">
+            Le secret est chiffré sur votre machine et n'est jamais renvoyé par ChronoCast, ni à
+            l'écran, ni dans les journaux. Pour le changer, il suffit d'en saisir un nouveau.
+          </p>
+
+          <div class="actions">
+            <button class="button" type="button" data-goto="intro">Retour</button>
+            <button class="button button--primary" type="button" id="save-credentials">
+              Enregistrer
+            </button>
+          </div>
+        </section>
+
+        <!-- 3 -->
+        <section class="step" id="step-connect" hidden>
+          <h2>Autoriser ChronoCast</h2>
+          <p>
+            Twitch va vous demander d'autoriser l'application à lire les abonnements, les bits et les
+            événements de votre chaîne. ChronoCast n'écrit jamais rien sur votre compte.
+          </p>
+          <p class="note">
+            Une fenêtre s'ouvre sur Twitch, puis vous revenez ici automatiquement. Le port de retour
+            n'est ouvert que pendant l'opération et se referme aussitôt.
+          </p>
+          <div class="actions">
+            <button class="button" type="button" data-goto="credentials">Retour</button>
+            <button class="button button--primary" type="button" id="connect">
+              Se connecter à Twitch
+            </button>
+          </div>
+        </section>
+
+        <!-- 4 -->
+        <section class="step" id="step-channel" hidden>
+          <h2>Chaîne détectée</h2>
+          <p class="detected">
+            Connecté à <strong class="detected__login" id="broadcaster-login"></strong>
+          </p>
+
+          <div id="scopes-ok" hidden>
+            <p class="status status--ok">Toutes les autorisations nécessaires ont été accordées.</p>
+          </div>
+
+          <div id="scopes-missing" hidden>
+            <p class="status status--warning">
+              Certaines autorisations manquent. Le compteur fonctionnera, mais les sources
+              correspondantes ne créditeront rien.
+            </p>
+            <ul class="scopes" id="missing-scopes"></ul>
+            <p class="note">
+              Refaites la connexion et acceptez l'ensemble des autorisations pour les activer.
+            </p>
+          </div>
+
+          <div class="actions">
+            <button class="button" type="button" id="reconnect">Refaire la connexion</button>
+            <button class="button button--primary" type="button" data-goto="counter">
+              Continuer
+            </button>
+          </div>
+        </section>
+
+        <!-- 5 -->
+        <section class="step" id="step-counter" hidden>
+          <h2>Compteur et barème</h2>
+          <p>
+            Tout est modifiable plus tard depuis le panneau d'administration. Ces valeurs suffisent
+            pour démarrer.
+          </p>
+
+          <label class="field">
+            <span class="field__label">Durée de départ, en heures</span>
+            <input class="field__input" id="initial-hours" type="number" min="0.25" step="0.25" />
+          </label>
+
+          <fieldset class="grid">
+            <legend class="field__label">Secondes ajoutées par abonnement</legend>
+            <label class="field field--compact">
+              <span class="field__label">Prime</span>
+              <input class="field__input" id="reward-prime" type="number" min="0" step="1" />
+            </label>
+            <label class="field field--compact">
+              <span class="field__label">Tier 1</span>
+              <input class="field__input" id="reward-tier1" type="number" min="0" step="1" />
+            </label>
+            <label class="field field--compact">
+              <span class="field__label">Tier 2</span>
+              <input class="field__input" id="reward-tier2" type="number" min="0" step="1" />
+            </label>
+            <label class="field field--compact">
+              <span class="field__label">Tier 3</span>
+              <input class="field__input" id="reward-tier3" type="number" min="0" step="1" />
+            </label>
+          </fieldset>
+
+          <label class="field">
+            <span class="field__label">Secondes ajoutées par tranche de 100 bits</span>
+            <input class="field__input" id="reward-bits" type="number" min="0" step="1" />
+          </label>
+
+          <div class="actions">
+            <button class="button" type="button" data-goto="channel">Retour</button>
+            <button class="button button--primary" type="button" id="save-counter">
+              Enregistrer et terminer
+            </button>
+          </div>
+        </section>
+
+        <!-- 6 -->
+        <section class="step" id="step-overlay" hidden>
+          <h2>Ajouter l'overlay dans OBS</h2>
+          <p>Dans OBS, ajoutez une source <em>Navigateur</em> et collez cette adresse :</p>
+
+          <span class="copyable copyable--wide">
+            <code id="overlay-url"></code>
+            <button class="button button--ghost" type="button" data-copy="overlay-url">Copier</button>
+          </span>
+
+          <ul class="guide">
+            <li>Largeur 1920, hauteur 1080 — ou la taille de votre scène.</li>
+            <li>
+              Laissez <em>Fermer la source lorsqu'elle n'est pas visible</em> décoché : le compteur
+              doit continuer à tourner.
+            </li>
+            <li>Le fond est transparent, aucun réglage supplémentaire n'est nécessaire.</li>
+          </ul>
+
+          <p class="status status--ok">
+            La configuration est terminée. ChronoCast est prêt.
+          </p>
+
+          <div class="actions">
+            <a class="button button--primary" href="/admin">Ouvrir le panneau d'administration</a>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/setup/main.js"></script>
+  </body>
+</html>

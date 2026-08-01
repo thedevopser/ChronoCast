@@ -127,6 +127,8 @@ describe('application complète', () => {
   let port: number;
   let sequence = 0;
   const sockets: WebSocket[] = [];
+  /** Trace du serveur de rappel OAuth, remplacé par un double. */
+  let oauthEvents: string[] = [];
 
   /** Construit une application sur le répertoire de données courant. */
   function build(): Application {
@@ -153,6 +155,21 @@ describe('application complète', () => {
       eventSubTimers: {
         setTimeout: () => 0,
         clearTimeout: () => undefined,
+      },
+      // Le port 37771 est fixe et imposé par Twitch : l'ouvrir réellement
+      // ferait échouer deux tests exécutés en parallèle sur la même machine.
+      createOAuthServer: () => {
+        oauthEvents.push('créé');
+        return {
+          start: () => {
+            oauthEvents.push('démarré');
+            return Promise.resolve(37_771);
+          },
+          stop: () => {
+            oauthEvents.push('arrêté');
+            return Promise.resolve();
+          },
+        };
       },
       createSocket: () => {
         throw new Error('aucune socket EventSub ne doit être ouverte dans ces tests');
@@ -190,6 +207,7 @@ describe('application complète', () => {
 
   beforeEach(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-'));
+    oauthEvents = [];
     application = build();
     port = await application.start();
   });
@@ -498,17 +516,67 @@ describe('application complète', () => {
   });
 
   describe('flux OAuth', () => {
-    it('renvoie une URL d’autorisation portant le state consommable une fois', async () => {
+    /** Déclenche un flux et rend le `state` que Twitch devra renvoyer. */
+    async function beginAuthorization(): Promise<string> {
       const response = await mutate('/api/twitch/connect');
       const { authorizationUrl } = (await response.json()) as { authorizationUrl: string };
-
       const url = new URL(authorizationUrl);
-      const state = application.takePendingOAuthState();
 
-      expect(url.searchParams.get('state')).toBe(state);
       expect(url.searchParams.get('redirect_uri')).toBe(OAUTH_REDIRECT_URI);
-      // Usage unique : un `state` rendu deux fois autoriserait le rejeu du rappel.
-      expect(application.takePendingOAuthState()).toBeNull();
+
+      const state = url.searchParams.get('state');
+      expect(state).not.toBeNull();
+      return state ?? '';
+    }
+
+    it('reconnaît le state qu’il vient d’émettre', async () => {
+      const state = await beginAuthorization();
+
+      expect(application.verifyOAuthState(state)).toBe(true);
+    });
+
+    it('n’accepte le state qu’une seule fois', async () => {
+      // Un `state` rejouable autoriserait le rejeu d'un rappel déjà consommé.
+      const state = await beginAuthorization();
+
+      expect(application.verifyOAuthState(state)).toBe(true);
+      expect(application.verifyOAuthState(state)).toBe(false);
+    });
+
+    it('refuse un state étranger sans consommer la demande en cours', async () => {
+      // N'importe quelle page distante peut provoquer une navigation vers la
+      // boucle locale. Si un `state` erroné consommait la demande, le premier
+      // venu ferait échouer la connexion du streamer, à distance et en boucle.
+      const state = await beginAuthorization();
+
+      expect(application.verifyOAuthState('b'.repeat(64))).toBe(false);
+      expect(application.verifyOAuthState(state)).toBe(true);
+    });
+
+    it('refuse tout state quand aucun flux n’est ouvert', () => {
+      expect(application.verifyOAuthState('a'.repeat(64))).toBe(false);
+    });
+
+    it('ouvre le port de rappel pour la durée du flux', async () => {
+      expect(oauthEvents).toStrictEqual([]);
+
+      await beginAuthorization();
+
+      expect(oauthEvents).toStrictEqual(['créé', 'démarré']);
+    });
+
+    it('referme le port de rappel à l’arrêt de l’application', async () => {
+      // Un port laissé ouvert après extinction est une surface offerte pour
+      // rien : plus personne n'attend de rappel.
+      await beginAuthorization();
+
+      await application.stop();
+      expect(oauthEvents).toContain('arrêté');
+
+      // Reconstruite pour que le démontage global, qui arrête l'application,
+      // travaille sur une instance vivante.
+      application = build();
+      port = await application.start();
     });
   });
 });
