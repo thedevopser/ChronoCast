@@ -1,0 +1,190 @@
+/*
+ * Feuille de l'overlay.
+ *
+ * Servie en fichier et jamais en ligne : `style-src 'self'` ne tolère ni la
+ * balise `<style>` ni l'attribut `style=`. Toute la personnalisation passe donc
+ * par les variables `--cc-*`, posées sur `:root` par le CSSOM depuis
+ * `overlay-style.ts` — seule voie que la CSP laisse ouverte.
+ *
+ * Les valeurs déclarées ici sont des **replis**, utilisés le temps que la
+ * première configuration arrive par le WebSocket. Sans elles, l'overlay
+ * clignoterait en noir sur transparent au démarrage de la scène OBS.
+ */
+
+:root {
+  --cc-font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  --cc-font-size: 96px;
+  --cc-font-weight: 700;
+  --cc-letter-spacing: 0px;
+  --cc-color: #ffffff;
+  --cc-text-align: center;
+  --cc-text-shadow: 0px 4px 12px #000000cc;
+  --cc-outline-width: 0px;
+  --cc-outline-color: #000000;
+  --cc-animation-duration: 600ms;
+  --cc-toast-color: #9146ff;
+  --cc-toast-font-size: 28px;
+  --cc-toast-duration: 4000ms;
+}
+
+/*
+ * Fond transparent, sur toute la chaîne.
+ *
+ * Une Browser Source OBS compose la page par-dessus la scène : la moindre
+ * couleur de fond héritée poserait un rectangle opaque sur le direct.
+ */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25em;
+  min-height: 100vh;
+
+  /* Le curseur n'a rien à faire ici, et un clic ne doit pas atteindre la page. */
+  user-select: none;
+  pointer-events: none;
+}
+
+.countdown {
+  font-family: var(--cc-font-family);
+  font-size: var(--cc-font-size);
+  font-weight: var(--cc-font-weight);
+  letter-spacing: var(--cc-letter-spacing);
+  color: var(--cc-color);
+  text-align: var(--cc-text-align);
+  text-shadow: var(--cc-text-shadow);
+
+  -webkit-text-stroke: var(--cc-outline-width) var(--cc-outline-color);
+
+  /*
+   * Chiffres à chasse fixe.
+   *
+   * Sans cela, la largeur du compteur change à chaque seconde — un « 1 » est
+   * plus étroit qu'un « 8 » — et le texte tressaute latéralement en permanence.
+   */
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Animations d'ajout de temps                                                 */
+/* -------------------------------------------------------------------------- */
+
+.countdown.is-flash {
+  animation: cc-flash var(--cc-animation-duration) ease-out;
+}
+
+.countdown.is-pulse {
+  animation: cc-pulse var(--cc-animation-duration) ease-out;
+}
+
+.countdown.is-shake {
+  animation: cc-shake var(--cc-animation-duration) ease-in-out;
+}
+
+@keyframes cc-flash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes cc-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes cc-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-0.08em);
+  }
+  75% {
+    transform: translateX(0.08em);
+  }
+}
+
+/*
+ * Respect du réglage système de réduction des animations.
+ *
+ * Sans intérêt dans OBS, qui n'en porte pas — mais l'aperçu d'apparence du
+ * panneau d'administration affiche cette même page dans un navigateur, où le
+ * réglage existe et doit être honoré.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .countdown.is-flash,
+  .countdown.is-pulse,
+  .countdown.is-shake {
+    animation: none;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Bulle d'événement                                                           */
+/* -------------------------------------------------------------------------- */
+
+.toast {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+
+  font-family: var(--cc-font-family);
+  font-size: var(--cc-toast-font-size);
+  font-weight: 600;
+  color: var(--cc-toast-color);
+  text-shadow: var(--cc-text-shadow);
+
+  animation: cc-toast-in 240ms ease-out;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+.toast__user {
+  /*
+   * Garde-fou de mise en page contre un pseudonyme démesuré.
+   *
+   * `safe-dom` tronque déjà à soixante-quatre graphèmes, mais rien n'empêche
+   * soixante-quatre idéogrammes pleine chasse de déborder de l'écran.
+   */
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast__reward {
+  opacity: 0.85;
+}
+
+@keyframes cc-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

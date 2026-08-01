@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 1er août 2026, fin de la Phase 4 sur la branche `feat/serveurs-locaux`. Phases 0 à 4 terminées, Phase 5 à commencer.
+**Dernière mise à jour :** 1er août 2026. Phases 0 à 4 terminées. **Phase 5 : la PR A (`feat/overlay-web`) est écrite et verte, en attente de relecture et de fusion** — voir section 8. Restent la PR B (assistant et serveur loopback OAuth) et la PR C (panneau d'administration).
 
 ---
 
@@ -32,7 +32,7 @@ Ces règles ont été énoncées explicitement par l'utilisateur. Elles priment 
 2. **Toujours du TDD.** Aucune ligne de code de production sans un test écrit d'abord et dont l'échec a été **constaté** dans le conteneur. Seule exemption validée : le HTML et le CSS purement présentationnels, vérifiés visuellement, toute logique étant extraite dans un module testé.
 3. **Ne jamais committer sans demande explicite** de l'utilisateur.
 4. **Après chaque commit, produire un document Markdown de PR** en français, à la racine, nommé `PR-<branche>.md` (le motif `PR-*.md` est dans `.gitignore`).
-5. **Quand l'utilisateur dit « c'est ok » ou signale la fusion**, supprimer le document de PR devenu obsolète.
+5. **Quand l'utilisateur dit « c'est ok » ou signale la fusion, nettoyer sans qu'il ait à le demander.** Cela couvre : supprimer le document de PR devenu obsolète, supprimer la branche locale de travail (`git branch -D <branche>` — après une fusion en squash, Git ne la considère pas comme fusionnée), supprimer les artefacts de build (`dist/`, fichiers temporaires laissés à la racine), et mettre à jour ce document. Ne pas demander confirmation pour ce nettoyage : le demander, c'est déjà ne pas l'avoir fait.
 6. **Toujours vérifier la branche courante avant toute action** : `git branch --show-current` en premier, systématiquement.
 7. **Markdown sans word-wrap** dans les documents livrés à l'utilisateur : un paragraphe tient sur une seule ligne, l'éditeur gère l'affichage. Un texte pré-coupé à 80 colonnes se colle mal dans GitHub. Cette règle ne concerne **pas** le code source, dont les commentaires gardent une largeur raisonnable.
 8. **Jamais de commit sur `main`.** Une branche typée par fonctionnalité (`chore/`, `feat/`, `fix/`), messages au format Conventional Commits avec un corps expliquant le *pourquoi*. C'est l'utilisateur qui crée et fusionne les PR — ne jamais les ouvrir à sa place.
@@ -109,10 +109,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `feat/serveurs-locaux`**, Phase 4 terminée et non encore fusionnée. Les cinq PR précédentes sont fusionnées en squash dans `main`.
+**Branche courante : `feat/overlay-web`**, partie de `main` à `eb02663`. La PR A de la Phase 5 y est écrite et verte, **non commitée** — l'utilisateur seul décide du moment. Les six PR précédentes sont fusionnées en squash.
 
 ```
-28cf0c4 docs: ajouter le document de reprise et rendre docs/ versionnable (#5)   <- main
+eb02663 Phase 4 — Serveurs locaux et point d'entrée headless (#6)   <- main
+28cf0c4 docs: ajouter le document de reprise et rendre docs/ versionnable (#5)
 6da9bfd Module Twitch : OAuth, Helix, EventSub, conversion et déduplication (#4)
 c7d5c64 Métier du compteur : réducteurs purs, barème et service (#3)
 b93615c Fondations du noyau : journalisation, persistance, configuration (#2)
@@ -122,21 +123,16 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 
 **797 tests, 33 fichiers. Lint, typecheck et `npm audit --audit-level=high` sans erreur.**
 
+La mise à jour post-fusion de la PR #6 et celle qui consigne les arbitrages de la Phase 5 ont toutes deux été écrites après coup et ne pouvaient figurer dans aucune PR existante : elles **partent dans le premier commit de la Phase 5**, avec le reste de la PR A.
+
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # feat/serveurs-locaux tant que la PR n'est pas fusionnée
-./scripts/dc.sh verify       # doit être intégralement vert
+git branch --show-current    # doit afficher feat/overlay-web
+./scripts/dc.sh verify       # doit être intégralement vert (942 tests)
 ```
 
-Une fois la Phase 4 fusionnée :
-
-```bash
-git checkout main && git pull --ff-only origin main
-git checkout -b feat/interfaces-web
-```
-
-La Phase 5 peut alors commencer, en TDD, en suivant la section 8.
+Puis, selon ce que décide l'utilisateur : committer la PR A, ou enchaîner sur la PR B (`feat/setup-oauth`) en suivant la section 8.
 
 ---
 
@@ -222,7 +218,7 @@ Conventions à connaître :
 - `channel.follow` est en **version 2**, la v1 étant dépréciée.
 - Tous les tests injectent transport, minuteurs, `fetch` et horloge : **aucun accès réseau, aucune attente réelle**.
 
-### Phase 4 — Serveurs locaux et point d'entrée headless (branche `feat/serveurs-locaux`, 403 tests, 797 au total)
+### Phase 4 — Serveurs locaux et point d'entrée headless (PR #6, fusionnée, 403 tests, 797 au total)
 
 | Fichier | Rôle |
 | --- | --- |
@@ -267,7 +263,7 @@ Conventions à connaître :
 
 ### Phase 5 — Interfaces web — **prochaine étape**
 
-Branche suggérée : `feat/interfaces-web`.
+Découpée en trois branches successives : `feat/overlay-web`, puis `feat/setup-oauth`, puis `feat/admin-web` (voir « Décisions actées » plus bas).
 
 **Première action : réintégrer `tsconfig.web.json` dans `npm run typecheck`.** C'est tracé et ne doit pas être oublié.
 
@@ -282,6 +278,59 @@ Les pages `admin.html` et `setup.html` doivent contenir `<meta name="chronocast-
 **Assistant de première configuration** — six étapes : explication et lien vers la console développeur Twitch avec la redirect URI exacte à copier, saisie Client ID et Secret, bouton de connexion, chaîne détectée automatiquement avec vérification des portées, valeur initiale et barème, URL de l'overlay à coller dans OBS. Reprise possible à l'étape interrompue.
 
 **Serveur loopback OAuth** — port fixe `37771`, actif uniquement pendant le flux, usage unique, expiration 5 min, `state` de 32 octets vérifié en comparaison à temps constant. Le `state` est déjà engendré par `POST /api/twitch/connect` et se récupère par `Application.takePendingOAuthState()`, qui ne le rend qu'une fois. Les constantes `OAUTH_REDIRECT_PORT` et `OAUTH_REDIRECT_URI` sont exportées par `core/app/application.ts`.
+
+#### Décisions actées pour la Phase 5 — ne pas les rouvrir
+
+Ces quatre points ont été arbitrés avec l'utilisateur au terme d'une session de conception. Ils ont le même statut que les décisions de la section 4.
+
+- **happy-dom est ajouté en devDependency**, et activé **uniquement** pour `tests/unit/web/**` et les tests XSS de `tests/security/`, via `test.projects` de Vitest 4 ; tout le reste garde `environment: 'node'`. Le commentaire de `vitest.config.ts` qui justifie aujourd'hui l'absence de DOM devient faux et **doit être réécrit** dans la même PR. Motif : la section 9 exige un test d'injection XSS par pseudo, et un faux `document` écrit à la main ne prouve rien sur la non-interprétation du HTML — il vérifie une troncature, pas une absence d'exécution. La conception ne change pas pour autant : la logique reste extraite en modules purs, happy-dom sert à prouver ce que l'injection de dépendances ne peut pas prouver, pas à dispenser de concevoir.
+- **Trois PR successives**, et non une PR par phase comme jusqu'ici. **PR A** (`feat/overlay-web`) : réintégration de `tsconfig.web.json` dans `npm run typecheck`, `web/shared/` complet, overlay complet. **PR B** (`feat/setup-oauth`) : serveur loopback OAuth, extension de l'interface `Application`, assistant de première configuration. **PR C** (`feat/admin-web`) : panneau d'administration et ses vues. Motif : l'overlay est le livrable de plus grande valeur et doit être vérifiable en premier ; une PR unique dépasserait très largement ce qui se relit.
+- **Open Props est vendoré** en fichier unique dans `src/web/shared/`, non modifié, avec un en-tête portant la version, la licence MIT et le SHA-256 — la même discipline que le twitch-cli figé de la Phase 0. Récupération reproductible par `npm pack open-props@<version>` dans le conteneur puis extraction du `.css` de l'archive, **pas de `curl`**. Ce n'est que des variables CSS : aucune classe, aucun composant, aucun JS. Par-dessus viennent nos propres tokens sémantiques (`src/web/shared/theme.css`) et nos propres classes. `scripts/copy-web-assets.mjs` copie déjà les `.css` vers `dist/public` : il n'y a aucune plomberie à ajouter, aucune dépendance npm, aucune étape de build, aucune surface d'audit. Direction artistique : thème sombre, sobre et dense, accent Twitch `#9146FF`, navigation latérale, aucune animation superflue.
+- **Tailwind a été examiné et écarté** — noté ici pour que le débat ne soit pas rouvert. La CSP ne l'interdit pas : utilisé normalement, c'est un outil de build qui émet un `.css` statique servi depuis `'self'`, parfaitement conforme ; seul le build CDN navigateur (`cdn.tailwindcss.com`), qui compile en JIT dans la page, tomberait sous `script-src 'self'`. Il est écarté pour deux autres raisons : l'arbre transitif et les binaires natifs de la v4 élargissent la surface d'un `npm audit --audit-level=high` qui est bloquant en CI et garde un droit de veto sur chaque PR — c'est exactement la logique qui a fait rejeter Vitest 2 en Phase 0 — et la compatibilité de ces binaires avec `npm ci --ignore-scripts` reste à vérifier. Le volume ne le justifie pas non plus : trois pages, une dizaine de vues, de l'ordre de 700 lignes de CSS.
+
+#### Contraintes découvertes dans le code — ne pas les ré-explorer
+
+Ces faits ont été vérifiés dans le dépôt. Les retrouver coûterait une exploration complète.
+
+- **`web/shared/protocol.ts` ne peut rien ré-exporter du noyau, pas même un type.** Vérifié à l'exécution en Phase 5 : `tsconfig.web.json` fixe `rootDir` à `src/web`, et TypeScript refuse tout fichier du programme situé hors de cette racine (TS6059), y compris atteint par un `import type` pourtant effacé à la compilation. Retirer `rootDir` ferait émettre le noyau compilé dans `dist/public`, servi au navigateur : exclu. ESLint va dans le même sens pour les *valeurs* (`allowTypeImports: true` n'autorise que les `import type`). **Le contrat est donc redéclaré en entier côté web**, et tenu par `tests/unit/web/shared/protocol.test.ts`, qui voit les deux côtés — la règle ESLint ne s'applique qu'à `src/web`, et `tsconfig.json` n'impose aucun `rootDir`. Les types sont comparés par assignabilité mutuelle à la compilation, les constantes à l'exécution. Le garde-fou a été éprouvé : un seul champ retypé fait échouer `npm run typecheck`.
+- **`Application` n'expose ni `oauth`, ni `tokenStore`, ni `secrets`.** `OAuthService.exchangeCode(code, clientSecret)` (`core/twitch/oauth-service.ts`) est donc hors d'atteinte depuis l'extérieur. La PR B devra étendre l'interface `Application` et le câblage de `createApplication`. À noter aussi : `takePendingOAuthState()` n'implémente **aucune expiration** — le TTL de 5 minutes est entièrement à la charge du serveur loopback à écrire.
+- **`src/web/setup/` n'existe pas** alors que `routes/pages.ts` route déjà `/setup` vers `/setup/index.html`. Les répertoires présents sont `admin/`, `admin/views/`, `overlay/`, `shared/`, tous vides.
+- **Conséquences concrètes de la CSP**, au-delà de l'interdiction déjà connue des scripts et styles en ligne : `form-action 'none'` interdit tout `<form>` soumissible, donc boutons `type="button"` et `fetch` partout ; `style-src 'self'` interdit la balise `<style>` **et** l'attribut `style=`, mais `element.style.setProperty('--x', v)` via le CSSOM n'est pas concerné par la CSP et reste la voie pour appliquer `OverlayConfig` en variables CSS ; `frame-ancestors 'self'` autorise bien l'aperçu d'apparence en `<iframe src="/overlay">`.
+- **`innerHTML` est banni y compris dans les tests** — le bloc `tests/**` d'ESLint ne lève que `no-non-null-assertion`, `no-unnecessary-condition` et `no-console`. Les assertions de non-injection passent donc par `textContent`, `childNodes` ou `querySelectorAll`.
+- **`scripts/dc.sh` n'a pas de sous-commande `typecheck:web` ni `coverage`** : passer par `./scripts/dc.sh npm run typecheck:web` et `./scripts/dc.sh npm run test:coverage`. À noter que le `verify` de `dc.sh` enchaîne lint, typecheck, test **et** `npm audit --audit-level=high`, là où le `verify` de `package.json` n'a pas l'audit.
+- **Aucun bundler.** Les pages chargent des modules ES natifs par chemin absolu (`<script type="module" src="/admin/main.js">`), et les imports relatifs en TypeScript portent l'extension `.js`. `tsc -p tsconfig.web.json` compile `src/web/**` vers `dist/public/**` avec `rootDir: src/web`, `types: []` et `moduleResolution: "Bundler"`.
+- **La couverture inclut déjà `src/web/**`** via `include: ['src/**/*.ts']`, sans exclusion : le code front y comptera dès qu'il existera.
+
+#### PR A — `feat/overlay-web` — **écrite, en attente de fusion**
+
+Dette `tsconfig.web.json` payée, `web/shared/` complet, overlay complet. **942 tests, 41 fichiers** (145 de plus), lint, typecheck et `npm audit` sans erreur. `npm run typecheck` enchaîne désormais les trois cibles.
+
+| Fichier | Rôle |
+| --- | --- |
+| `web/shared/protocol.ts` | Contrat de fil redéclaré, plus `parseServerMessage` — un message illisible ne doit pas tuer la boucle de réception d'une page qu'OBS ne rechargera jamais |
+| `web/shared/time-format.ts` | `formatRemaining` (troncature, jamais d'arrondi au supérieur) et `formatReward` |
+| `web/shared/ws-client.ts` | Machine à états, retrait exponentiel plafonné avec bruit, socket et minuteurs injectés |
+| `web/shared/safe-dom.ts` | Seul point d'écriture DOM. `textContent`, retrait des caractères de contrôle et des marques de direction, troncature par graphème |
+| `web/shared/countdown.ts` | Interpolation locale et resynchronisation |
+| `web/overlay/overlay-style.ts` | `OverlayConfig` vers variables CSS |
+| `web/overlay/toast-queue.ts` | Une bulle à la fois, file plafonnée |
+| `web/overlay/main.ts`, `index.html`, `overlay.css` | Câblage et présentation |
+| `tests/security/xss-overlay.test.ts` | Treize charges utiles hostiles, plus l'audit statique du gabarit |
+
+**Décisions prises pendant cette PR :**
+
+- **La distinction entre resynchronisation `tick` et `authoritative` est le cœur de l'overlay.** Une resynchronisation de routine ne peut que confirmer ou rattraper **à la baisse** : accepter une valeur plus haute ferait remonter le compteur à l'écran une fois par seconde, indéfiniment, puisque l'interpolation locale dérive toujours un peu. Une resynchronisation autoritaire — crédit, action manuelle, instantané reçu au retour d'une coupure — s'impose telle quelle : en mode gel le serveur détient **plus** de temps que l'overlay, qui a continué à décompter dans le vide, et le lui refuser volerait au streamer ce que le gel lui garantit.
+- **U+200C et U+200D sont délibérément épargnés** par `safe-dom`. Le liant et l'antiliant sont légitimes en persan, en arabe et dans les écritures indiennes, et U+200D tient ensemble les emoji composés. Les retirer abîmerait des pseudos honnêtes sans rien protéger : ils lient la lecture, ils ne la trompent pas.
+- **Troncature par graphème via `Intl.Segmenter`**, et non par point de code : un étalement de chaîne ferait éclater une famille emoji en trois personnes. ESLint l'avait signalé, à raison.
+- **Les caractères de contrôle sont décrits par une table de plages en hexadécimal**, jamais écrits en littéral — ni dans le code, ni dans les tests. Un octet invisible dans le source ne se relit pas, ne se revoit pas, et sa disparition accidentelle rendrait le test trivialement vert.
+- **Vitest est scindé en deux projets** (`node` et `web`) via `test.projects`, avec `handleDisabledFileLoadingAsSuccess` côté happy-dom : sans ce réglage, chaque chargement de ressource refusé remplit la sortie de piles d'appel qui n'annoncent aucun défaut.
+- **Open Props n'est pas encore vendoré** : l'overlay n'en a aucun besoin — fond transparent, tout piloté par les variables `--cc-*`. Le vendorer maintenant reviendrait à livrer un fichier inutilisé. Il arrivera avec la PR C, qui en a l'usage.
+
+**Trois points restés ouverts, à traiter plus tard :**
+
+1. **`overlay.enableCustomCss` n'a aucune route serveur.** Le réglage existe au schéma depuis la Phase 1, mais `static-handler.ts` ne sert que `webRootDirectory` : rien ne lit `custom.css` dans le répertoire de données. Il faudra une route dédiée, avec les mêmes gardes de chemin.
+2. **Le mode `server.websocket.mode: 'separate'` n'est pas découvrable depuis la page.** Le message `hello` ne porte que le port HTTP. L'overlay se connecte donc à `window.location.host`, ce qui ne vaut que pour le mode `shared` — qui est le défaut et la décision actée. Ajouter le port WebSocket au `hello` réglerait le sujet.
+3. **Les fichiers `.js.map` sont émis dans `dist/public` mais absents de la liste blanche du serveur statique**, donc servis en 404. Sans conséquence fonctionnelle, mais à trancher au packaging (Phase 7) : les exclure du build de production plutôt que les livrer inaccessibles.
 
 ### Phase 6 — Coquille Electron
 
