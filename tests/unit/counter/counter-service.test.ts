@@ -167,6 +167,18 @@ describe('createCounterService', () => {
       expect(service.getState().status).toBe('idle');
     });
 
+    it('écrit l\'état de départ sur le disque dès le démarrage', async () => {
+      // Sans cette écriture, le fichier d'état n'existe qu'après la première
+      // mutation : le répertoire de données ne décrit pas l'application, et un
+      // changement de valeur de départ suivi d'un crash précoce serait perdu.
+      const { service, double } = createService();
+
+      await service.start();
+
+      expect(double.writes).toHaveLength(1);
+      expect(double.writes[0]?.remainingMs).toBe(DEFAULT_CONFIG.counter.initialSeconds * 1_000);
+    });
+
     it('restaure exactement l\'état persisté', async () => {
       const persisted: CounterState = {
         remainingMs: 12_345,
