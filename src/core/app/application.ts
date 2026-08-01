@@ -57,10 +57,15 @@ import { createConsoleSink } from '../logging/sinks/console-sink.js';
 import { createJsonlSink, type JsonlSink } from '../logging/sinks/jsonl-sink.js';
 import { createRingBufferSink, type RingBufferSink } from '../logging/sinks/ring-buffer-sink.js';
 import { createHttpServer, type HttpServer } from '../server/http-server.js';
-import { createRouter } from '../server/router.js';
+import { createOAuthCallbackRouter } from '../server/oauth-callback.js';
+import {
+  createOAuthCallbackServer,
+  type ArmableServer,
+} from '../server/oauth-callback-server.js';
+import { createRouter, type Router } from '../server/router.js';
 import { createApiRoutes, type TwitchApiPort } from '../server/routes/api.js';
 import { createPageHandler } from '../server/routes/pages.js';
-import { createCsrfToken } from '../server/security/csrf.js';
+import { createCsrfToken, verifyCsrfToken } from '../server/security/csrf.js';
 import { createStaticHandler } from '../server/static-handler.js';
 import { createWsAdapter, type WsAdapter } from '../server/ws-adapter.js';
 import { createWsHub, type HubTimers, type WsHub } from '../server/ws-hub.js';
@@ -75,6 +80,7 @@ import {
   type Timers,
 } from '../twitch/eventsub-client.js';
 import { createHelixClient, type HelixClient } from '../twitch/helix-client.js';
+import { createOAuthCompletion } from '../twitch/oauth-completion.js';
 import {
   buildAuthorizationUrl,
   createOAuthService,
@@ -141,7 +147,15 @@ export interface Application {
    * Usage unique : le rendre une seconde fois permettrait de rejouer un rappel.
    * Le serveur de la Phase 5 le comparera à celui que Twitch lui renvoie.
    */
-  takePendingOAuthState(): string | null;
+  /**
+   * Vérifie le `state` renvoyé par Twitch, en temps constant.
+   *
+   * Ne consomme la demande en cours qu'en cas de correspondance : un `state`
+   * erroné ne doit pas pouvoir clore un flux légitime, sans quoi n'importe
+   * quelle page distante ferait échouer la connexion du streamer en provoquant
+   * une navigation vers la boucle locale.
+   */
+  verifyOAuthState(state: string): boolean;
 }
 
 export interface ApplicationOptions {
@@ -166,6 +180,23 @@ export interface ApplicationOptions {
 
   /** Temporisation entre deux tentatives Helix. Injectée pour ne rien attendre en test. */
   readonly sleep: (ms: number) => Promise<void>;
+
+  /**
+   * Minuteurs du serveur de rappel OAuth. À défaut, ceux d'EventSub.
+   *
+   * Facultatif parce que ce serveur n'existe que pendant le flux
+   * d'autorisation : aucun test qui ne le déclenche pas n'a à s'en soucier.
+   */
+  readonly oauthTimers?: Timers;
+
+  /**
+   * Fabrique du serveur de rappel OAuth.
+   *
+   * Remplacée par un double dans les tests : le port 37771 est fixe et imposé
+   * par Twitch, l'ouvrir réellement ferait échouer deux suites exécutées en
+   * parallèle sur la même machine.
+   */
+  readonly createOAuthServer?: (router: Router) => ArmableServer;
 }
 
 export function createApplication(options: ApplicationOptions): Application {
@@ -316,6 +347,29 @@ export function createApplication(options: ApplicationOptions): Application {
   let twitchStatus: TwitchStatusPayload = { status: 'disconnected' };
   let pendingOAuthState: string | null = null;
 
+  /**
+   * Vérifie le `state` renvoyé par Twitch.
+   *
+   * `verifyCsrfToken` plutôt qu'une comparaison directe : la valeur a la même
+   * forme qu'un jeton CSRF — trente-deux octets en hexadécimal, engendrés par
+   * la même fabrique — et la comparaison y est à temps constant.
+   *
+   * La consommation n'a lieu **qu'en cas de correspondance**. Usage unique, donc
+   * pas de rejeu d'un rappel déjà honoré ; mais un `state` erroné ne clôt rien,
+   * sans quoi n'importe quelle page distante provoquant une navigation vers la
+   * boucle locale ferait échouer la connexion du streamer, en boucle.
+   */
+  function verifyOAuthState(state: string): boolean {
+    if (pendingOAuthState === null) {
+      return false;
+    }
+    if (!verifyCsrfToken(pendingOAuthState, state)) {
+      return false;
+    }
+    pendingOAuthState = null;
+    return true;
+  }
+
   bus.on('twitch:status', (payload) => {
     twitchStatus = payload;
   });
@@ -417,6 +471,74 @@ export function createApplication(options: ApplicationOptions): Application {
     }
   }
 
+  /**
+   * Rouvre la connexion EventSub avec l'identité et le jeton courants.
+   *
+   * Déclaré ici et non dans `oauth-completion.ts` parce que `startTwitch` est
+   * une fermeture du composition root : elle lit la configuration, le magasin
+   * de jetons et la fabrique de sockets, qui n'existent qu'à ce niveau.
+   */
+  async function restartTwitch(): Promise<void> {
+    await stopTwitch();
+    await startTwitch();
+  }
+
+  const completeOAuth = createOAuthCompletion({
+    exchangeCode: (code, clientSecret) => oauth.exchangeCode(code, clientSecret),
+    validate: (accessToken) => oauth.validate(accessToken),
+    findMissingScopes: (granted) => oauth.findMissingScopes(granted),
+    readClientSecret: () => secrets.read(CLIENT_SECRET_KEY),
+    getBroadcaster: () => {
+      const twitch = configService.get().twitch;
+      return { userId: twitch.broadcasterUserId, login: twitch.broadcasterLogin };
+    },
+    updateBroadcaster: async (identity) => {
+      await configService.update({
+        twitch: { broadcasterUserId: identity.userId, broadcasterLogin: identity.login },
+      });
+    },
+    restartTwitch,
+    logger,
+  });
+
+  /**
+   * Serveur éphémère du rappel OAuth.
+   *
+   * Il porte lui-même la vérification du `state` : le gestionnaire ne voit
+   * jamais la valeur attendue, il ne reçoit qu'un verdict. Il ne peut donc ni
+   * la journaliser, ni la renvoyer dans une page.
+   */
+  const oauthCallbackServer = createOAuthCallbackServer({
+    router: createOAuthCallbackRouter({
+      verifyState: (state) => verifyOAuthState(state),
+      complete: (code) => completeOAuth(code),
+      getAppPort: () => httpServer?.getPort() ?? null,
+      // Le rappel est arrivé : ce port n'a plus rien à écouter.
+      onSettled: () => {
+        void oauthCallbackServer.disarm().catch((error: unknown) => {
+          logger.error('fermeture du port de rappel impossible', { cause: error });
+        });
+      },
+      logger,
+    }),
+    createServer:
+      options.createOAuthServer ??
+      ((router) =>
+        createHttpServer({
+          router,
+          host: '127.0.0.1',
+          port: OAUTH_REDIRECT_PORT,
+          // Aucun repli : Twitch exige une correspondance exacte de la redirect
+          // URI. Écouter sur 37772 rendrait le rappel introuvable, ce qui serait
+          // bien plus déroutant qu'une erreur franche.
+          portFallbackAttempts: 0,
+          maxBodyBytes: 4_096,
+          logger,
+        })),
+    timers: options.oauthTimers ?? options.eventSubTimers,
+    logger,
+  });
+
   const twitchApi: TwitchApiPort = {
     getStatus: () => twitchStatus,
 
@@ -437,8 +559,13 @@ export function createApplication(options: ApplicationOptions): Application {
       };
     },
 
-    startAuthorization() {
+    async startAuthorization() {
       const twitch = configService.get().twitch;
+
+      // Le port n'est ouvert qu'à partir d'ici, et pour cinq minutes au plus.
+      // L'armer au démarrage laisserait un port à l'écoute pendant tout le
+      // subathon pour une opération qui dure une poignée de secondes.
+      await oauthCallbackServer.arm();
 
       // Le `state` est engendré ici et vérifié par le serveur de rappel de la
       // Phase 5 : sans lui, un tiers pourrait faire aboutir son propre flux
@@ -446,7 +573,7 @@ export function createApplication(options: ApplicationOptions): Application {
       const state = createCsrfToken();
       pendingOAuthState = state;
 
-      return Promise.resolve({
+      return {
         authorizationUrl: buildAuthorizationUrl({
           idBaseUrl: twitch.idBaseUrl,
           clientId: twitch.clientId,
@@ -455,7 +582,7 @@ export function createApplication(options: ApplicationOptions): Application {
           state,
           forceVerify: true,
         }),
-      });
+      };
     },
 
     async revoke() {
@@ -565,13 +692,7 @@ export function createApplication(options: ApplicationOptions): Application {
     getCsrfToken: () => csrfToken,
     getPort: currentPort,
 
-    takePendingOAuthState(): string | null {
-      // Usage unique : le rendre une seconde fois autoriserait le rejeu d'un
-      // rappel OAuth déjà consommé.
-      const state = pendingOAuthState;
-      pendingOAuthState = null;
-      return state;
-    },
+    verifyOAuthState,
 
     ingestNotification,
 
@@ -653,6 +774,9 @@ export function createApplication(options: ApplicationOptions): Application {
     },
 
     async stop(): Promise<void> {
+      // Un port de rappel laissé ouvert après extinction est une surface
+      // offerte pour rien : plus personne n'attend de rappel.
+      await oauthCallbackServer.disarm();
       await stopTwitch();
       await wsAdapter.close();
       hub.stop();
