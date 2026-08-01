@@ -276,12 +276,40 @@ const serverSchema = z
         port: z.number().int().min(1).max(65_535).default(3_778),
         /** Période des pings de vivacité. */
         heartbeatIntervalMs: millisecondsAboveZero.default(30_000),
+
+        /**
+         * Période de diffusion de l'état pendant le décompte.
+         *
+         * L'overlay interpole localement en `requestAnimationFrame` : diffuser
+         * plus souvent n'améliorerait pas la fluidité et réveillerait la Browser
+         * Source d'OBS pour rien. Les mutations — événement Twitch, action
+         * manuelle — échappent à ce lissage et partent immédiatement.
+         */
+        stateBroadcastIntervalMs: millisecondsAboveZero.default(1_000),
+
+        /**
+         * Plafond d'un message entrant.
+         *
+         * Le canal n'accepte que `ping` et `subscribe`, dont la forme la plus
+         * longue tient en quelques dizaines d'octets. Un kilooctet est déjà une
+         * marge confortable, et borne ce qu'une page locale peut faire allouer.
+         */
+        maxMessageBytes: z.number().int().positive().max(65_536).default(4_096),
       })
       .strip()
       .default({}),
 
     /** Nombre de ports consécutifs essayés si le port choisi est déjà pris. */
     portFallbackAttempts: z.number().int().min(0).max(50).default(10),
+
+    /**
+     * Plafond du corps d'une requête HTTP.
+     *
+     * Le plus gros corps légitime est une configuration importée : quelques
+     * kilooctets. Le plafond lui laisse de la marge sans permettre qu'un seul
+     * POST sature la mémoire du processus et interrompe le subathon.
+     */
+    maxBodyBytes: z.number().int().positive().max(10_485_760).default(262_144),
   })
   .strip();
 

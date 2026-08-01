@@ -44,6 +44,23 @@ describe('configSchema', () => {
     it('porte le numéro de version courant du schéma', () => {
       expect(DEFAULT_CONFIG.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
     });
+
+    it('diffuse le décompte une fois par seconde', () => {
+      // L'overlay interpole localement : diffuser plus souvent n'améliorerait
+      // pas la fluidité et réveillerait OBS pour rien.
+      expect(DEFAULT_CONFIG.server.websocket.stateBroadcastIntervalMs).toBe(1_000);
+    });
+
+    it('plafonne la taille des messages WebSocket entrants', () => {
+      expect(DEFAULT_CONFIG.server.websocket.maxMessageBytes).toBeGreaterThan(0);
+      expect(DEFAULT_CONFIG.server.websocket.maxMessageBytes).toBeLessThanOrEqual(64 * 1_024);
+    });
+
+    it('plafonne la taille du corps des requêtes HTTP', () => {
+      // Une configuration exportée puis réimportée est le plus gros corps
+      // légitime : le plafond doit lui laisser de la marge, pas davantage.
+      expect(DEFAULT_CONFIG.server.maxBodyBytes).toBeGreaterThan(0);
+    });
   });
 
   describe('complétion des valeurs absentes', () => {
