@@ -1,0 +1,33 @@
+# Dépendances — jamais versionnées, reconstruites via ./scripts/dc.sh install
+node_modules/
+
+# Artefacts de compilation TypeScript et de packaging electron-builder
+dist/
+release/
+*.tsbuildinfo
+
+# Rapports de couverture
+coverage/
+
+# Données locales produites par une exécution de développement.
+# Ces fichiers contiennent potentiellement des jetons OAuth : ils ne doivent
+# sous aucun prétexte se retrouver dans l'historique Git.
+.chronocast-data/
+*.enc
+
+# Secrets d'environnement
+.env
+.env.*
+!.env.example
+
+# Brouillons de description de pull request, générés après chaque commit.
+# Destinés au copier-coller dans GitHub, ils n'ont pas à être versionnés.
+PR-*.md
+
+# Fichiers propres aux éditeurs et aux systèmes d'exploitation
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
