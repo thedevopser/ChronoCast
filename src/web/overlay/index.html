@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChronoCast — Overlay</title>
+
+    <!--
+      Aucun jeton CSRF ici, délibérément : `routes/pages.ts` ne substitue le
+      marqueur que sur /admin et /setup. L'overlay ne mute rien, et une page
+      affichée dans OBS n'a aucune raison de porter un secret.
+
+      Aucune ressource distante non plus. La CSP l'interdirait de toute façon,
+      mais la vraie raison est ailleurs : l'application doit fonctionner sans
+      connexion, et une Browser Source qui attend une police sur un CDN affiche
+      un compteur vide pendant plusieurs secondes au démarrage de la scène.
+    -->
+    <link rel="stylesheet" href="/overlay/overlay.css" />
+  </head>
+
+  <body>
+    <!--
+      Chemins absolus et non relatifs : la page est servie à l'URL /overlay,
+      sans barre oblique finale, où « overlay.css » se résoudrait en /overlay.css.
+    -->
+    <div class="overlay" id="overlay">
+      <div class="countdown" id="countdown">--:--:--</div>
+
+      <div class="toast" id="toast" hidden>
+        <span class="toast__user" id="toast-user"></span>
+        <span class="toast__reward" id="toast-reward"></span>
+      </div>
+    </div>
+
+    <script type="module" src="/overlay/main.js"></script>
+  </body>
+</html>

@@ -13,7 +13,7 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.json && tsc -p tsconfig.web.json --noEmit",
     "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -31,6 +31,7 @@
     "@types/ws": "^8.5.13",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.17.0",
+    "happy-dom": "^20.11.1",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
     "vitest": "^4.1.10"
