@@ -63,17 +63,24 @@ export interface OAuthCallbackOptions {
   /** Échange le code contre un jeton, puis met la connexion Twitch en route. */
   readonly complete: (code: string) => Promise<void>;
 
-  /** Port du serveur applicatif, pour renvoyer l'utilisateur dans l'assistant. */
+  /** Port du serveur applicatif, pour le lien de repli vers l'assistant. */
   readonly getAppPort: () => number | null;
 
-  /** Le flux est terminé, quel qu'en soit le résultat : le serveur peut s'éteindre. */
-  readonly onSettled: () => void;
+  /**
+   * Le flux est terminé, quel qu'en soit le résultat.
+   *
+   * Deux conséquences, et elles sont de nature différente : le serveur
+   * éphémère n'a plus rien à écouter, et la coquille Electron doit ramener sa
+   * fenêtre au premier plan. L'issue est transmise parce que la seconde en
+   * dépend — un refus doit ramener la fenêtre autant qu'une réussite.
+   */
+  readonly onSettled: (outcome: OAuthOutcome) => void;
 
   readonly logger: Logger;
 }
 
 /** Issue du flux, telle qu'elle parvient à l'assistant. Codes stables et clos. */
-type Outcome = 'ok' | 'denied' | 'failed';
+export type OAuthOutcome = 'ok' | 'denied' | 'failed';
 
 function textResponse(status: number, body: string): HttpResponse {
   return {
@@ -83,52 +90,54 @@ function textResponse(status: number, body: string): HttpResponse {
   };
 }
 
+/** Message affiché au navigateur, un par issue. Textes constants. */
+const TERMINAL_MESSAGES: Readonly<Record<OAuthOutcome, string>> = {
+  ok: 'Connexion à Twitch réussie. Vous pouvez fermer cet onglet : la suite se passe dans ChronoCast.',
+  denied: 'Autorisation refusée. Fermez cet onglet et réessayez depuis ChronoCast.',
+  failed: "La connexion à Twitch n'a pas abouti. Fermez cet onglet et réessayez depuis ChronoCast.",
+};
+
 /**
- * Page de repli, affichée quand le serveur applicatif n'écoute pas encore.
+ * Page terminale du navigateur.
+ *
+ * Elle a d'abord été une redirection vers `/setup`, ce qui était juste tant que
+ * le navigateur était la seule interface. Depuis la coquille Electron, cette
+ * redirection faisait **poursuivre la configuration dans le navigateur**
+ * pendant que la fenêtre de l'application restait à l'étape précédente : deux
+ * assistants ouverts, et l'utilisateur qui termine dans le mauvais. Le
+ * navigateur a fait sa part — il rapporte l'issue et s'arrête là.
+ *
+ * Le lien vers l'assistant subsiste pour le point d'entrée headless, où il n'y
+ * a pas de fenêtre et où cette page est le seul retour. Il est présenté comme
+ * un recours, pas comme la suite du parcours : dans l'application, le suivre
+ * ramènerait exactement le défaut qu'on vient de corriger.
  *
  * Sans style et sans script : la CSP de ce serveur n'autorise rien, et une page
- * lue deux secondes avant d'être fermée n'a pas besoin d'être belle.
+ * lue quelques secondes avant d'être fermée n'a pas besoin d'être belle. Seul
+ * un code d'issue transite — jamais le code d'autorisation, jamais un message
+ * d'erreur de Twitch, qui est du texte contrôlé par un tiers.
  */
-function fallbackPage(outcome: Outcome): HttpResponse {
-  const message =
-    outcome === 'ok'
-      ? 'Connexion à Twitch réussie. Vous pouvez fermer cette fenêtre et revenir à ChronoCast.'
-      : "La connexion à Twitch n'a pas abouti. Retournez à ChronoCast pour réessayer.";
+function terminalPage(outcome: OAuthOutcome, appPort: number | null): HttpResponse {
+  const recourse =
+    appPort === null
+      ? ''
+      : `<p><small><a href="http://127.0.0.1:${String(appPort)}/setup?oauth=${outcome}">Si ChronoCast ne réagit pas, poursuivre la configuration ici.</a></small></p>`;
 
   return {
     status: 200,
     headers: { ...CALLBACK_HEADERS, 'content-type': 'text/html; charset=utf-8' },
-    body: `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ChronoCast</title></head><body><p>${message}</p></body></html>`,
-  };
-}
-
-/**
- * Ramène le navigateur dans l'assistant.
- *
- * Bien meilleur qu'une page morte : l'utilisateur y voit le résultat et
- * poursuit sa configuration là où il l'avait laissée. Seul un code d'issue
- * transite — jamais le code d'autorisation, jamais un message d'erreur de
- * Twitch, qui est du texte contrôlé par un tiers et finirait dans une barre
- * d'adresse.
- */
-function redirectToSetup(port: number, outcome: Outcome): HttpResponse {
-  return {
-    status: 302,
-    headers: {
-      ...CALLBACK_HEADERS,
-      location: `http://127.0.0.1:${String(port)}/setup?oauth=${outcome}`,
-    },
-    body: '',
+    body:
+      `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ChronoCast</title></head>` +
+      `<body><p>${TERMINAL_MESSAGES[outcome]}</p>${recourse}</body></html>`,
   };
 }
 
 export function createOAuthCallbackRouter(options: OAuthCallbackOptions): Router {
   const scoped = options.logger.child('oauth-callback');
 
-  function settle(outcome: Outcome): HttpResponse {
-    options.onSettled();
-    const port = options.getAppPort();
-    return port === null ? fallbackPage(outcome) : redirectToSetup(port, outcome);
+  function settle(outcome: OAuthOutcome): HttpResponse {
+    options.onSettled(outcome);
+    return terminalPage(outcome, options.getAppPort());
   }
 
   return {

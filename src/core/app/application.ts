@@ -547,11 +547,16 @@ export function createApplication(options: ApplicationOptions): Application {
       verifyState: (state) => verifyOAuthState(state),
       complete: (code) => completeOAuth(code),
       getAppPort: () => httpServer?.getPort() ?? null,
-      // Le rappel est arrivé : ce port n'a plus rien à écouter.
-      onSettled: () => {
+      onSettled: (outcome) => {
+        // Le rappel est arrivé : ce port n'a plus rien à écouter.
         void oauthCallbackServer.disarm().catch((error: unknown) => {
           logger.error('fermeture du port de rappel impossible', { cause: error });
         });
+
+        // Et l'issue part sur le bus : le flux s'est déroulé dans le navigateur
+        // système, la fenêtre de l'application n'en a rien su. C'est par là
+        // qu'elle revient au premier plan et se recharge.
+        bus.emit('oauth:settled', { outcome });
       },
       logger,
     }),

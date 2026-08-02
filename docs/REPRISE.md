@@ -2,11 +2,36 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, sur la branche `fix/oauth-redirect-localhost`. **Phases 0 à 7 terminées**, l'installeur Windows est produit, s'installe et se lance. Un bloquant découvert à l'usage a été corrigé aussitôt : Twitch refusait la redirect URI en `127.0.0.1`. Il ne reste que la **Phase 8, la documentation**.
+**Dernière mise à jour :** 2 août 2026, sur la branche `fix/retour-dans-la-fenetre`, non commitée. **Phases 0 à 7 terminées.** L'installeur Windows est produit, s'installe et se lance, et **le flux OAuth aboutit de bout en bout** — autorisation Twitch, rappel reçu, chaîne détectée. Le défaut d'ergonomie qui le suivait — la configuration se poursuivait dans le navigateur — **est corrigé et vérifié en conteneur** ; la section 0 dit ce qui a été fait et ce qui reste à valider sur poste. **La version est passée à `0.2.0`.** Il ne reste ensuite que la **Phase 8, la documentation**.
 
 **Le `.exe` existe, il s'installe et il se lance.** Le workflow `Release` a produit l'installeur, l'installation aboutit, et l'application démarre sur l'assistant de première configuration avec son icône. **La Phase 7 est donc éprouvée, et pas seulement écrite.** Il reste à valider le reste du parcours sur poste Windows — la liste est en section 8, sous Phase 7.
 
 **La dette actée pendant la PR C a été tranchée par le retrait** : `server.websocket.mode` et `server.websocket.port` ne sont plus au schéma. L'arbitrage et ses conséquences sont en **section 7, sous « Dette soldée »**. Il n'y a plus rien à décider sur ce sujet.
+
+---
+
+## 0. Correctif en cours — le retour dans la fenêtre après le flux OAuth
+
+> **À lire en premier.** Le défaut est corrigé sur la branche `fix/retour-dans-la-fenetre`, vérifié en conteneur, **pas encore commité ni validé sur poste Windows**.
+
+**Le défaut, tel qu'il a été constaté.** Le flux OAuth aboutissait — Twitch autorisait, le rappel arrivait, la chaîne était détectée — mais l'assistant **se poursuivait dans le navigateur**. L'utilisateur se retrouvait avec deux assistants ouverts : celui de la fenêtre ChronoCast, resté à l'étape 3, et celui du navigateur, à l'étape 5. Il terminait sa configuration dans le mauvais des deux, et la fenêtre ne se mettait jamais à jour.
+
+**La cause était de conception, pas d'implémentation.** `core/server/oauth-callback.ts` répondait `302` vers `/setup?oauth=ok`, et le navigateur suivait. C'était la décision de la PR B — « le rappel redirige vers l'assistant plutôt que de rendre une page morte » — et elle était **juste pour le point d'entrée headless**, où le navigateur est la seule interface. La Phase 6 a introduit une fenêtre applicative sans que cette décision soit rouverte : elle est devenue fausse à ce moment-là.
+
+**La correction, en deux moitiés dont aucune ne suffit seule.**
+
+1. **Côté navigateur** — `oauth-callback.ts` rend désormais une **page terminale** : un message par issue, et rien d'autre. Ce que la PR B avait acté est préservé et vérifié par des tests : ni code d'autorisation, ni message d'erreur de Twitch — texte contrôlé par un tiers — n'y figure, et la CSP reste `default-src 'none'`.
+2. **Côté application** — nouvel événement de bus **`oauth:settled`**, émis par `application.ts` à la clôture du flux, avec l'issue. `main/main.ts` s'y abonne, ramène la fenêtre par `showWindow()` et la recharge.
+
+**Trois décisions valent d'être connues avant d'y toucher.**
+
+- **Un événement dédié, et non `twitch:status`.** Celui-ci change à chaque reconnexion EventSub, y compris en plein direct : y accrocher le retour au premier plan ferait passer la fenêtre par-dessus OBS pendant un stream. `oauth:settled` n'est émis qu'à la clôture d'un flux d'autorisation.
+- **L'issue voyage avec l'événement, et un échec ramène la fenêtre autant qu'une réussite.** C'est même là que c'est le plus utile : sans cela, l'utilisateur reste devant un assistant muet qui ne dit pas pourquoi rien ne s'est passé. Le test d'intégration couvre exactement ce cas — l'échange échoue, faute de réseau, et le bus annonce `failed`.
+- **La destination du rechargement est prise dans un ensemble clos de deux pages** (`/setup`, `/admin`), décidée par le module pur `main/oauth-return.ts` — la coquille ne décide de rien. Cette URL part dans `loadURL` : filtrer les formes hostiles une à une aurait laissé passer la suivante, une liste blanche non. Tout ce qui n'est pas l'une de ces deux pages sous l'origine applicative retombe sur l'assistant.
+
+**Le mode headless ne régresse pas.** La page terminale porte un lien vers `/setup?oauth=<issue>` quand le port applicatif est connu — c'est le seul retour possible sans fenêtre. Il est formulé comme un **recours** (« si ChronoCast ne réagit pas ») et non comme la suite du parcours : dans l'application, le suivre ramènerait exactement le défaut qu'on vient de corriger.
+
+**Ce qui reste à valider à la main, sur poste Windows :** que la fenêtre revienne réellement au premier plan à la fin du flux, y compris repliée dans le tray, et que l'assistant s'y remette à l'étape suivante. Le conteneur ne dira rien de cette partie — c'est `showWindow()` et `loadURL`, dans les trois fichiers qui importent `electron`.
 
 ---
 
@@ -113,10 +138,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. Les quatorze PR sont fusionnées en squash.
+**Branche courante : `fix/retour-dans-la-fenetre`**, non commitée à l'heure où ces lignes sont écrites. Les quinze PR sont fusionnées en squash ; `main` est sur `ae3f7de`.
 
 ```
-a01167c fix(windows): canoniser la racine servie, figer les fins de ligne (#14) <- main
+ae3f7de fix(oauth): rediriger vers localhost (#15)                          <- main
+a01167c fix(windows): canoniser la racine servie, figer les fins de ligne (#14)
 0bc9120 chore(packaging): electron-builder et workflows GitHub (#13)
 4078cb6 chore(assets): identité visuelle définitive (#12)
 c93202f Phase 6 — Coquille Electron (#11)
@@ -133,16 +159,17 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 479 tests, 68 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging et les **3** de la portabilité Windows.)
+**1 496 tests, 70 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth et les **10** du retour dans la fenêtre.)
 
-**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #14 a été écrite après la fusion elle-même. Comme les fois précédentes, elle partira dans le premier commit du prochain lot. `git status` ne doit signaler aucun autre fichier — `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Modifications en attente de commit : le correctif décrit en section 0, la version portée à `0.2.0`, et ce fichier.** `git status` ne doit rien signaler d'autre — `dist/`, `release/` et `PR-*.md` sont ignorés.
+
+**La version est passée à `0.2.0`**, à deux endroits qui doivent rester alignés : `package.json` — d'où electron-builder tire le nom de l'installeur et `app.getVersion()` — et la constante `APP_VERSION` de `src/headless/index.ts`, qui n'a pas accès au premier. Rien ne vérifie automatiquement cet alignement : la seule garde est de les modifier ensemble.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # doit afficher main
-git pull --ff-only origin main
-./scripts/dc.sh verify       # doit être intégralement vert (1 479 tests)
+git branch --show-current    # fix/retour-dans-la-fenetre tant que la PR n'est pas fusionnée
+./scripts/dc.sh verify       # doit être intégralement vert (1 496 tests)
 ```
 
 **La suite de la Phase 7 ne commence pas par du code, mais par un clic** : déclencher manuellement le workflow `Release` pour obtenir un premier `.exe`. La marche à suivre est en section 8. Tant que ce build n'a pas tourné, rien de ce qui a été écrit n'a jamais été exécuté sous Windows.
@@ -365,7 +392,7 @@ Serveur loopback OAuth, extension d'`Application`, assistant de première config
 
 - **Le gestionnaire de rappel ne voit jamais le `state` attendu.** Il ne reçoit qu'un `verifyState()` qui répond oui ou non : il ne peut donc ni le journaliser, ni le renvoyer dans une page, ni le laisser fuir dans une URL de redirection.
 - **Un `state` erroné ne consomme rien.** N'importe quelle page distante peut provoquer une navigation vers la boucle locale ; si un `state` faux suffisait à clore le flux, le premier venu ferait échouer la connexion du streamer, à distance et en boucle. C'est ce qui a fait remplacer `takePendingOAuthState()` par `verifyOAuthState()`.
-- **Le rappel redirige vers `/setup?oauth=ok|denied|failed` au lieu de rendre une page.** L'utilisateur revient dans l'assistant et poursuit là où il en était, et le serveur éphémère n'a presque aucune surface HTML. Seul un code d'issue clos transite : ni le code d'autorisation, ni un message d'erreur de Twitch, qui est du texte contrôlé par un tiers et finirait dans une barre d'adresse.
+- **Le rappel rend une page terminale portant un code d'issue clos** — `ok`, `denied` ou `failed`. Il redirigeait à l'origine vers `/setup?oauth=…`, ce qui a dû être défait dès qu'une fenêtre applicative a existé : voir section 0. Ce qui n'a pas bougé, et qui était le fond de la décision : le serveur éphémère n'a presque aucune surface HTML, et seul ce code transite — ni le code d'autorisation, ni un message d'erreur de Twitch, qui est du texte contrôlé par un tiers.
 - **Le port de rappel ne se replie jamais.** Twitch exige une correspondance exacte de la redirect URI : écouter sur 37772 rendrait le rappel introuvable, ce qui serait bien plus déroutant qu'une erreur franche au moment du clic.
 - **L'étape de l'assistant est dérivée de l'état réel**, jamais d'un numéro d'étape enregistré — qui se désynchroniserait au premier jeton révoqué depuis Twitch. Seul `setup.completed` est persisté, parce qu'il ne se déduit de rien : la valeur de départ du compteur a toujours une valeur par défaut, on ne peut pas distinguer « laissée telle quelle » de « jamais vue ».
 - **La reprise s'arrête à l'écran « chaîne détectée »** et ne va jamais directement au barème : c'est l'écran qui confirme que la connexion a abouti, et déposer quelqu'un sur un formulaire sans le lui montrer laisserait le doute sur l'étape précédente.
@@ -599,7 +626,7 @@ Sans ce second mode, la seule façon de savoir si le build aboutit serait de cr�
 #### Ce qui reste à faire
 
 - **Valider le reste du parcours sur poste Windows.** Sont déjà confirmés : l'installation, le lancement, l'icône de fenêtre, et le service des pages — donc la canonisation de racine tient sur un vrai poste.
-- **Restent à vérifier :** l'icône et le menu du tray, le repli de la fenêtre à la fermeture avec sa notification, `%APPDATA%\ChronoCast` et son contenu, le lancement au démarrage, l'instance unique, DPAPI par un flux OAuth complet, l'overlay collé dans OBS, et la désinstallation qui conserve les données.
+- **Restent à vérifier :** l'icône et le menu du tray, le repli de la fenêtre à la fermeture avec sa notification, `%APPDATA%\ChronoCast` et son contenu, le lancement au démarrage, l'instance unique, DPAPI par un flux OAuth complet, **le retour de la fenêtre au premier plan à la fin de ce flux** (section 0), l'overlay collé dans OBS, et la désinstallation qui conserve les données.
 - **Décider du sort de `build-win`** une fois la CI éprouvée : le garder comme confort local, ou le retirer avec son image de plusieurs gigaoctets.
 
 ---

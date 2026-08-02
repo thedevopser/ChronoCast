@@ -11,6 +11,7 @@
 import type { CounterState } from '../counter/counter-state.js';
 import type { RewardComputation } from '../counter/reward-engine.js';
 import type { DomainEvent } from '../events/domain-event.js';
+import type { OAuthOutcome } from '../server/oauth-callback.js';
 
 /** Origine d'une modification du compteur, pour l'historique et l'affichage. */
 export type CounterChangeOrigin = 'tick' | 'manual' | 'twitch' | 'restore';
@@ -98,4 +99,18 @@ export interface AppEvents extends Record<string, unknown> {
 
   /** Une souscription n'a pas pu être créée. */
   readonly 'twitch:subscription-failed': TwitchSubscriptionFailedPayload;
+
+  /**
+   * Le flux d'autorisation Twitch s'est achevé, quelle qu'en soit l'issue.
+   *
+   * Émis à l'arrivée du rappel, donc dans le navigateur système : la fenêtre de
+   * l'application, elle, ne voit rien passer. C'est cet événement qui la ramène
+   * au premier plan et la fait se recharger. Sans lui, elle resterait à l'étape
+   * précédente pendant que l'utilisateur croirait avoir terminé.
+   *
+   * Distinct de `twitch:status` à dessein : celui-ci change à chaque
+   * reconnexion, y compris en plein direct, et ramener la fenêtre au premier
+   * plan à ce moment-là passerait par-dessus OBS.
+   */
+  readonly 'oauth:settled': { readonly outcome: OAuthOutcome };
 }

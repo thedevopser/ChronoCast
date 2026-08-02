@@ -40,7 +40,9 @@ import { createSystemClock } from '../core/app/system-clock.js';
 import { createSystemTicker } from '../core/app/system-ticker.js';
 import { createLogger } from '../core/logging/logger.js';
 import { createConsoleSink } from '../core/logging/sinks/console-sink.js';
+import type { OAuthOutcome } from '../core/server/oauth-callback.js';
 import { createExternalBrowserOpener } from './browser-opener.js';
+import { oauthReturnUrl } from './oauth-return.js';
 import { createSafeStorageSecretStore } from './safe-storage-secret-store.js';
 import { createAppTray, type AppTray } from './tray.js';
 import { createMainWindow } from './windows.js';
@@ -210,10 +212,38 @@ function onStarted(port: number): void {
   }, TRAY_REFRESH_MS);
   refresh.unref();
 
+  // Retour du flux d'autorisation. Il s'est entièrement déroulé dans le
+  // navigateur système : sans cet abonnement, la fenêtre resterait à l'étape
+  // précédente pendant que l'utilisateur croirait avoir terminé.
+  current.bus.on('oauth:settled', ({ outcome }) => {
+    returnFromOAuth(appOrigin, outcome);
+  });
+
   applyLaunchAtStartup(config.app.launchAtStartup);
   current.config.onChange((updated) => {
     applyLaunchAtStartup(updated.app.launchAtStartup);
   });
+}
+
+/**
+ * Ramène la fenêtre au premier plan et lui fait rejouer sa page.
+ *
+ * L'assistant dérive son étape de l'état réel : le recharger suffit à ce qu'il
+ * se remette au bon endroit, sans que rien ici n'ait à savoir où il en était.
+ * Le choix de l'URL est pris par un module pur — ce fichier n'en décide pas.
+ */
+function returnFromOAuth(appOrigin: string, outcome: OAuthOutcome): void {
+  if (window === null || window.isDestroyed()) {
+    return;
+  }
+
+  showWindow();
+
+  void window
+    .loadURL(oauthReturnUrl({ appOrigin, currentUrl: window.webContents.getURL(), outcome }))
+    .catch((error: unknown) => {
+      console.error('retour dans la fenêtre impossible :', error);
+    });
 }
 
 /**
