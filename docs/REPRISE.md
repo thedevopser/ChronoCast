@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, pendant la PR C. Phases 0 à 4 terminées. **Phase 5 : PR A (#7) et PR B (#8) fusionnées.** La **PR C** est en cours sur `feat/admin-web` : **lot 1 commité**, lots 2 et 3 à écrire. Tout est en section 8.
+**Dernière mise à jour :** 2 août 2026, à l'issue de la PR C. Phases 0 à 4 terminées. **Phase 5 terminée : PR A (#7) et PR B (#8) fusionnées, PR C écrite et verte sur `feat/admin-web`** en trois commits, **en attente d'ouverture et de fusion**. La prochaine étape est la **Phase 6, la coquille Electron** (section 8).
 
 **Une dette a été actée pendant le lot 1** et sortie de la PR C : le mode `server.websocket.mode: 'separate'` n'a aucune implémentation côté serveur. Elle fera l'objet d'un lot dédié, sur sa propre branche, et **les arbitrages restent à prendre**. Tout ce qu'il faut pour trancher sans rien ré-explorer est en section 8, sous « Dette — le mode `separate` ».
 
@@ -111,10 +111,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `feat/admin-web`**, partie de `main` à `6b1bec1`. **Les lots 1 et 2 de la PR C y sont commités**, le lot 3 reste à écrire, et les trois iront dans **une seule PR** — décision de l'utilisateur : un commit par lot, pas de PR intermédiaire. Le document `PR-feat-admin-web.md` ne sera donc écrit **qu'après le commit 3**, quand la PR sera prête à être ouverte. Les huit PR précédentes sont fusionnées en squash.
+**Branche courante : `feat/admin-web`**, partie de `main` à `6b1bec1`. **Les trois lots de la PR C y sont commités**, et vont dans **une seule PR** — décision de l'utilisateur : un commit par lot, pas de PR intermédiaire. Le document `PR-feat-admin-web.md` est écrit à la racine, prêt pour l'ouverture. **C'est l'utilisateur qui ouvre et fusionne la PR.** Les huit PR précédentes sont fusionnées en squash.
 
 ```
-(lot 2 : vues de saisie, liaison de formulaires, custom.css)    <- feat/admin-web
+(lot 3 : vues historique et journaux)                           <- feat/admin-web
+217ec65 feat(admin): vues de saisie et liaison de formulaires
 25170e7 feat(admin): socle du panneau et vue tableau de bord
 6b1bec1 feat(setup): flux OAuth complet et assistant de configuration (#8)  <- main
 67d9219 feat(web): fondations web et overlay OBS (#7)
@@ -127,19 +128,21 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 236 tests, 57 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur.** (1 025 avant le lot 1, 1 112 après, soit 211 nouveaux à ce stade.)
+**1 337 tests, 60 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur.** (1 025 avant la PR C, soit **312 nouveaux** : 87 au lot 1, 124 au lot 2, 101 au lot 3.)
 
-**Seule modification en attente : ce fichier**, qui partira dans le commit du lot 3, comme les fois précédentes. `git status` ne doit signaler aucun autre fichier — `dist/` et `PR-*.md` sont ignorés.
+**Seule modification en attente : ce fichier**, qui partira dans le commit du lot 3. `git status` ne doit signaler aucun autre fichier — `dist/` et `PR-*.md` sont ignorés.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # doit afficher feat/admin-web
-git status --short           # ne doit lister que docs/REPRISE.md
-./scripts/dc.sh verify       # doit être intégralement vert (1 236 tests)
+git branch --show-current    # feat/admin-web si la PR C n'est pas encore fusionnée
+git status --short           # ne doit rien lister
+./scripts/dc.sh verify       # doit être intégralement vert (1 337 tests)
 ```
 
-Le lot 3 peut alors commencer, en TDD, en suivant la section 8.
+**Si la PR C est fusionnée**, faire le ménage sans le demander (règle 5) : supprimer `PR-feat-admin-web.md`, supprimer la branche locale par `git branch -D feat/admin-web` — après une fusion en squash, Git ne la considère pas comme fusionnée —, supprimer `dist/`, et mettre ce document à jour. La **Phase 6** peut alors commencer sur `feat/coquille-electron`.
+
+**Si elle ne l'est pas**, il reste à l'ouvrir : c'est l'utilisateur qui le fait, jamais l'assistant.
 
 ---
 
@@ -268,7 +271,7 @@ Conventions à connaître :
 
 ## 8. Ce qui reste à faire — Phases 5 à 8
 
-### Phase 5 — Interfaces web — **en cours**
+### Phase 5 — Interfaces web — **terminée, PR C en attente de fusion**
 
 Découpée en trois branches successives (voir « Décisions actées » plus bas) :
 
@@ -276,7 +279,7 @@ Découpée en trois branches successives (voir « Décisions actées » plus bas
 | --- | --- | --- |
 | A | `feat/overlay-web` | **Fusionnée (#7)** — dette `tsconfig.web.json` payée, `web/shared/` complet, overlay complet |
 | B | `feat/setup-oauth` | **Fusionnée (#8)** — serveur loopback OAuth, extension d'`Application`, assistant de première configuration |
-| C | `feat/admin-web` | **Prochaine étape** — panneau d'administration et ses vues |
+| C | `feat/admin-web` | **Écrite et verte, en attente d'ouverture** — panneau d'administration et ses huit vues, 312 tests |
 
 `web/shared/` et `web/overlay/` sont livrés : voir le détail de la PR A plus bas. **Les PR B et C consomment `web/shared/` tel quel** — `protocol.ts`, `ws-client.ts`, `safe-dom.ts`, `time-format.ts`, `countdown.ts` — et n'ont aucune raison d'en réécrire une partie.
 
@@ -371,7 +374,7 @@ Serveur loopback OAuth, extension d'`Application`, assistant de première config
 
 **Un point resté ouvert :** l'assistant n'est atteignable qu'en tapant `/setup`, `/` redirigeant vers `/admin` depuis la Phase 4. Une fois `setup.completed` disponible, `/` devrait rediriger vers `/setup` tant qu'il vaut `false`. C'est une modification de `routes/pages.ts`, qui appartient naturellement à la PR C — celle qui livre `/admin`.
 
-#### PR C — `feat/admin-web` — **prochaine étape**
+#### PR C — `feat/admin-web` — **écrite, verte, en attente d'ouverture**
 
 C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies : huit vues, un routage par hash, une couche de liaison de formulaires pour environ soixante-dix réglages, l'aperçu d'apparence en `<iframe>`, la vendorisation d'Open Props, et la bascule de `/`. Ne pas l'attaquer d'un bloc.
 
@@ -379,7 +382,7 @@ C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies
 
 1. **Socle** — **fait, 87 tests, 1 112 au total.** Open Props 1.7.23 vendoré, `theme.css` rebasé, port WebSocket découvrable, redirection de `/` vers `/setup`, routage par hash, coquille du panneau avec navigation latérale, et vue *tableau de bord* branchée sur le WebSocket. Détail plus bas.
 2. **Vues de saisie** — **fait, 124 tests, 1 236 au total.** Couche de liaison, table de descripteurs, vues barème, apparence avec aperçu live, Twitch, paramètres, import/export, et la route `custom.css`. Détail plus bas.
-3. **Vues de consultation** — historique et journaux, avec pagination et filtres.
+3. **Vues de consultation** — **fait, 101 tests, 1 337 au total.** Historique et journaux, avec filtres, pagination et alimentation au fil de l'eau. Détail plus bas.
 
 **Travaux à ne pas oublier, tracés depuis les PR précédentes :**
 
@@ -494,6 +497,30 @@ grep -n "onUpgrade\|createWsAdapter" src/core/app/application.ts
 - **L'aperçu d'apparence n'a besoin d'aucun `postMessage`.** Un `PATCH /api/config` diffuse un message `config` sur le WebSocket, que l'overlay du cadre applique de lui-même. Le cadre n'est chargé qu'à la première ouverture de la vue : le charger d'emblée ouvrirait une seconde connexion WebSocket qui vivrait tout le direct pour un cadre que personne ne regarde.
 - **Le gestionnaire de `custom.css` passe après les pages et avant le statique.** Après, pour qu'il ne puisse jamais masquer une page ; avant, parce que le fichier vit dans le répertoire de données où le gestionnaire statique ne sait pas aller. Il reprend le contrat `serve(pathname) → HttpResponse | null` des pages, et surtout leur discipline : canonisation puis vérification que le chemin est resté sous la racine. La seule vraie surface est le lien symbolique — `tokens.json` est le voisin immédiat du fichier servi.
 - **Le bandeau est effacé avant l'action, jamais après.** L'effacer après emporterait le message que l'action vient elle-même d'afficher.
+
+#### Lot 3 de la PR C — livré, 101 tests
+
+| Fichier | Rôle |
+| --- | --- |
+| `web/admin/history-view.ts` | Filtrage, recherche, pagination et mise en forme du détail |
+| `web/admin/log-view.ts` | Tampon plafonné, seuil de niveau, filtre par portée |
+| `web/admin/index.html`, `admin.css`, `main.ts` | Deux vues de plus, et leur câblage |
+| `tests/security/xss-admin-lists.test.ts` | Non-interprétation du contenu hostile dans les deux vues |
+
+**Décisions prises pendant ce lot :**
+
+- **La recherche est une inclusion de sous-chaîne, jamais une expression régulière.** Un pseudo Twitch peut contenir n'importe quoi, et un `(` tapé dans le champ ferait lever la construction du motif — la vue deviendrait inutilisable au moment précis où l'on cherche le pseudo qui pose problème.
+- **La page hors bornes est ramenée dans les bornes, pas refusée.** Un filtre peut réduire la liste alors qu'on se trouve sur la dernière page ; sans ce recadrage, l'écran se viderait sans explication. Tout changement de filtre ramène par ailleurs à la première page.
+- **`paginate` annonce au moins une page**, même pour une liste vide : zéro ferait afficher « page 1 sur 0 ».
+- **Le filtre de niveau des journaux est un seuil minimal**, comme celui du serveur dans `routes/api.ts`. Les deux doivent s'accorder, sinon un rechargement changerait ce que la page affiche. Un niveau inconnu laisse tout passer plutôt que de tout masquer : une page vide et muette est le pire des retours.
+- **Les portées sont filtrées par préfixe**, pas par égalité : demander `twitch` ramène `twitch:eventsub`, faute de quoi le filtre obligerait à connaître l'arborescence des composants pour s'en servir.
+- **Le tampon des journaux est plafonné à 2 000 enregistrements**, plus large que le tampon circulaire du serveur puisque la page accumule aussi ce qui arrive après le chargement. Ce sont les plus anciens qui partent : un journal consulté en direct sert à voir ce qui vient d'arriver.
+- **La pause fige l'affichage, pas la collecte.** Le tampon continue de se remplir : figer sert à lire une pile d'appel, pas à perdre ce qui arrive pendant qu'on la lit.
+- **Le rechargement des journaux repart de zéro.** Conserver ce que le WebSocket a déjà livré ferait apparaître deux fois les enregistrements présents dans les deux sources.
+- **Le contexte d'un enregistrement est écrit en JSON indenté dans un seul nœud texte**, jamais reconstruit en éléments : sa profondeur et son contenu viennent de l'exécution, et le reconstruire rendrait ce contenu capable de créer des nœuds.
+- **Un palier ou un détail inconnu traverse tel quel.** L'historique est relu d'un fichier JSONL qu'une version antérieure a pu écrire : deviner sa forme serait afficher autre chose que ce qui s'est passé.
+- **Le test d'injection est un test de caractérisation**, écrit après le code qu'il couvre, et il est passé vert du premier coup. C'est assumé : il ne pilote aucun code neuf, il fige la garantie exigée par la section 9 pour deux vues qui affichent du contenu **stocké** puis relu longtemps après. Sa non-vacuité a été vérifiée séparément — happy-dom crée bien des éléments quand du HTML est réellement analysé, donc `querySelectorAll('*')` à zéro veut dire quelque chose.
+- **Le nom d'un fichier de test décide de son environnement.** Un fichier de `tests/security/` qui ne commence pas par `xss-` tourne dans le projet `node`, sans DOM. Constaté en direct pendant ce lot, sur un fichier temporaire : `DOMParser` y est simplement absent, et l'échec ne dit pas pourquoi.
 
 ### Phase 6 — Coquille Electron
 

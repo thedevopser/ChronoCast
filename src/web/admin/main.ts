@@ -44,6 +44,20 @@ import {
 import { fieldsOf, groupsOf } from './fields.js';
 import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
 import {
+  filterHistory,
+  formatDetail,
+  paginate,
+  type HistoryEntry,
+} from './history-view.js';
+import {
+  appendRecords,
+  createLogBuffer,
+  filterRecords,
+  scopesOf,
+  type LogBuffer,
+  type LogRecord,
+} from './log-view.js';
+import {
   clearFieldErrors,
   readFieldValues,
   renderFieldGroups,
@@ -298,11 +312,21 @@ function start(): void {
         countdown.sync(message.state, performance.now(), syncModeOf(message.origin));
         break;
 
+      case 'log':
+        // Le tampon continue de se remplir même en pause : figer l'affichage
+        // sert à lire une pile d'appel, pas à perdre ce qui arrive pendant.
+        logs = appendRecords(logs, [message.record]);
+        if (!logsPaused) {
+          paintScopes();
+          paintLogs();
+          paintLogState();
+        }
+        break;
+
       case 'hello':
       case 'twitch:status':
       case 'event':
       case 'config':
-      case 'log':
       case 'pong':
       case 'error':
         // Rien à resynchroniser : ces messages n'affectent que le modèle, qui
@@ -655,6 +679,255 @@ function start(): void {
   });
 
   /* ---------------------------------------------------------------------- */
+  /* Vue Historique                                                         */
+  /* ---------------------------------------------------------------------- */
+
+  /** Une page d'affichage, alignée sur la borne basse de l'API. */
+  const HISTORY_PAGE_SIZE = 25;
+
+  let historyEntries: readonly HistoryEntry[] = [];
+  let historyPage = 0;
+
+  const historyList = requireElement(document, '#history-list');
+
+  function paintHistory(): void {
+    const applied = input('#history-applied').value;
+    const filtered = filterHistory(historyEntries, {
+      type: input('#history-type').value,
+      ...(applied === '' ? {} : { applied: applied === 'yes' }),
+      search: input('#history-search').value,
+    });
+
+    const page = paginate(filtered, historyPage, HISTORY_PAGE_SIZE);
+    historyPage = page.page;
+
+    clearChildren(historyList);
+    requireElement(document, '#history-empty').hidden = filtered.length > 0;
+    setText(
+      requireElement(document, '#history-page'),
+      `Page ${String(page.page + 1)} sur ${String(page.pageCount)} — ${String(filtered.length)} entrée(s)`,
+      80,
+    );
+    button('#history-prev').disabled = page.page === 0;
+    button('#history-next').disabled = page.page >= page.pageCount - 1;
+
+    for (const item of page.items) {
+      const row = document.createElement('li');
+      row.className = item.applied ? 'record' : 'record record--skipped';
+
+      const time = document.createElement('span');
+      time.className = 'record__time';
+      setText(time, new Date(item.occurredAt).toLocaleTimeString('fr-FR'), 20);
+
+      const type = document.createElement('span');
+      type.className = 'record__scope';
+      setText(type, EVENT_LABELS[item.type]);
+
+      const main = document.createElement('span');
+      main.className = 'record__main';
+
+      // Le pseudo vient de Twitch, donc d'un inconnu : `setText` tronque,
+      // retire les caractères de contrôle et n'interprète jamais de HTML.
+      const title = document.createElement('span');
+      title.className = 'record__title';
+      setText(title, item.userName);
+
+      const detail = document.createElement('span');
+      detail.className = 'record__detail';
+      // Le motif vient du serveur et explique pourquoi rien n'a été crédité :
+      // c'est l'information qu'on vient chercher ici.
+      setText(detail, [formatDetail(item), item.reason].filter((part) => part !== '').join(' · '), 200);
+
+      main.append(title, detail);
+
+      const reward = document.createElement('span');
+      reward.className = 'record__reward';
+      setText(reward, item.applied ? formatReward(item.rewardSeconds) : 'non crédité');
+
+      row.append(time, type, main, reward);
+      historyList.append(row);
+    }
+  }
+
+  async function refreshHistory(): Promise<void> {
+    const limit = input('#history-limit').value;
+    const payload = await api.get<{ entries: readonly HistoryEntry[] }>(
+      `/api/history?limit=${encodeURIComponent(limit)}`,
+    );
+    historyEntries = payload.entries;
+    paintHistory();
+  }
+
+  for (const selector of ['#history-type', '#history-applied', '#history-search']) {
+    requireElement(document, selector).addEventListener('input', () => {
+      // Tout changement de filtre ramène à la première page : rester sur la
+      // huitième d'une liste qui n'en compte plus que deux afficherait le vide.
+      historyPage = 0;
+      paintHistory();
+    });
+  }
+
+  requireElement(document, '#history-limit').addEventListener('change', () => {
+    historyPage = 0;
+    void guarded(button('#history-refresh'), refreshHistory);
+  });
+
+  button('#history-prev').addEventListener('click', () => {
+    historyPage -= 1;
+    paintHistory();
+  });
+
+  button('#history-next').addEventListener('click', () => {
+    historyPage += 1;
+    paintHistory();
+  });
+
+  const historyRefresh = button('#history-refresh');
+  historyRefresh.addEventListener('click', () => {
+    void guarded(historyRefresh, refreshHistory);
+  });
+
+  /* ---------------------------------------------------------------------- */
+  /* Vue Journaux                                                           */
+  /* ---------------------------------------------------------------------- */
+
+  let logs: LogBuffer = createLogBuffer();
+  let logsPaused = false;
+
+  const logsList = requireElement(document, '#logs-list');
+  const logsScope = requireElement(document, '#logs-scope') as HTMLSelectElement;
+
+  /** Classe de la ligne, pour que l'œil trouve une erreur sans lire. */
+  function logClassOf(level: string): string {
+    if (level === 'error') {
+      return 'record record--error';
+    }
+    return level === 'warning' ? 'record record--warning' : 'record';
+  }
+
+  /** Met la liste des portées à jour sans perdre celle qui est choisie. */
+  function paintScopes(): void {
+    const chosen = logsScope.value;
+    const scopes = scopesOf(logs.records);
+
+    clearChildren(logsScope);
+    const all = document.createElement('option');
+    all.value = '';
+    setText(all, 'Toutes');
+    logsScope.append(all);
+
+    for (const scope of scopes) {
+      const option = document.createElement('option');
+      option.value = scope;
+      setText(option, scope, 80);
+      logsScope.append(option);
+    }
+
+    logsScope.value = scopes.includes(chosen) ? chosen : '';
+  }
+
+  function paintLogs(): void {
+    const filtered = filterRecords(logs.records, {
+      level: input('#logs-level').value,
+      scope: logsScope.value,
+      search: input('#logs-search').value,
+    });
+
+    clearChildren(logsList);
+    requireElement(document, '#logs-empty').hidden = filtered.length > 0;
+
+    for (const item of filtered) {
+      const row = document.createElement('li');
+      row.className = logClassOf(item.level);
+
+      const time = document.createElement('span');
+      time.className = 'record__time';
+      // L'horodatage est en UTC dans le fichier ; l'afficher tel quel
+      // obligerait le streamer à convertir de tête pendant un incident.
+      setText(time, new Date(item.timestamp).toLocaleTimeString('fr-FR'), 20);
+
+      const scope = document.createElement('span');
+      scope.className = 'record__scope';
+      setText(scope, item.scope, 40);
+
+      const main = document.createElement('span');
+      main.className = 'record__main';
+
+      const title = document.createElement('span');
+      title.className = 'record__title';
+      setText(title, item.message, 500);
+      main.append(title);
+
+      if (item.context !== undefined) {
+        // Le contexte est écrit en JSON indenté dans un seul nœud texte,
+        // jamais reconstruit en éléments : sa profondeur et son contenu
+        // viennent de l'exécution, pas d'une forme connue à l'avance.
+        const context = document.createElement('pre');
+        context.className = 'record__context';
+        setText(context, JSON.stringify(item.context, null, 2), 2_000);
+        main.append(context);
+      }
+
+      row.append(time, scope, main);
+      logsList.append(row);
+    }
+  }
+
+  function paintLogState(): void {
+    setText(
+      requireElement(document, '#logs-state'),
+      logsPaused
+        ? 'Affichage figé. Les enregistrements continuent d’arriver et seront montrés à la reprise.'
+        : `${String(logs.records.length)} enregistrement(s) en mémoire.`,
+      160,
+    );
+    setText(button('#logs-pause'), logsPaused ? 'Reprendre' : 'Mettre en pause');
+  }
+
+  async function refreshLogs(): Promise<void> {
+    // Rechargement complet : conserver ce que le WebSocket a déjà livré ferait
+    // apparaître deux fois les enregistrements présents dans les deux sources.
+    const payload = await api.get<{ records: readonly LogRecord[] }>('/api/logs?limit=1000');
+    logs = appendRecords(createLogBuffer(), payload.records);
+    paintScopes();
+    paintLogs();
+    paintLogState();
+  }
+
+  for (const selector of ['#logs-level', '#logs-scope', '#logs-search']) {
+    requireElement(document, selector).addEventListener('input', () => {
+      paintLogs();
+    });
+  }
+
+  const logsPause = button('#logs-pause');
+  logsPause.addEventListener('click', () => {
+    logsPaused = !logsPaused;
+    if (!logsPaused) {
+      paintScopes();
+      paintLogs();
+    }
+    paintLogState();
+  });
+
+  const logsRefresh = button('#logs-refresh');
+  logsRefresh.addEventListener('click', () => {
+    void guarded(logsRefresh, refreshLogs);
+  });
+
+  const logsCopy = button('#logs-copy');
+  logsCopy.addEventListener('click', () => {
+    void navigator.clipboard.writeText(logsList.textContent).then(
+      () => {
+        showBanner('Journaux copiés.', 'banner--success');
+      },
+      () => {
+        showBanner('Copie impossible : sélectionnez le texte à la main.', 'banner--error');
+      },
+    );
+  });
+
+  /* ---------------------------------------------------------------------- */
   /* Import et export                                                       */
   /* ---------------------------------------------------------------------- */
 
@@ -724,6 +997,13 @@ function start(): void {
       reportFailure(error);
     },
   );
+
+  void refreshHistory().catch((error: unknown) => {
+    reportFailure(error);
+  });
+  void refreshLogs().catch((error: unknown) => {
+    reportFailure(error);
+  });
 
   // Twitch en dernier et sans bloquer : c'est justement quand Twitch ne répond
   // pas que le streamer doit pouvoir ouvrir son panneau.

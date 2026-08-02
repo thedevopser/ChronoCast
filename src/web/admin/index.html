@@ -283,6 +283,121 @@
           </div>
         </section>
 
+        <!-- Historique -->
+        <section class="view" id="view-history" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Historique</h1>
+            <p class="view__subtitle">
+              D'où vient le temps gagné — y compris les événements qui n'ont rien crédité.
+            </p>
+          </header>
+
+          <div class="card">
+            <div class="row">
+              <label class="field field--compact">
+                <span class="field__label">Type</span>
+                <select class="field__input" id="history-type">
+                  <option value="">Tous</option>
+                  <option value="sub">Abonnements</option>
+                  <option value="resub">Réabonnements</option>
+                  <option value="gift">Dons</option>
+                  <option value="bits">Bits</option>
+                  <option value="raid">Raids</option>
+                  <option value="follow">Follows</option>
+                </select>
+              </label>
+
+              <label class="field field--compact">
+                <span class="field__label">Crédité</span>
+                <select class="field__input" id="history-applied">
+                  <option value="">Tous</option>
+                  <option value="yes">Oui</option>
+                  <option value="no">Non</option>
+                </select>
+              </label>
+
+              <label class="field field--grow">
+                <span class="field__label">Pseudo</span>
+                <input class="field__input" id="history-search" type="search" autocomplete="off" />
+              </label>
+
+              <label class="field field--compact">
+                <span class="field__label">Entrées chargées</span>
+                <select class="field__input" id="history-limit">
+                  <option value="50">50</option>
+                  <option value="200">200</option>
+                  <option value="500">500</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button class="button" type="button" id="history-refresh">Rafraîchir</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <ul class="records" id="history-list"></ul>
+            <p class="card__hint" id="history-empty">Aucune entrée ne correspond.</p>
+
+            <div class="pager">
+              <button class="button" type="button" id="history-prev">Précédent</button>
+              <span class="pager__label" id="history-page"></span>
+              <button class="button" type="button" id="history-next">Suivant</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Journaux -->
+        <section class="view" id="view-logs" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Journaux</h1>
+            <p class="view__subtitle">
+              Ce que l'application a fait, au fil de l'eau. Les secrets y sont systématiquement
+              masqués.
+            </p>
+          </header>
+
+          <div class="card">
+            <div class="row">
+              <label class="field field--compact">
+                <span class="field__label">Niveau minimal</span>
+                <select class="field__input" id="logs-level">
+                  <option value="">Tous</option>
+                  <option value="debug">Debug</option>
+                  <option value="info">Info</option>
+                  <option value="warning">Avertissement</option>
+                  <option value="error">Erreur</option>
+                </select>
+              </label>
+
+              <label class="field field--compact">
+                <span class="field__label">Portée</span>
+                <select class="field__input" id="logs-scope">
+                  <option value="">Toutes</option>
+                </select>
+              </label>
+
+              <label class="field field--grow">
+                <span class="field__label">Message</span>
+                <input class="field__input" id="logs-search" type="search" autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="actions">
+              <button class="button" type="button" id="logs-pause">Mettre en pause</button>
+              <button class="button" type="button" id="logs-refresh">Recharger</button>
+              <button class="button" type="button" id="logs-copy">Copier l'affichage</button>
+            </div>
+            <p class="card__hint" id="logs-state"></p>
+          </div>
+
+          <div class="card">
+            <ul class="records records--logs" id="logs-list"></ul>
+            <p class="card__hint" id="logs-empty">Aucun enregistrement ne correspond.</p>
+          </div>
+        </section>
+
         <!-- Paramètres -->
         <section class="view" id="view-settings" hidden>
           <header class="view__head">

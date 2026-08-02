@@ -523,6 +523,113 @@
 }
 
 /* -------------------------------------------------------------------------- */
+/* Listes de consultation : historique et journaux                             */
+/* -------------------------------------------------------------------------- */
+
+.records {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+}
+
+.records:empty {
+  display: none;
+}
+
+.record {
+  display: grid;
+  grid-template-columns: 6rem 8rem 1fr auto;
+  gap: var(--cc-space-2);
+  align-items: baseline;
+  padding: var(--cc-space-2);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-raised);
+  font-size: var(--cc-text-sm);
+}
+
+/* Les journaux n'ont pas de colonne de récompense, mais un message long. */
+.records--logs .record {
+  grid-template-columns: 6rem 8rem 1fr;
+}
+
+.record__time,
+.record__scope {
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-xs);
+  color: var(--cc-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.record__main {
+  min-width: 0;
+}
+
+.record__title {
+  display: block;
+  /* Un pseudo ou un message long se coupe ; il ne pousse pas la colonne. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record__detail {
+  display: block;
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-xs);
+}
+
+/* Le contexte est du JSON indenté : il garde ses retours à la ligne et défile
+   pour lui-même plutôt que d'élargir la page. */
+.record__context {
+  margin: var(--cc-space-1) 0 0;
+  padding: var(--cc-space-2);
+  background: var(--cc-bg);
+  border-radius: var(--cc-radius);
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-xs);
+  color: var(--cc-text-muted);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 12rem;
+}
+
+.record__reward {
+  font-family: var(--cc-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--cc-success);
+}
+
+.record--skipped .record__reward {
+  color: var(--cc-text-faint);
+  text-decoration: line-through;
+}
+
+.record--warning {
+  border-left: 3px solid var(--cc-warning);
+}
+
+.record--error {
+  border-left: 3px solid var(--cc-danger);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cc-space-3);
+  margin-top: var(--cc-space-3);
+}
+
+.pager__label {
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Bandeau, notes, copie                                                       */
 /* -------------------------------------------------------------------------- */
 

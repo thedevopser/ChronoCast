@@ -23,6 +23,8 @@ export const ADMIN_VIEWS = [
   'rewards',
   'appearance',
   'twitch',
+  'history',
+  'logs',
   'settings',
   'transfer',
 ] as const;
@@ -48,6 +50,8 @@ export const VIEW_LABELS: Readonly<Record<AdminViewId, string>> = {
   rewards: 'Barème',
   appearance: 'Apparence',
   twitch: 'Twitch',
+  history: 'Historique',
+  logs: 'Journaux',
   settings: 'Paramètres',
   transfer: 'Import / export',
 };
