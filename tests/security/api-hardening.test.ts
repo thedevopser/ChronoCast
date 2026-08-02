@@ -65,6 +65,8 @@ describe('durcissement de l’API', () => {
     router = createRouter({
       routes: createApiRoutes(doubles.context),
       pageHandler: NO_PAGE,
+      // Aucune feuille personnelle : ce fichier n'audite que l'API.
+      customCssHandler: NO_PAGE,
       staticHandler: NO_STATIC,
       getCsrfToken: () => TOKEN,
       logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),

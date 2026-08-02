@@ -88,6 +88,7 @@ describe('createWsHub', () => {
       clock: { now: () => 1_000, monotonicMs: () => monotonic },
       timers: timers.timers,
       getPort: () => 3_777,
+      getWsPort: () => 3_777,
       appVersion: '0.1.0',
       logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),
     });
@@ -105,8 +106,34 @@ describe('createWsHub', () => {
         protocolVersion: PROTOCOL_VERSION,
         appVersion: '0.1.0',
         port: 3_777,
+        wsPort: 3_777,
       });
       expect(client.sent[1]).toMatchObject({ type: 'state' });
+    });
+
+    it('annonce le port du WebSocket quand il diffère de celui du HTTP', () => {
+      // Mode `separate`. La page a déjà dû joindre ce port pour lire ce
+      // message — le marqueur du gabarit s'en est chargé — mais l'annoncer
+      // rend le contrat auto-descriptif et permet de vérifier la cohérence.
+      const separate = createWsHub({
+        bus,
+        getConfig: () => config,
+        getSnapshot: () => ({ counter, twitch: { status: 'ready' } }),
+        clock: { now: () => 1_000, monotonicMs: () => monotonic },
+        timers: timers.timers,
+        getPort: () => 3_777,
+        getWsPort: () => 3_778,
+        appVersion: '0.1.0',
+        logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),
+      });
+      separate.start();
+
+      const other = createSocketDouble();
+      separate.accept(other.socket, {});
+
+      expect(other.sent[0]).toMatchObject({ type: 'hello', port: 3_777, wsPort: 3_778 });
+
+      separate.stop();
     });
 
     it("transmet la configuration d'overlay dès l'accueil", () => {

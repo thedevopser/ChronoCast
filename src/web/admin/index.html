@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChronoCast — Administration</title>
+
+    <!--
+      Jeton CSRF, substitué par `routes/pages.ts` au moment de servir la page.
+      Il n'est exposé par aucune route : une page tierce ne peut ni le lire ni
+      le deviner, et c'est ce qui protège toutes les mutations de l'API.
+    -->
+    <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
+
+    <!-- Port du WebSocket, substitué lui aussi. Ce n'est pas un secret. -->
+    <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
+
+    <!--
+      Ordre imposé : les primitives d'Open Props d'abord, nos tokens
+      sémantiques ensuite — ils les référencent —, la feuille de page en
+      dernier. Elle ne connaît que nos tokens.
+    -->
+    <link rel="stylesheet" href="/shared/open-props.css" />
+    <link rel="stylesheet" href="/shared/theme.css" />
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
+
+  <body>
+    <!--
+      Aucun `<form>` : `form-action 'none'` interdit toute soumission. Les
+      boutons sont en `type="button"` et tout passe par `fetch`.
+    -->
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sidebar__brand">
+          <span class="sidebar__mark" aria-hidden="true">◷</span>
+          <span class="sidebar__name">ChronoCast</span>
+        </div>
+
+        <!-- Peuplée par `main.ts` depuis la liste close de `router.ts`. -->
+        <nav class="nav" id="nav" aria-label="Sections du panneau"></nav>
+
+        <div class="sidebar__foot">
+          <span class="sidebar__version" id="app-version"></span>
+          <span class="dot" id="link-state" title="État de la liaison au serveur"></span>
+        </div>
+      </aside>
+
+      <main class="content">
+        <p class="banner" id="banner" hidden></p>
+
+        <!-- Tableau de bord -->
+        <section class="view" id="view-dashboard" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Tableau de bord</h1>
+            <p class="view__subtitle">
+              L'état du subathon en direct, et les commandes qui agissent dessus.
+            </p>
+          </header>
+
+          <div class="board">
+            <div class="card card--counter">
+              <p class="card__label">Temps restant</p>
+              <p class="counter" id="counter">--:--:--</p>
+              <p class="card__meta">
+                <span class="pill" id="counter-status">—</span>
+                <span class="card__hint" id="counter-detail"></span>
+              </p>
+
+              <div class="actions">
+                <button class="button" type="button" id="pause">Mettre en pause</button>
+                <button class="button" type="button" id="resume">Reprendre</button>
+                <button class="button button--danger" type="button" id="reset">
+                  Remettre à zéro
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Twitch</p>
+              <p class="card__value">
+                <span class="pill" id="twitch-status">—</span>
+              </p>
+              <p class="card__hint" id="twitch-detail"></p>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Overlay</p>
+              <p class="card__hint">Adresse à coller dans une source Navigateur d'OBS.</p>
+              <span class="copyable copyable--wide">
+                <code id="overlay-url"></code>
+                <button class="button button--ghost" type="button" data-copy="overlay-url">
+                  Copier
+                </button>
+              </span>
+            </div>
+          </div>
+
+          <div class="board">
+            <div class="card">
+              <p class="card__label">Ajuster le compteur</p>
+
+              <div class="row">
+                <label class="field field--compact">
+                  <span class="field__label">Durée, en secondes</span>
+                  <input class="field__input" id="adjust-seconds" type="number" min="1" step="1" value="60" />
+                </label>
+                <label class="field field--grow">
+                  <span class="field__label">Motif</span>
+                  <input
+                    class="field__input"
+                    id="adjust-reason"
+                    type="text"
+                    maxlength="200"
+                    placeholder="ajout manuel"
+                    autocomplete="off"
+                  />
+                </label>
+              </div>
+
+              <div class="actions">
+                <button class="button button--primary" type="button" id="add-time">Ajouter</button>
+                <button class="button" type="button" id="remove-time">Retirer</button>
+              </div>
+
+              <hr class="rule" />
+
+              <label class="field field--compact">
+                <span class="field__label">Valeur de départ, en heures</span>
+                <input class="field__input" id="initial-hours" type="number" min="0.25" step="0.25" />
+              </label>
+              <p class="note">
+                Changer la valeur de départ en plein subathon ne touche pas au temps restant : le
+                répercuter effacerait le temps gagné par les spectateurs.
+              </p>
+              <div class="actions">
+                <button class="button" type="button" id="save-initial">Enregistrer</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Tester l'overlay</p>
+              <p class="card__hint">
+                Injecte un événement de démonstration : il crédite réellement du temps et apparaît
+                dans l'historique, marqué comme manuel.
+              </p>
+              <div class="actions actions--wrap" id="overlay-tests">
+                <button class="button" type="button" data-test-event="sub">Abonnement</button>
+                <button class="button" type="button" data-test-event="resub">Réabonnement</button>
+                <button class="button" type="button" data-test-event="gift">Dons</button>
+                <button class="button" type="button" data-test-event="bits">Bits</button>
+                <button class="button" type="button" data-test-event="raid">Raid</button>
+                <button class="button" type="button" data-test-event="follow">Follow</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="card__label">Derniers événements</p>
+            <ul class="events" id="events"></ul>
+            <p class="card__hint" id="events-empty">Aucun événement depuis l'ouverture du panneau.</p>
+          </div>
+        </section>
+
+        <!--
+          Les quatre vues de réglage ne portent qu'une coquille : leurs champs
+          sont engendrés depuis `fields.ts` au chargement. Les recopier ici
+          créerait une seconde source de vérité, et une faute de frappe entre
+          un sélecteur et son descripteur ne se verrait qu'à l'usage.
+        -->
+
+        <!-- Barème -->
+        <section class="view" id="view-rewards" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Barème</h1>
+            <p class="view__subtitle">Ce que chaque événement crédite au compteur.</p>
+          </header>
+
+          <div class="fields" id="fields-rewards"></div>
+
+          <div class="card" id="bits-tiers-card">
+            <p class="card__label">Paliers de bits</p>
+            <p class="card__hint">
+              Utilisés seulement lorsque le mode de calcul est « par paliers ». Le palier atteint le
+              plus généreux s'applique.
+            </p>
+            <ul class="tiers" id="bits-tiers"></ul>
+            <div class="actions">
+              <button class="button" type="button" id="add-tier">Ajouter un palier</button>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="button button--primary" type="button" id="save-rewards">
+              Enregistrer le barème
+            </button>
+          </div>
+        </section>
+
+        <!-- Apparence -->
+        <section class="view" id="view-appearance" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Apparence</h1>
+            <p class="view__subtitle">
+              L'aperçu est l'overlay réel : il se met à jour tout seul dès que vous enregistrez.
+            </p>
+          </header>
+
+          <div class="preview">
+            <p class="card__label">Aperçu</p>
+            <!--
+              L'overlay lui-même, servi par la même origine — `frame-ancestors
+              'self'` l'autorise. Aucun `postMessage` n'est nécessaire : un
+              enregistrement diffuse un message `config` sur le WebSocket, que
+              l'overlay de ce cadre applique de lui-même.
+            -->
+            <iframe class="preview__frame" id="overlay-preview" title="Aperçu de l'overlay"></iframe>
+          </div>
+
+          <div class="fields" id="fields-appearance"></div>
+
+          <div class="actions">
+            <button class="button button--primary" type="button" id="save-appearance">
+              Enregistrer l'apparence
+            </button>
+          </div>
+        </section>
+
+        <!-- Twitch -->
+        <section class="view" id="view-twitch" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Twitch</h1>
+            <p class="view__subtitle">Connexion, autorisations et souscriptions EventSub.</p>
+          </header>
+
+          <div class="board">
+            <div class="card">
+              <p class="card__label">Chaîne</p>
+              <p class="card__value"><strong id="twitch-login">—</strong></p>
+              <p class="card__meta">
+                <span class="pill" id="twitch-connection">—</span>
+                <span class="pill" id="twitch-secret">—</span>
+              </p>
+              <p class="card__hint" id="twitch-scopes"></p>
+              <ul class="scopes" id="twitch-missing-scopes"></ul>
+              <div class="actions">
+                <button class="button" type="button" id="twitch-reconnect">
+                  Refaire la connexion
+                </button>
+                <button class="button button--danger" type="button" id="twitch-revoke">
+                  Révoquer l'accès
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Souscriptions EventSub</p>
+              <ul class="subscriptions" id="twitch-subscriptions"></ul>
+              <p class="card__hint" id="twitch-subscriptions-empty">
+                Aucune souscription active. Le compteur fonctionne, mais rien ne le fait monter.
+              </p>
+              <div class="actions">
+                <button class="button" type="button" id="twitch-refresh">Rafraîchir</button>
+              </div>
+            </div>
+          </div>
+
+          <label class="field">
+            <span class="field__label">Nouveau Client Secret</span>
+            <input class="field__input" id="twitch-client-secret" type="password" autocomplete="off" />
+            <span class="field__hint">
+              En écriture seule : chiffré sur cette machine, jamais renvoyé, jamais journalisé.
+              Laissez vide pour conserver l'actuel.
+            </span>
+          </label>
+
+          <div class="fields" id="fields-twitch"></div>
+
+          <div class="actions">
+            <button class="button button--primary" type="button" id="save-twitch">
+              Enregistrer
+            </button>
+          </div>
+        </section>
+
+        <!-- Historique -->
+        <section class="view" id="view-history" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Historique</h1>
+            <p class="view__subtitle">
+              D'où vient le temps gagné — y compris les événements qui n'ont rien crédité.
+            </p>
+          </header>
+
+          <div class="card">
+            <div class="row">
+              <label class="field field--compact">
+                <span class="field__label">Type</span>
+                <select class="field__input" id="history-type">
+                  <option value="">Tous</option>
+                  <option value="sub">Abonnements</option>
+                  <option value="resub">Réabonnements</option>
+                  <option value="gift">Dons</option>
+                  <option value="bits">Bits</option>
+                  <option value="raid">Raids</option>
+                  <option value="follow">Follows</option>
+                </select>
+              </label>
+
+              <label class="field field--compact">
+                <span class="field__label">Crédité</span>
+                <select class="field__input" id="history-applied">
+                  <option value="">Tous</option>
+                  <option value="yes">Oui</option>
+                  <option value="no">Non</option>
+                </select>
+              </label>
+
+              <label class="field field--grow">
+                <span class="field__label">Pseudo</span>
+                <input class="field__input" id="history-search" type="search" autocomplete="off" />
+              </label>
+
+              <label class="field field--compact">
+                <span class="field__label">Entrées chargées</span>
+                <select class="field__input" id="history-limit">
+                  <option value="50">50</option>
+                  <option value="200">200</option>
+                  <option value="500">500</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button class="button" type="button" id="history-refresh">Rafraîchir</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <ul class="records" id="history-list"></ul>
+            <p class="card__hint" id="history-empty">Aucune entrée ne correspond.</p>
+
+            <div class="pager">
+              <button class="button" type="button" id="history-prev">Précédent</button>
+              <span class="pager__label" id="history-page"></span>
+              <button class="button" type="button" id="history-next">Suivant</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Journaux -->
+        <section class="view" id="view-logs" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Journaux</h1>
+            <p class="view__subtitle">
+              Ce que l'application a fait, au fil de l'eau. Les secrets y sont systématiquement
+              masqués.
+            </p>
+          </header>
+
+          <div class="card">
+            <div class="row">
+              <label class="field field--compact">
+                <span class="field__label">Niveau minimal</span>
+                <select class="field__input" id="logs-level">
+                  <option value="">Tous</option>
+                  <option value="debug">Debug</option>
+                  <option value="info">Info</option>
+                  <option value="warning">Avertissement</option>
+                  <option value="error">Erreur</option>
+                </select>
+              </label>
+
+              <label class="field field--compact">
+                <span class="field__label">Portée</span>
+                <select class="field__input" id="logs-scope">
+                  <option value="">Toutes</option>
+                </select>
+              </label>
+
+              <label class="field field--grow">
+                <span class="field__label">Message</span>
+                <input class="field__input" id="logs-search" type="search" autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="actions">
+              <button class="button" type="button" id="logs-pause">Mettre en pause</button>
+              <button class="button" type="button" id="logs-refresh">Recharger</button>
+              <button class="button" type="button" id="logs-copy">Copier l'affichage</button>
+            </div>
+            <p class="card__hint" id="logs-state"></p>
+          </div>
+
+          <div class="card">
+            <ul class="records records--logs" id="logs-list"></ul>
+            <p class="card__hint" id="logs-empty">Aucun enregistrement ne correspond.</p>
+          </div>
+        </section>
+
+        <!-- Paramètres -->
+        <section class="view" id="view-settings" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Paramètres</h1>
+            <p class="view__subtitle">
+              Compteur, serveur local, journalisation et historique. Les réglages de port ne
+              prennent effet qu'au prochain démarrage.
+            </p>
+          </header>
+
+          <div class="fields" id="fields-settings"></div>
+
+          <div class="actions">
+            <button class="button button--primary" type="button" id="save-settings">
+              Enregistrer les paramètres
+            </button>
+          </div>
+        </section>
+
+        <!-- Import / export -->
+        <section class="view" id="view-transfer" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Import / export</h1>
+            <p class="view__subtitle">
+              Sauvegarder la configuration, ou la restaurer sur une autre installation.
+            </p>
+          </header>
+
+          <div class="board">
+            <div class="card">
+              <p class="card__label">Exporter</p>
+              <p class="card__hint">
+                Le fichier ne contient aucun secret : ni le Client Secret, ni les jetons Twitch.
+                Il est donc partageable tel quel.
+              </p>
+              <div class="actions">
+                <!-- Route GET : aucun jeton nécessaire, le serveur pose déjà le
+                     `content-disposition` qui déclenche le téléchargement. -->
+                <a class="button button--primary" href="/api/config/export" download>
+                  Télécharger la configuration
+                </a>
+              </div>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Importer</p>
+              <p class="card__hint">
+                Les réglages inconnus sont écartés en silence plutôt que de faire échouer le
+                fichier entier : une configuration d'une version antérieure reste importable.
+              </p>
+              <label class="field">
+                <span class="field__label">Fichier de configuration</span>
+                <input class="field__input" id="import-file" type="file" accept="application/json,.json" />
+              </label>
+              <div class="actions">
+                <button class="button" type="button" id="import-config">Importer</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/admin/main.js"></script>
+  </body>
+</html>

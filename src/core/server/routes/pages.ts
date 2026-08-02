@@ -11,6 +11,13 @@
  * précisément ce qui permet à la CSP de rester stricte : une seule exception
  * `unsafe-inline` accordée pour le confort annulerait la protection dont dépend
  * l'overlay, qui affiche des pseudos choisis par des inconnus.
+ *
+ * **Deux marqueurs, deux régimes.** Le port du WebSocket emprunte le même
+ * mécanisme mais pas la même règle : il est substitué sur les trois pages,
+ * overlay compris. Ce n'est pas un secret, et c'est l'overlay qui en a le plus
+ * besoin — il doit savoir où se connecter avant d'ouvrir quoi que ce soit, et
+ * le message `hello` qui porte ce port arrive, lui, sur la connexion qu'il
+ * aurait fallu savoir joindre.
  */
 
 import type { HttpResponse } from '../http-types.js';
@@ -19,6 +26,9 @@ import type { StaticHandler } from '../static-handler.js';
 
 /** Forme d'un jeton engendré par `createCsrfToken` : 32 octets en hexadécimal. */
 const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+
+/** Marqueur du port WebSocket. Doit rester aligné sur `web/shared/ws-url.ts`. */
+export const WS_PORT_PLACEHOLDER = '__CHRONOCAST_WS_PORT__';
 
 interface PageDefinition {
   /** Chemin du document, relatif à la racine web. */
@@ -47,6 +57,15 @@ export interface PageHandlerOptions {
   readonly staticHandler: StaticHandler;
   /** Lu à chaque requête : le jeton change à chaque démarrage. */
   readonly getCsrfToken: () => string;
+  /** Port réel du WebSocket, lu à chaque requête : il dépend du port retenu. */
+  readonly getWsPort: () => number;
+  /**
+   * État de l'assistant, lu à chaque requête.
+   *
+   * Il change en cours d'exécution, au moment précis où l'utilisateur termine
+   * l'assistant : le figer au démarrage renverrait indéfiniment vers `/setup`.
+   */
+  readonly isSetupCompleted: () => boolean;
 }
 
 /**
@@ -64,22 +83,41 @@ export function injectCsrfToken(html: string, token: string): string {
   return html.replaceAll(CSRF_PLACEHOLDER, token);
 }
 
+/**
+ * Substitue le port du WebSocket au marqueur.
+ *
+ * Même précaution que pour le jeton, et pour la même raison : la valeur finit
+ * dans un attribut HTML. Elle vient d'un serveur qui écoute réellement sur ce
+ * port, donc d'un entier — mais le vérifier coûte une ligne et ferme le sujet.
+ */
+export function injectWsPort(html: string, port: number): string {
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error('port WebSocket de forme inattendue : injection refusée');
+  }
+  return html.replaceAll(WS_PORT_PLACEHOLDER, String(port));
+}
+
 /** Retire la barre oblique finale, sauf pour la racine. */
 function normalize(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
 }
 
 export function createPageHandler(options: PageHandlerOptions): PageHandler {
-  const { staticHandler, getCsrfToken } = options;
+  const { staticHandler, getCsrfToken, getWsPort, isSetupCompleted } = options;
 
   return {
     async serve(pathname: string): Promise<HttpResponse | null> {
       const normalized = normalize(pathname);
 
-      // La racine mène au panneau d'administration : c'est la page utile quand
-      // on lance l'application, l'overlay n'étant destiné qu'à OBS.
       if (normalized === '/') {
-        return { status: 302, headers: { location: '/admin' }, body: '' };
+        // Tant que l'assistant n'a pas été mené à son terme, le panneau n'a
+        // rien à montrer et rien à commander : sans jeton Twitch, il ouvrirait
+        // sur un compteur muet. L'assistant, lui, sait quoi demander.
+        return {
+          status: 302,
+          headers: { location: isSetupCompleted() ? '/admin' : '/setup' },
+          body: '',
+        };
       }
 
       const page = PAGES[normalized];
@@ -92,20 +130,25 @@ export function createPageHandler(options: PageHandlerOptions): PageHandler {
         return response;
       }
 
-      if (!page.requiresToken) {
-        return { ...response, headers: { ...response.headers, 'cache-control': 'no-cache' } };
-      }
+      // Le port est substitué sur les trois pages. Le corps est donc réécrit
+      // même pour l'overlay, ce qui impose de recalculer la longueur — le
+      // `content-length` posé par le gestionnaire statique décrit le fichier,
+      // pas ce qu'on s'apprête à envoyer.
+      let body = injectWsPort(response.body.toString(), getWsPort());
 
-      // Un jeton mis en cache survivrait au redémarrage qui l'a invalidé : la
-      // page semblerait fonctionner tout en échouant sur chaque mutation.
-      const body = injectCsrfToken(response.body.toString(), getCsrfToken());
+      if (page.requiresToken) {
+        body = injectCsrfToken(body, getCsrfToken());
+      }
 
       return {
         status: 200,
         headers: {
           ...response.headers,
           'content-length': String(Buffer.byteLength(body, 'utf8')),
-          'cache-control': 'no-store',
+          // Un jeton mis en cache survivrait au redémarrage qui l'a invalidé :
+          // la page semblerait fonctionner tout en échouant sur chaque
+          // mutation. L'overlay, sans jeton, se contente d'un `no-cache`.
+          'cache-control': page.requiresToken ? 'no-store' : 'no-cache',
         },
         body,
       };

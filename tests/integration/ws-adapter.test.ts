@@ -123,6 +123,8 @@ describe('createWsAdapter', () => {
         clearInterval: () => undefined,
       },
       getPort: () => port,
+      // Mode `shared` : le socket est attaché au serveur HTTP, donc le même port.
+      getWsPort: () => port,
       appVersion: '0.1.0',
       logger,
     });

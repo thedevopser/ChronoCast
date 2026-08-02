@@ -29,6 +29,7 @@ import {
   type ServerMessage,
 } from '../shared/protocol.js';
 import { createWsClient, type WsSocket } from '../shared/ws-client.js';
+import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
 import { overlayCssVariables } from './overlay-style.js';
 import { createToastQueue } from './toast-queue.js';
 
@@ -212,9 +213,15 @@ function start(): void {
   }
 
   const client = createWsClient({
-    // Le WebSocket est attaché au serveur HTTP par défaut : même hôte, même
-    // port. Le mode `separate` n'est pas découvrable depuis la page.
-    url: `ws://${window.location.host}/ws`,
+    // Le port vient du marqueur substitué dans le gabarit, et non du message
+    // `hello` : celui-ci arrive sur la connexion qu'il aurait fallu savoir
+    // ouvrir. À défaut de marqueur, on reste sur l'hôte courant, ce qui est
+    // exact en mode `shared` — le défaut acté.
+    url: resolveWebSocketUrl({
+      host: window.location.host,
+      protocol: window.location.protocol,
+      port: readWebSocketPort(document),
+    }),
     channels: OVERLAY_CHANNELS,
     createSocket: createBrowserSocket,
     onMessage: handle,

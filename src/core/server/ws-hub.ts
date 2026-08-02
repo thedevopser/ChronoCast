@@ -103,6 +103,8 @@ export interface WsHubOptions {
   readonly timers: HubTimers;
   /** Port réellement retenu, transmis au client pour qu'il construise ses URL. */
   readonly getPort: () => number;
+  /** Port du WebSocket : le même en mode `shared`, un autre en mode `separate`. */
+  readonly getWsPort: () => number;
   readonly appVersion: string;
   readonly logger: Logger;
 }
@@ -121,7 +123,8 @@ interface Client {
 }
 
 export function createWsHub(options: WsHubOptions): WsHub {
-  const { bus, getConfig, getSnapshot, clock, timers, getPort, appVersion, logger } = options;
+  const { bus, getConfig, getSnapshot, clock, timers, getPort, getWsPort, appVersion, logger } =
+    options;
   const scoped = logger.child('ws');
 
   const clients = new Set<Client>();
@@ -350,6 +353,7 @@ export function createWsHub(options: WsHubOptions): WsHub {
         protocolVersion: PROTOCOL_VERSION,
         appVersion,
         port: getPort(),
+        wsPort: getWsPort(),
         // Seule la section `overlay` est transmise : elle ne contient aucun
         // secret, contrairement à la configuration complète.
         overlay: getConfig().overlay,

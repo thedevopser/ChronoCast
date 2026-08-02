@@ -12,6 +12,15 @@
     -->
     <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
 
+    <!-- Port du WebSocket, substitué lui aussi. Ce n'est pas un secret. -->
+    <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
+
+    <!--
+      Ordre imposé : les primitives d'Open Props d'abord, nos tokens
+      sémantiques ensuite — ils les référencent —, la feuille de page en
+      dernier. Elle ne connaît que nos tokens.
+    -->
+    <link rel="stylesheet" href="/shared/open-props.css" />
     <link rel="stylesheet" href="/shared/theme.css" />
     <link rel="stylesheet" href="/setup/setup.css" />
   </head>

@@ -1,0 +1,684 @@
+/*
+ * Panneau d'administration.
+ *
+ * Aucune valeur littérale : tout vient des tokens de `theme.css`, qui reposent
+ * eux-mêmes sur les primitives d'Open Props. Cette feuille ne connaît ni l'un
+ * ni l'autre — elle ne nomme que des intentions.
+ *
+ * Les classes de composant reprennent celles de l'assistant (`.button`,
+ * `.field`, `.banner`, `.note`, `.copyable`, `.actions`) : ce sont les mêmes
+ * objets, et les diviser en deux vocabulaires ferait diverger deux pages du
+ * même produit. Elles sont redéclarées plutôt que partagées faute d'une feuille
+ * commune de composants — sujet à trancher si une troisième page apparaît.
+ *
+ * Direction artistique actée : sombre, dense, accent Twitch, aucune animation
+ * superflue. C'est un outil qu'on garde ouvert six heures sur un second écran.
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Gabarit                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--cc-sidebar-width) 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-4);
+  padding: var(--cc-space-4) var(--cc-space-3);
+  background: var(--cc-surface);
+  border-right: var(--cc-border-width) solid var(--cc-border);
+  /* Le panneau se parcourt en gardant la navigation sous les yeux. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+  font-size: var(--cc-text-lg);
+  font-weight: var(--cc-weight-bold);
+}
+
+.sidebar__mark {
+  color: var(--cc-accent);
+  font-size: var(--cc-text-xl);
+  line-height: 1;
+}
+
+.sidebar__foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cc-space-2);
+  color: var(--cc-text-faint);
+  font-size: var(--cc-text-xs);
+}
+
+.content {
+  padding: var(--cc-space-5) var(--cc-space-4);
+  /* Le panneau respire, mais une ligne de texte ne traverse pas un 34 pouces. */
+  max-width: calc(var(--cc-measure) * 1.6);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Navigation                                                                  */
+/* -------------------------------------------------------------------------- */
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+}
+
+.nav__item {
+  display: block;
+  padding: var(--cc-space-2) var(--cc-space-3);
+  border-radius: var(--cc-radius);
+  color: var(--cc-text-muted);
+  text-decoration: none;
+  font-size: var(--cc-text-sm);
+}
+
+.nav__item:hover {
+  background: var(--cc-surface-raised);
+  color: var(--cc-text);
+}
+
+.nav__item[aria-current="page"] {
+  background: var(--cc-accent-soft);
+  color: var(--cc-text);
+  font-weight: var(--cc-weight-medium);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Vues                                                                        */
+/* -------------------------------------------------------------------------- */
+
+.view[hidden] {
+  display: none;
+}
+
+.view__head {
+  margin-bottom: var(--cc-space-4);
+}
+
+.view__title {
+  margin: 0;
+  font-size: var(--cc-text-xl);
+}
+
+.view__subtitle {
+  margin: var(--cc-space-1) 0 0;
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cartes                                                                      */
+/* -------------------------------------------------------------------------- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--cc-space-3);
+  margin-bottom: var(--cc-space-3);
+}
+
+.card {
+  padding: var(--cc-space-3);
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+}
+
+.card--counter {
+  /* Le compteur est ce qu'on vient voir : il occupe la largeur disponible. */
+  grid-column: 1 / -1;
+}
+
+.card__label {
+  margin: 0 0 var(--cc-space-2);
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.card__value {
+  margin: 0;
+  font-size: var(--cc-text-lg);
+}
+
+.card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+  margin: var(--cc-space-2) 0 0;
+}
+
+.card__hint {
+  margin: var(--cc-space-1) 0 0;
+  color: var(--cc-text-faint);
+  font-size: var(--cc-text-sm);
+}
+
+.counter {
+  margin: 0;
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-counter);
+  font-weight: var(--cc-weight-bold);
+  line-height: 1.1;
+  /* Les chiffres ne dansent pas d'une seconde à l'autre. */
+  font-variant-numeric: tabular-nums;
+}
+
+.rule {
+  margin: var(--cc-space-3) 0;
+  border: 0;
+  border-top: var(--cc-border-width) solid var(--cc-border);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pastilles et indicateurs                                                    */
+/* -------------------------------------------------------------------------- */
+
+.pill {
+  display: inline-block;
+  padding: var(--cc-space-1) var(--cc-space-2);
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface-raised);
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-xs);
+  font-weight: var(--cc-weight-medium);
+}
+
+.pill--ok {
+  background: var(--cc-success-soft);
+  color: var(--cc-success);
+}
+
+.pill--warning {
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning);
+}
+
+.pill--danger {
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger);
+}
+
+.dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-text-faint);
+}
+
+.dot--ok {
+  background: var(--cc-success);
+}
+
+.dot--warning {
+  background: var(--cc-warning);
+}
+
+.dot--danger {
+  background: var(--cc-danger);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Liste d'événements                                                          */
+/* -------------------------------------------------------------------------- */
+
+.events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+}
+
+.events:empty {
+  display: none;
+}
+
+.event {
+  display: grid;
+  grid-template-columns: 8rem 1fr auto;
+  align-items: center;
+  gap: var(--cc-space-2);
+  padding: var(--cc-space-2);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-raised);
+  font-size: var(--cc-text-sm);
+}
+
+.event__type {
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.event__user {
+  /* Un pseudo peut être long : il se coupe, il ne pousse pas la colonne. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event__reward {
+  font-family: var(--cc-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--cc-success);
+}
+
+.event--skipped .event__reward {
+  color: var(--cc-text-faint);
+  text-decoration: line-through;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Champs                                                                      */
+/* -------------------------------------------------------------------------- */
+
+.row {
+  display: flex;
+  gap: var(--cc-space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+  margin-bottom: var(--cc-space-3);
+}
+
+.field--grow {
+  flex: 1 1 12rem;
+}
+
+.field--compact {
+  margin-bottom: 0;
+  max-width: 14rem;
+}
+
+.field__label {
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+.field__input {
+  padding: var(--cc-space-2);
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  font-family: inherit;
+  font-size: var(--cc-text-base);
+}
+
+.field__input:focus {
+  border-color: var(--cc-accent);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Boutons                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  gap: var(--cc-space-2);
+  margin-top: var(--cc-space-3);
+}
+
+.actions--wrap {
+  flex-wrap: wrap;
+}
+
+.button {
+  padding: var(--cc-space-2) var(--cc-space-3);
+  background: var(--cc-surface-raised);
+  color: var(--cc-text);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  font-family: inherit;
+  font-size: var(--cc-text-sm);
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--cc-accent);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button--primary {
+  background: var(--cc-accent);
+  border-color: var(--cc-accent);
+  color: var(--cc-accent-text);
+  font-weight: var(--cc-weight-medium);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--cc-accent-hover);
+  border-color: var(--cc-accent-hover);
+}
+
+.button--danger:hover:not(:disabled) {
+  border-color: var(--cc-danger);
+  color: var(--cc-danger);
+}
+
+.button--ghost {
+  background: transparent;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Groupes de champs engendrés                                                 */
+/* -------------------------------------------------------------------------- */
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-3);
+  margin-bottom: var(--cc-space-3);
+}
+
+.group {
+  padding: var(--cc-space-3);
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+}
+
+.group__title {
+  margin: 0 0 var(--cc-space-3);
+  font-size: var(--cc-text-base);
+  font-weight: var(--cc-weight-medium);
+  color: var(--cc-text);
+}
+
+.group__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--cc-space-3);
+  align-items: start;
+}
+
+/* Une case à cocher tient sur une ligne : elle n'a pas besoin d'une colonne. */
+.field--switch {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--cc-space-2);
+  margin-bottom: 0;
+}
+
+.field--switch .field__label {
+  color: var(--cc-text);
+}
+
+.field__error {
+  color: var(--cc-danger);
+  font-size: var(--cc-text-sm);
+}
+
+.field__error:empty {
+  display: none;
+}
+
+.field__input--invalid {
+  border-color: var(--cc-danger);
+}
+
+/* Un sélecteur de couleur natif reste minuscule sans hauteur explicite. */
+.field__input[type="color"] {
+  height: 2.4rem;
+  padding: var(--cc-space-1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Aperçu de l'overlay                                                         */
+/* -------------------------------------------------------------------------- */
+
+.preview {
+  padding: var(--cc-space-3);
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  margin-bottom: var(--cc-space-3);
+}
+
+.preview__frame {
+  width: 100%;
+  height: 14rem;
+  border: var(--cc-border-width) dashed var(--cc-border);
+  border-radius: var(--cc-radius);
+  /* Damier : l'overlay a un fond transparent, et sur un aplat sombre on ne
+     distinguerait pas un texte noir d'un texte absent. */
+  background-color: var(--cc-bg);
+  background-image:
+    linear-gradient(45deg, var(--cc-surface-raised) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--cc-surface-raised) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--cc-surface-raised) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--cc-surface-raised) 75%);
+  background-size: 1.5rem 1.5rem;
+  background-position: 0 0, 0 0.75rem, 0.75rem -0.75rem, -0.75rem 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Paliers de bits                                                             */
+/* -------------------------------------------------------------------------- */
+
+.tiers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-2);
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--cc-space-2);
+  align-items: end;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Listes de la vue Twitch                                                     */
+/* -------------------------------------------------------------------------- */
+
+.scopes,
+.subscriptions {
+  margin: var(--cc-space-2) 0 0;
+  padding-left: var(--cc-space-3);
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+.scopes:empty,
+.subscriptions:empty {
+  display: none;
+}
+
+.subscriptions li {
+  font-family: var(--cc-font-mono);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Listes de consultation : historique et journaux                             */
+/* -------------------------------------------------------------------------- */
+
+.records {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+}
+
+.records:empty {
+  display: none;
+}
+
+.record {
+  display: grid;
+  grid-template-columns: 6rem 8rem 1fr auto;
+  gap: var(--cc-space-2);
+  align-items: baseline;
+  padding: var(--cc-space-2);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-raised);
+  font-size: var(--cc-text-sm);
+}
+
+/* Les journaux n'ont pas de colonne de récompense, mais un message long. */
+.records--logs .record {
+  grid-template-columns: 6rem 8rem 1fr;
+}
+
+.record__time,
+.record__scope {
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-xs);
+  color: var(--cc-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.record__main {
+  min-width: 0;
+}
+
+.record__title {
+  display: block;
+  /* Un pseudo ou un message long se coupe ; il ne pousse pas la colonne. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record__detail {
+  display: block;
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-xs);
+}
+
+/* Le contexte est du JSON indenté : il garde ses retours à la ligne et défile
+   pour lui-même plutôt que d'élargir la page. */
+.record__context {
+  margin: var(--cc-space-1) 0 0;
+  padding: var(--cc-space-2);
+  background: var(--cc-bg);
+  border-radius: var(--cc-radius);
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-xs);
+  color: var(--cc-text-muted);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 12rem;
+}
+
+.record__reward {
+  font-family: var(--cc-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--cc-success);
+}
+
+.record--skipped .record__reward {
+  color: var(--cc-text-faint);
+  text-decoration: line-through;
+}
+
+.record--warning {
+  border-left: 3px solid var(--cc-warning);
+}
+
+.record--error {
+  border-left: 3px solid var(--cc-danger);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cc-space-3);
+  margin-top: var(--cc-space-3);
+}
+
+.pager__label {
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Bandeau, notes, copie                                                       */
+/* -------------------------------------------------------------------------- */
+
+.banner {
+  margin: 0 0 var(--cc-space-3);
+  padding: var(--cc-space-2) var(--cc-space-3);
+  border-radius: var(--cc-radius);
+  font-size: var(--cc-text-sm);
+}
+
+.banner[hidden] {
+  display: none;
+}
+
+.banner--error {
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger);
+}
+
+.banner--success {
+  background: var(--cc-success-soft);
+  color: var(--cc-success);
+}
+
+.note {
+  margin: var(--cc-space-2) 0 0;
+  color: var(--cc-text-faint);
+  font-size: var(--cc-text-sm);
+}
+
+.copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+}
+
+.copyable--wide {
+  display: flex;
+  margin-top: var(--cc-space-2);
+}
+
+.copyable code {
+  flex: 1;
+  padding: var(--cc-space-2);
+  background: var(--cc-bg);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  font-family: var(--cc-font-mono);
+  font-size: var(--cc-text-sm);
+  overflow-x: auto;
+  white-space: nowrap;
+}
