@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, après fusion de la PR #16. **Phases 0 à 7 terminées.** L'installeur Windows est produit, s'installe et se lance, et **le flux OAuth aboutit de bout en bout** — autorisation Twitch, rappel reçu, chaîne détectée. Le défaut d'ergonomie qui le suivait — la configuration se poursuivait dans le navigateur — **est corrigé et fusionné** ; il reste à le voir fonctionner sur poste Windows, ce que le conteneur ne peut pas montrer (section 0). **La version est passée à `0.2.0`.** S'y ajoutent deux nouveautés d'apparence livrées à la demande de l'utilisateur — **cadre et dégradé** — décrites en section 0 bis. Il ne reste ensuite que la **Phase 8, la documentation**.
+**Dernière mise à jour :** 2 août 2026, après fusion de la PR #16. **Phases 0 à 7 terminées.** L'installeur Windows est produit, s'installe et se lance, et **le flux OAuth aboutit de bout en bout** — autorisation Twitch, rappel reçu, chaîne détectée. Le défaut d'ergonomie qui le suivait — la configuration se poursuivait dans le navigateur — **est corrigé et fusionné** ; il reste à le voir fonctionner sur poste Windows, ce que le conteneur ne peut pas montrer (section 0). **La version est passée à `0.2.0`.** S'y ajoutent deux nouveautés d'apparence livrées à la demande de l'utilisateur — **cadre et dégradé**, PR #17 — décrites en section 0 bis, dont une correction d'ergonomie reste à fusionner. Il ne reste ensuite que la **Phase 8, la documentation**.
 
 **Le `.exe` existe, il s'installe et il se lance.** Le workflow `Release` a produit l'installeur, l'installation aboutit, et l'application démarre sur l'assistant de première configuration avec son icône. **La Phase 7 est donc éprouvée, et pas seulement écrite.** Il reste à valider le reste du parcours sur poste Windows — la liste est en section 8, sous Phase 7.
 
@@ -35,11 +35,11 @@ Ce document permet de reprendre le développement depuis une fenêtre de context
 
 ---
 
-## 0 bis. Apparence — cadre et dégradé (branche `feat/cadre-et-degrade`)
+## 0 bis. Apparence — cadre et dégradé
 
 Deux sections de plus au schéma de l'overlay, **éteintes par défaut** : la scène OBS d'un utilisateur existant est déjà cadrée sur ce qu'il voit, et une nouveauté d'apparence ne doit rien y déplacer tant qu'il ne l'a pas demandée.
 
-- **`overlay.gradient`** — deux couleurs et un angle, appliqués **au texte et au cadre**. Une seule définition pour les deux : deux réglages séparés n'auraient servi qu'à les désaccorder.
+- **`overlay.gradient`** — deux couleurs, un angle, et **deux cibles indépendantes** : `onText` et `onFrame`. Vouloir le dégradé sur les chiffres n'implique pas de le vouloir sur le cadre. Les couleurs, elles, restent communes : les dédoubler n'aurait servi qu'à donner l'occasion de les désaccorder.
 - **`overlay.frame`** — épaisseur, arrondi, marges intérieures, couleur, remplissage et son opacité. À ne pas confondre avec `overlay.outline`, qui cerne les glyphes ; le champ correspondant a d'ailleurs été renommé « Contour des chiffres », la confusion ayant eu lieu pour de vrai.
 
 **Trois contraintes de rendu expliquent la forme du code, et se paieraient cher à redécouvrir.**
@@ -47,6 +47,8 @@ Deux sections de plus au schéma de l'overlay, **éteintes par défaut** : la sc
 1. **Le trait du cadre est un `padding` peint par le fond, pas une bordure.** `border-image` est la façon évidente de faire un trait en dégradé, et elle fait perdre `border-radius`. Il fallait choisir entre le dégradé et les coins ronds : cette construction garde les deux.
 2. **Un dégradé de texte passe par `background-clip: text`**, ce qui impose `color: transparent`. D'où le couple `--cc-text-fill` / `--cc-text-background`, et la règle qui va avec : la couleur doit redevenir opaque dès que le dégradé s'éteint, sans quoi **le compteur disparaît de la scène**.
 3. **D'où deux enveloppes autour du compteur** (`.frame`, `.frame__inner`) : le remplissage ne peut pas vivre sur l'élément du texte, il serait découpé à la forme des chiffres.
+
+**L'intérieur du cadre est libre par défaut** (`fillOpacity: 0`). Un cadre est un trait, pas un pavé : le premier défaut retenu, un noir à 0,4, laissait le dégradé transparaître à travers et faisait passer le cadre pour un fond plein — défaut corrigé sur retour d'usage, avant même la fusion.
 
 **L'opacité du remplissage est un réglage distinct de sa couleur** parce que `<input type="color">` ne sait pas exprimer la transparence. Les deux sont recomposés en notation à huit chiffres par `withOpacity`, qui développe la notation courte `#RGB` et remplace une opacité déjà portée par la couleur.
 
@@ -157,10 +159,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `feat/cadre-et-degrade`**, commitée, PR non fusionnée à l'heure où ces lignes sont écrites. Les seize PR précédentes sont fusionnées en squash ; `main` est sur `0c9fa9c`.
+**Branche courante : `fix/cadre-anneau-et-degrade-ciblable`**, PR non fusionnée à l'heure où ces lignes sont écrites. Les dix-sept PR précédentes sont fusionnées en squash ; `main` est sur `0937d9b`.
 
 ```
-0c9fa9c fix(oauth): ramener la configuration dans la fenêtre (#16)          <- main
+0937d9b feat(overlay): cadre et dégradé (#17)                                <- main
+0c9fa9c fix(oauth): ramener la configuration dans la fenêtre (#16)
 ae3f7de fix(oauth): rediriger vers localhost (#15)
 a01167c fix(windows): canoniser la racine servie, figer les fins de ligne (#14)
 0bc9120 chore(packaging): electron-builder et workflows GitHub (#13)
@@ -179,7 +182,7 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 510 tests, 70 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth, les **10** du retour dans la fenêtre et les **14** du cadre et du dégradé.)
+**1 515 tests, 70 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth, les **10** du retour dans la fenêtre et les **19** du cadre et du dégradé.)
 
 **Rien en attente hors du travail de la branche.** `git status` ne doit signaler aucun fichier une fois la branche commitée — `dist/`, `release/` et `PR-*.md` sont ignorés.
 
@@ -188,8 +191,8 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # feat/cadre-et-degrade tant que la PR n'est pas fusionnée
-./scripts/dc.sh verify       # doit être intégralement vert (1 510 tests)
+git branch --show-current    # fix/cadre-anneau-et-degrade-ciblable tant que la PR n'est pas fusionnée
+./scripts/dc.sh verify       # doit être intégralement vert (1 515 tests)
 ```
 
 **La suite de la Phase 7 ne commence pas par du code, mais par un clic** : déclencher manuellement le workflow `Release` pour obtenir un premier `.exe`. La marche à suivre est en section 8. Tant que ce build n'a pas tourné, rien de ce qui a été écrit n'a jamais été exécuté sous Windows.

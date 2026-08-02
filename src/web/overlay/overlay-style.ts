@@ -45,16 +45,13 @@ function composeTextShadow(config: OverlayConfig): string {
 }
 
 /**
- * Compose le dégradé, ou `null` s'il est éteint.
+ * Compose le dégradé.
  *
- * `null` et non `'none'` : les deux consommateurs — le texte et le cadre — en
- * font quelque chose de différent, et c'est à eux de le dire.
+ * Une seule définition, deux cibles indépendantes : c'est l'appelant qui décide
+ * s'il l'applique au texte, au cadre, aux deux ou à rien. Dédoubler les
+ * couleurs n'aurait servi qu'à donner l'occasion de les désaccorder.
  */
-function composeGradient(config: OverlayConfig): string | null {
-  if (!config.gradient.enabled) {
-    return null;
-  }
-
+function composeGradient(config: OverlayConfig): string {
   const { angleDeg, from, to } = config.gradient;
   return `linear-gradient(${String(angleDeg)}deg, ${from}, ${to})`;
 }
@@ -85,6 +82,15 @@ function withOpacity(color: string, opacity: number): string {
   return `#${rgb}${alpha}`;
 }
 
+/** Peinture du trait du cadre : rien, le dégradé, ou sa couleur unie. */
+function frameBackground(config: OverlayConfig): string {
+  if (!config.frame.enabled) {
+    return 'transparent';
+  }
+
+  return config.gradient.onFrame ? composeGradient(config) : config.frame.color;
+}
+
 /** Variables CSS décrivant l'apparence de l'overlay. */
 export function overlayCssVariables(config: OverlayConfig): Record<string, string> {
   const gradient = composeGradient(config);
@@ -100,8 +106,8 @@ export function overlayCssVariables(config: OverlayConfig): Record<string, strin
      * avec — la couleur doit redevenir opaque dès que le dégradé s'éteint,
      * sans quoi le compteur disparaît de la scène.
      */
-    '--cc-text-background': gradient ?? 'none',
-    '--cc-text-fill': gradient === null ? config.color : 'transparent',
+    '--cc-text-background': config.gradient.onText ? gradient : 'none',
+    '--cc-text-fill': config.gradient.onText ? 'transparent' : config.color,
 
     /*
      * Cadre.
@@ -118,7 +124,7 @@ export function overlayCssVariables(config: OverlayConfig): Record<string, strin
       : '0px',
     '--cc-frame-padding-x': frame.enabled ? `${String(frame.paddingX)}px` : '0px',
     '--cc-frame-padding-y': frame.enabled ? `${String(frame.paddingY)}px` : '0px',
-    '--cc-frame-background': frame.enabled ? (gradient ?? frame.color) : 'transparent',
+    '--cc-frame-background': frameBackground(config),
     '--cc-frame-fill': frame.enabled ? withOpacity(frame.fillColor, frame.fillOpacity) : 'transparent',
 
     '--cc-font-family': config.fontFamily,
