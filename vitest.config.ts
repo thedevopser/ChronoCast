@@ -47,9 +47,19 @@ export default defineConfig({
       reportsDirectory: 'coverage',
       include: ['src/**/*.ts'],
       exclude: [
-        // Coquille Electron : non exécutable dans un conteneur sans Chromium,
-        // vérifiée manuellement sur Windows (voir docs/BUILD.md).
-        'src/main/**',
+        // Coquille Electron : ces trois fichiers, et eux seuls, importent
+        // `electron`. Ils sont donc non exécutables dans un conteneur sans
+        // Chromium, et vérifiés manuellement sur Windows (voir docs/BUILD.md).
+        //
+        // L'exclusion est nominative, et non `src/main/**`, précisément pour
+        // que la discipline d'extraction soit mécanique : tout ce qui est
+        // extrait de la coquille — politique de navigation, magasin de secrets,
+        // menu du tray, ouverture de navigateur — compte dans la couverture,
+        // et une logique de décision laissée dans ces trois fichiers s'y verrait
+        // par son absence.
+        'src/main/main.ts',
+        'src/main/windows.ts',
+        'src/main/tray.ts',
         // Points d'entrée : câblage sans logique propre.
         'src/headless/index.ts',
       ],

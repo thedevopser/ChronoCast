@@ -17,24 +17,20 @@
  * du navigateur, qui se contente d'afficher l'URL.
  */
 
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 import { createApplication, type Application } from '../core/app/application.js';
+import { createFsPathProvider, defaultWebRoot } from '../core/app/fs-path-provider.js';
+import { createNodeRuntime } from '../core/app/node-runtime.js';
 import type { BrowserOpener } from '../core/app/ports.js';
 import { createSystemClock } from '../core/app/system-clock.js';
 import { createSystemTicker } from '../core/app/system-ticker.js';
 import { createLogger } from '../core/logging/logger.js';
 import { createConsoleSink } from '../core/logging/sinks/console-sink.js';
-import { createWebSocketFactory } from '../core/twitch/ws-socket-adapter.js';
 import { createAesSecretStore } from './aes-secret-store.js';
-import { createFsPathProvider } from './fs-path-provider.js';
 
 /** Version affichée aux clients WebSocket. Alignée sur `package.json` au packaging. */
 const APP_VERSION = '0.1.0';
-
-/** Racine des ressources web, surchargeable pour servir une compilation en cours. */
-const WEB_ROOT_VARIABLE = 'CHRONOCAST_WEB_ROOT';
 
 /**
  * Ouverture de navigateur dégradée.
@@ -56,21 +52,11 @@ function createConsoleBrowserOpener(): BrowserOpener {
   };
 }
 
-/** Racine par défaut des ressources web : `dist/public`, à côté du code compilé. */
-function defaultWebRoot(): string {
-  const fromEnvironment = process.env[WEB_ROOT_VARIABLE];
-  if (fromEnvironment !== undefined && fromEnvironment !== '') {
-    return fromEnvironment;
-  }
-
-  // `dist/headless/index.js` → `dist/public`. Le chemin est relatif au module
-  // compilé, jamais au répertoire courant : l'application doit démarrer de
-  // partout, y compris depuis un raccourci Windows.
-  return resolve(dirname(fileURLToPath(import.meta.url)), '..', 'public');
-}
-
 export function buildHeadlessApplication(): Application {
-  const paths = createFsPathProvider({ webRootDirectory: defaultWebRoot() });
+  // `import.meta.url` est celui de ce module, et c'est ce qui compte : la racine
+  // web se mesure depuis le point d'entrée compilé, ici `dist/headless/index.js`,
+  // qui a `dist/public` pour voisin.
+  const paths = createFsPathProvider({ webRootDirectory: defaultWebRoot(import.meta.url) });
 
   const logger = createLogger({ level: 'info', sinks: [createConsoleSink()] });
 
@@ -81,34 +67,7 @@ export function buildHeadlessApplication(): Application {
     browser: createConsoleBrowserOpener(),
     ticker: createSystemTicker(),
     appVersion: APP_VERSION,
-    hubTimers: {
-      setInterval: (handler, ms) => {
-        const timer = setInterval(handler, ms);
-        // Sans `unref`, le battement de vivacité empêcherait le processus de se
-        // terminer, et l'arrêt propre ne se terminerait jamais.
-        timer.unref();
-        return timer as unknown as number;
-      },
-      clearInterval: (id) => {
-        clearInterval(id as unknown as NodeJS.Timeout);
-      },
-    },
-    eventSubTimers: {
-      setTimeout: (handler, ms) => {
-        const timer = setTimeout(handler, ms);
-        timer.unref();
-        return timer as unknown as number;
-      },
-      clearTimeout: (id) => {
-        clearTimeout(id as unknown as NodeJS.Timeout);
-      },
-    },
-    createSocket: createWebSocketFactory(),
-    fetch: globalThis.fetch.bind(globalThis),
-    sleep: (ms) =>
-      new Promise((done) => {
-        setTimeout(done, ms).unref();
-      }),
+    ...createNodeRuntime(),
   });
 }
 
@@ -167,6 +126,3 @@ if (process.argv[1] !== undefined && import.meta.url === `file://${resolve(proce
     process.exit(1);
   });
 }
-
-/** Exporté pour que la coquille Electron partage la même racine par défaut. */
-export { defaultWebRoot };
