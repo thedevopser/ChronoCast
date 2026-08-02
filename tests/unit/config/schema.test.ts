@@ -180,6 +180,44 @@ describe('configSchema', () => {
  * pour que l'assistant ne renvoie pas indéfiniment le streamer à l'étape du
  * barème une fois sa configuration terminée.
  */
+/**
+ * Comportements de l'application de bureau.
+ *
+ * Ces deux réglages n'ont d'effet que dans la coquille Electron, et c'est
+ * légitime là où `websocket.mode` ne l'était pas : ils agissent dans
+ * l'exécutable, seul artefact que l'utilisateur reçoit. Le point d'entrée
+ * headless est un outil de développement, pas un livrable.
+ *
+ * Ce qui **ne s'y trouve pas** compte autant : fermer la fenêtre replie
+ * toujours vers le tray, sans réglage. Un compteur de subathon ne doit pas
+ * pouvoir être tué par réflexe pendant un direct, et on ne rend pas
+ * configurable ce dont la mauvaise valeur coûte le stream.
+ */
+describe('app', () => {
+  it('ne se lance pas au démarrage de la session sans qu’on le demande', () => {
+    // Une application qui s'installe au démarrage sans rien dire est une
+    // application qu'on désinstalle.
+    expect(configSchema.parse({}).app.launchAtStartup).toBe(false);
+  });
+
+  it('ouvre sa fenêtre par défaut', () => {
+    // Démarrer masqué au premier lancement laisserait croire que rien ne s'est
+    // passé. C'est un confort pour qui lance au démarrage, pas un défaut.
+    expect(configSchema.parse({}).app.startMinimized).toBe(false);
+  });
+
+  it('retient les deux réglages', () => {
+    const parsed = configSchema.parse({ app: { launchAtStartup: true, startMinimized: true } });
+
+    expect(parsed.app).toStrictEqual({ launchAtStartup: true, startMinimized: true });
+  });
+
+  it('n’expose aucun réglage de fermeture vers le tray', () => {
+    // La fermeture de la fenêtre ne se configure pas : elle replie toujours.
+    expect(configSchema.parse({}).app).not.toHaveProperty('closeToTray');
+  });
+});
+
 describe('setup', () => {
   it("part de l'idée que l'assistant n'a jamais été mené à son terme", () => {
     expect(configSchema.parse({}).setup.completed).toBe(false);
