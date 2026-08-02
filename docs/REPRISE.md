@@ -2,9 +2,9 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, après fusion de la PR #11. **Phases 0 à 6 terminées**, dette du mode WebSocket `separate` soldée au passage. Les trois interfaces web sont livrées, et la coquille Electron aussi : cycle de vie, fenêtre durcie, zone de notification, et les trois ports Windows — chemins, `safeStorage`, navigateur système.
+**Dernière mise à jour :** 2 août 2026, sur la branche `chore/packaging-ci`. **Phases 0 à 6 terminées**, dette du mode WebSocket `separate` soldée, identité visuelle intégrée, et **configuration de packaging livrée**. Les trois interfaces web sont livrées, et la coquille Electron aussi : cycle de vie, fenêtre durcie, zone de notification, et les trois ports Windows — chemins, `safeStorage`, navigateur système.
 
-**Il n'y a pas encore de `.exe`.** L'application est fonctionnellement complète mais pas empaquetée : `electron-builder` n'est pas une dépendance, aucun `electron-builder.yml` n'existe, et le service Docker `build-win` n'a jamais été exécuté. C'est l'objet de la **Phase 7**, qui est la prochaine étape et le premier livrable réellement lançable sous Windows. Le détail de ce qui manque est en section 8, sous Phase 7.
+**Le `.exe` n'a pas encore été produit, mais tout est en place pour l'obtenir.** `electron-builder` est installé et configuré, et le workflow `Release` sait construire sur un runner Windows. Il reste à le **déclencher manuellement** — la marche à suivre est en section 8, sous Phase 7 — puis à éprouver l'installeur sur un poste Windows. C'est la seule partie du projet que rien ici ne peut vérifier.
 
 **La dette actée pendant la PR C a été tranchée par le retrait** : `server.websocket.mode` et `server.websocket.port` ne sont plus au schéma. L'arbitrage et ses conséquences sont en **section 7, sous « Dette soldée »**. Il n'y a plus rien à décider sur ce sujet.
 
@@ -113,10 +113,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. Les onze PR sont fusionnées en squash.
+**Branche courante : `chore/packaging-ci`**, partie d'un `main` à jour. Un commit, celui de la configuration de packaging, qui emporte aussi cette mise à jour. Les douze PR précédentes sont fusionnées en squash.
 
 ```
-c93202f Phase 6 — Coquille Electron (#11)                                   <- main
+4078cb6 chore(assets): identité visuelle définitive (#12)                    <- main
+c93202f Phase 6 — Coquille Electron (#11)
 1720d70 refactor(config): retirer le mode WebSocket « separate » (#10)
 1726b53 Phase 5 : PR C - Panneau d'administration (#9)
 6b1bec1 feat(setup): flux OAuth complet et assistant de configuration (#8)
@@ -130,20 +131,18 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 457 tests, 66 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6 : 68 au commit 1, 50 au commit 2.)
+**1 476 tests, 68 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle et les **10** du packaging.)
 
-**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #11 a été écrite après la fusion elle-même, elle ne pouvait donc pas y figurer. Comme les fois précédentes, elle **partira dans le premier commit de la Phase 7**, sur la branche `chore/packaging-ci`, plutôt que dans une PR de documentation à elle seule. `git status` ne doit signaler aucun autre fichier — `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Ce fichier fait partie du commit en cours**, comme les fois précédentes : la mise à jour post-fusion de la PR #12 y est intégrée. `git status` ne doit signaler aucun fichier hors de ceux du commit — `dist/`, `release/` et `PR-*.md` sont ignorés.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # doit afficher main
-git pull --ff-only origin main
-./scripts/dc.sh verify       # doit être intégralement vert (1 457 tests)
-git checkout -b chore/packaging-ci
+git branch --show-current    # chore/packaging-ci tant que sa PR n'est pas fusionnée
+./scripts/dc.sh verify       # doit être intégralement vert (1 476 tests)
 ```
 
-La Phase 7 peut alors commencer, en suivant la section 8. C'est elle qui produit le premier livrable lançable : jusqu'ici, rien de ce qui a été écrit ne peut être exécuté sous Windows.
+La suite de la Phase 7 peut alors commencer, en suivant la section 8. C'est elle qui produit le premier livrable lançable : jusqu'ici, rien de ce qui a été écrit ne peut être exécuté sous Windows.
 
 **Le changement de régime a eu lieu en Phase 6, et il vaut aussi pour la suite :** le conteneur ne vérifie plus tout. `main/main.ts`, `main/windows.ts` et `main/tray.ts` importent `electron`, qu'aucun Chromium ne peut lancer ici — ils sont nommément exclus de la couverture, et éprouver leur comportement passe par vos mains sous Windows. La parade tient en une phrase : **tout ce qui décide est extrait de la coquille en modules purs**, exactement comme `src/core/**` l'a été des ports. La Phase 7 va plus loin encore, puisqu'elle produit un artefact que seul un poste Windows peut exécuter.
 
@@ -564,20 +563,41 @@ Deux visuels sources, fournis par l'utilisateur et versionnés : `assets/logo.pn
 
 ## 8. Ce qui reste à faire — Phases 7 et 8
 
-### Phase 7 — Packaging et CI
+### Phase 7 — Packaging et CI — **configuration livrée, build à éprouver**
 
-Branche suggérée : `chore/packaging-ci`.
+Branche : `chore/packaging-ci`. Ce qui s'écrit est fait et vérifié ; ce qui s'exécute sur Windows ne l'est pas encore, et c'est le seul point ouvert.
 
-`electron-builder.yml` (cible NSIS Windows uniquement), `.github/workflows/ci.yml` (lint, typecheck, tests, `npm audit` bloquant), `.github/workflows/release.yml` (tag `vX.Y.Z` → contrôle de cohérence avec `package.json` → build `.exe` → changelog depuis les commits → GitHub Release avec l'installeur et son SHA-256).
+| Livré | Rôle |
+| --- | --- |
+| `electron-builder.yml` | Cible NSIS Windows x64, `asar`, `files` explicites, installation par utilisateur |
+| `.github/workflows/ci.yml` | Lint, typecheck, tests, `npm audit --audit-level=high` bloquant, sur `ubuntu-latest` |
+| `.github/workflows/release.yml` | Build sur `windows-latest`, contrôle de cohérence du tag, artefact, GitHub Release |
+| `tests/unit/assets/packaging.test.ts` | Cohérence de la configuration — 10 tests |
 
-Le service `build-win` de `docker/compose.yml` existe déjà mais **n'a jamais été exécuté** : il faudra le vérifier.
+`electron-builder@26.15.3`, en devDependency, version figée. **234 paquets ajoutés, et `npm audit --audit-level=high` reste à zéro** : c'était le risque à lever avant d'écrire quoi que ce soit.
 
-**Constaté à la fin de la Phase 6, à traiter ici** — rien de tout cela n'existe encore, et c'est ce qui sépare aujourd'hui le dépôt d'un `.exe` lançable :
+#### Le build de release ne passe pas par Wine
 
-- **`electron-builder` n'est pas une dépendance.** `./scripts/dc.sh build:win` appelle `npx electron-builder` et échouera tant qu'il n'est pas en devDependency.
-- **Aucun `electron-builder.yml`.** Rien ne décrit la cible NSIS, le `productName` — qui doit valoir exactement `ChronoCast`, comme l'`app.setName` de `main/main.ts`, faute de quoi le répertoire de données se déplacerait — ni l'`asar`.
-- **`assets/` doit figurer dans les `files` du paquet.** `main/main.ts` y résout ses deux icônes depuis `dist/main/` : l'oublier donnerait une fenêtre et un tray sans icône, et Electron n'en dit rien.
-- **`assets/icon.ico` existe déjà** et couvre les sept tailles : c'est lui qu'attendent `nsis.installerIcon` et `win.icon`.
+**Décision prise pendant cette phase.** Le workflow construit sur un runner `windows-latest`, nativement. Le service Docker `build-win` et son image Wine restent un confort local, mais ils ne sont plus le chemin de release et n'ont pas à l'être : GitHub fournit la vraie plateforme, et un build natif est incomparablement plus fiable qu'un build croisé. Cela retire aussi du chemin critique le seul élément que le conteneur n'avait jamais exécuté.
+
+#### Comment produire un `.exe` sans publier de release
+
+Le workflow `Release` a **deux déclencheurs**, et c'est sa principale décision de conception :
+
+| Déclencheur | Effet |
+| --- | --- |
+| Tag `vX.Y.Z` poussé | Installeur **et** GitHub Release, avec l'installeur et son `.sha256` attachés |
+| Manuel (`workflow_dispatch`) | Installeur seul, **rien n'est publié**, artefact téléchargeable 30 jours |
+
+**Marche à suivre pour le mode manuel :** onglet *Actions* du dépôt → workflow *Release* dans la colonne de gauche → bouton *Run workflow* → choisir la branche → *Run workflow*. À la fin de l'exécution, l'installeur et son condensat sont dans la section *Artifacts*, sous `chronocast-windows`.
+
+Sans ce second mode, la seule façon de savoir si le build aboutit serait de créer une release — c'est-à-dire de publier avant d'avoir vérifié, puis de supprimer des tags après coup.
+
+#### Ce qui reste à faire
+
+- **Éprouver le build**, par un déclenchement manuel. C'est la seule partie de la phase que rien ici ne peut vérifier. Points de vigilance connus : `npm ci --ignore-scripts` n'exécute pas le post-install d'Electron, et l'on compte sur electron-builder pour récupérer lui-même le runtime ; `assets/**` doit se retrouver dans l'archive asar ; l'installeur doit s'appeler `ChronoCast-Setup-<version>.exe`.
+- **Valider l'installeur sur poste Windows** : installation, lancement, icône de fenêtre et de tray, `%APPDATA%\ChronoCast`, désinstallation qui conserve les données.
+- **Décider du sort de `build-win`** une fois la CI éprouvée : le garder comme confort local, ou le retirer avec son image de plusieurs gigaoctets.
 
 ### Phase 8 — Documentation
 

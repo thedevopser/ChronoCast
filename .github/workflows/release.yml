@@ -1,0 +1,123 @@
+# Construction de l'installeur Windows, et publication d'une release.
+#
+# Deux façons de le déclencher, et c'est la principale décision de ce fichier :
+#
+#   - **Un tag `vX.Y.Z` poussé** produit l'installeur *et* crée la GitHub
+#     Release, l'installeur et son SHA-256 attachés.
+#   - **Un déclenchement manuel** (onglet Actions → « Release » → « Run
+#     workflow ») produit l'installeur **sans rien publier**. Il est alors
+#     téléchargeable comme artefact de l'exécution, pendant trente jours.
+#
+# Le second mode existe pour éprouver le packaging sans polluer les releases.
+# Sans lui, la seule façon de savoir si le build aboutit serait de créer une
+# release — c'est-à-dire de publier avant d'avoir vérifié, ou de supprimer des
+# tags après coup.
+#
+# Le build tourne sur un runner **Windows**, nativement. Le service Docker
+# `build-win` et son Wine restent un confort local ; ils ne sont pas le chemin
+# de release, et n'ont pas à l'être quand GitHub fournit la vraie plateforme.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # electron-builder télécharge lui-même le runtime Electron dont il a
+      # besoin : le script post-install du paquet npm n'est pas nécessaire, et
+      # la règle `--ignore-scripts` tient donc aussi ici.
+      - name: Installer les dépendances
+        run: npm ci --ignore-scripts
+
+      # Le tag fait foi, mais `package.json` est ce qui finit dans l'installeur
+      # et dans le nom du fichier produit. Les laisser diverger publierait une
+      # release `v1.2.0` contenant un `ChronoCast-Setup-1.1.0.exe` : personne ne
+      # saurait plus quelle version est installée.
+      - name: Vérifier la cohérence du tag et de package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$manifest" ]; then
+            echo "::error::le tag ($tag) et package.json ($manifest) désignent des versions différentes"
+            exit 1
+          fi
+          echo "version : $manifest"
+
+      # La même vérification qu'en CI, avant de produire quoi que ce soit : un
+      # installeur bâti sur une suite rouge n'a aucune raison d'exister.
+      - name: Vérifier
+        run: npm run verify
+
+      - name: Compiler
+        run: npm run build
+
+      - name: Construire l'installeur
+        run: npx electron-builder --windows --publish never
+
+      # Le condensat remplace la signature que ce projet n'achète pas : il est
+      # publié avec la release pour que l'utilisateur puisse vérifier ce qu'il
+      # exécute, malgré l'avertissement SmartScreen.
+      - name: Calculer le SHA-256
+        shell: bash
+        run: |
+          cd release
+          installer="$(ls *.exe)"
+          sha256sum "$installer" > "$installer.sha256"
+          cat "$installer.sha256"
+
+      # Toujours produit, y compris en déclenchement manuel : c'est ce qui rend
+      # le mode d'essai utile.
+      - name: Publier l'artefact de l'exécution
+        uses: actions/upload-artifact@v4
+        with:
+          name: chronocast-windows
+          path: |
+            release/*.exe
+            release/*.exe.sha256
+          retention-days: 30
+
+      - name: Créer la release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/*.exe.sha256
+          generate_release_notes: true
+          # Le binaire n'est pas signé : le dire dans la release elle-même, et
+          # non seulement dans la documentation, est le seul endroit où
+          # l'utilisateur le lira au moment où la question se pose.
+          body: |
+            ## Installation
+
+            Téléchargez `ChronoCast-Setup-*.exe` et lancez-le.
+
+            **SmartScreen affichera un avertissement** : le binaire n'est pas signé,
+            un certificat de signature de code coûtant plusieurs centaines d'euros par an.
+            Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
+
+            Pour vérifier le fichier avant de l'exécuter, comparez son empreinte à celle
+            publiée dans `.sha256` :
+
+            ```powershell
+            Get-FileHash .\ChronoCast-Setup-*.exe -Algorithm SHA256
+            ```

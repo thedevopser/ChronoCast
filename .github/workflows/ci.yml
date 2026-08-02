@@ -1,0 +1,60 @@
+# Vérification continue.
+#
+# Elle exécute exactement ce que `./scripts/dc.sh verify` exécute en local, dans
+# le même ordre : lint, les trois typechecks, la suite complète, puis l'audit.
+# Le conteneur n'est pas reproduit ici — ce serait une image à construire à
+# chaque exécution pour le même résultat — mais la version de Node est celle de
+# l'image `dev`, et c'est ce qui compte.
+#
+# L'audit est **bloquant**, et c'est délibéré : il garde un droit de veto sur
+# chaque PR. C'est ce qui a fait écarter Vitest 2 en Phase 0 et Tailwind en
+# Phase 5, et ce qui a été vérifié avant d'ajouter Electron puis electron-builder.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Une nouvelle poussée annule la vérification en cours sur la même référence :
+# seul le dernier état compte, et laisser tourner les précédents ne fait
+# qu'allonger la file.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `--ignore-scripts` comme partout ailleurs : aucun script post-install de
+      # dépendance tierce n'est exécuté, ce qui ferme une voie d'attaque
+      # classique de la chaîne d'approvisionnement. Electron n'en a pas besoin
+      # ici, son binaire n'étant jamais lancé par les tests.
+      - name: Installer les dépendances
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Audit
+        run: npm audit --audit-level=high

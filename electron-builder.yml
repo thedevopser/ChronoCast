@@ -1,0 +1,78 @@
+# Packaging de ChronoCast.
+#
+# Cible unique : Windows, installeur NSIS. Linux et macOS sont hors périmètre de
+# la V1, et le resteront tant qu'elle n'est pas pleinement fonctionnelle.
+#
+# Le binaire n'est pas signé : un certificat de signature de code coûte 300 à
+# 500 € par an, ce que ce projet n'engage pas. SmartScreen affichera donc un
+# avertissement au premier lancement ; la procédure pour le passer est
+# documentée, et le SHA-256 de l'installeur est publié avec chaque release pour
+# que l'utilisateur puisse vérifier ce qu'il exécute.
+
+appId: dev.thedevopser.chronocast
+
+# Doit rester identique à l'`app.setName('ChronoCast')` de `src/main/main.ts`.
+# C'est de lui que dérive `%APPDATA%\ChronoCast`, où vivent la configuration,
+# l'état du compteur et les jetons : les désaccorder déplacerait le répertoire
+# de données d'une version à l'autre, c'est-à-dire perdrait un subathon en
+# cours. Un test tient les deux ensemble.
+productName: ChronoCast
+
+copyright: © ChronoCast
+
+directories:
+  output: release
+  buildResources: assets
+
+# Liste explicite plutôt que les exclusions par défaut. Ce qui n'est pas nommé
+# ici n'entre pas dans le paquet : ni les sources TypeScript, ni les tests, ni
+# la configuration d'outillage.
+#
+# `assets/**` est indispensable et facile à oublier : `src/main/main.ts` y
+# résout l'icône de la fenêtre et celle du tray. Sans ce motif, l'application
+# démarrerait avec l'icône par défaut d'Electron et un tray vide, sans
+# qu'Electron n'émette le moindre avertissement.
+files:
+  - dist/**/*
+  - assets/**/*
+  - package.json
+
+# Archive asar : les sources compilées ne traînent pas en clair dans
+# `resources/app`. Ce n'est pas une protection — une archive asar se lit — mais
+# cela évite qu'une modification accidentelle passe inaperçue.
+asar: true
+
+# Aucune publication automatique depuis le build. C'est le workflow de release
+# qui attache l'installeur, après avoir vérifié la cohérence du tag.
+publish: null
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: assets/icon.ico
+  # Pas de signature, et il faut le dire explicitement : sans cela, une variable
+  # d'environnement de certificat traînant sur un runner ferait échouer le build
+  # au lieu de produire un binaire non signé, comme prévu.
+  forceCodeSigning: false
+
+nsis:
+  # Installation par utilisateur, sans élévation. Trois raisons : l'application
+  # n'écrit que dans `%APPDATA%`, `safeStorage` lie de toute façon les secrets au
+  # compte Windows, et une invite UAC sur un binaire non signé est le meilleur
+  # moyen de faire renoncer quelqu'un.
+  perMachine: false
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ChronoCast
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  # Les données de l'utilisateur — compteur, configuration, jetons — ne sont
+  # jamais effacées par la désinstallation : un subathon en cours doit survivre
+  # à une réinstallation, et c'est précisément ce qu'on fait quand quelque chose
+  # ne va pas.
+  deleteAppDataOnUninstall: false
+  artifactName: ChronoCast-Setup-${version}.${ext}
