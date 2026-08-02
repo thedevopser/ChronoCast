@@ -57,6 +57,7 @@ import { createConsoleSink } from '../logging/sinks/console-sink.js';
 import { createJsonlSink, type JsonlSink } from '../logging/sinks/jsonl-sink.js';
 import { createRingBufferSink, type RingBufferSink } from '../logging/sinks/ring-buffer-sink.js';
 import { createHttpServer, type HttpServer } from '../server/http-server.js';
+import { createLoopbackPair } from '../server/loopback-pair.js';
 import { createOAuthCallbackRouter } from '../server/oauth-callback.js';
 import {
   createOAuthCallbackServer,
@@ -100,10 +101,26 @@ import type { BrowserOpener, Clock, PathProvider, SecretStore } from './ports.js
  * dans la console développeur et celle envoyée à l'autorisation. Le port HTTP
  * applicatif étant configurable — et susceptible de basculer sur un repli — il ne
  * peut pas servir : d'où ce port dédié, fixe, ouvert le temps du flux seulement.
- * Le serveur qui l'écoute arrive en Phase 5.
  */
 export const OAUTH_REDIRECT_PORT = 37_771;
-export const OAUTH_REDIRECT_URI = `http://127.0.0.1:${String(OAUTH_REDIRECT_PORT)}/callback`;
+
+/**
+ * Hôte de la redirection, et il ne se choisit pas.
+ *
+ * Twitch impose HTTPS à toute URL de redirection, **sauf pour le nom littéral
+ * `localhost`**. L'exception ne s'étend pas à `127.0.0.1` : la console
+ * développeur refuse l'adresse numérique avec « Les URLs de redirection doivent
+ * utiliser le protocole HTTPS », alors même qu'elle désigne exactement la même
+ * machine. Écrire l'adresse ici rendrait donc l'application impossible à
+ * configurer — l'utilisateur resterait bloqué à la première étape de
+ * l'assistant, sans que rien n'explique pourquoi.
+ *
+ * Conséquence à ne pas perdre de vue : `localhost` est un **nom**, que le
+ * système résout. Sous Windows il mène souvent à `::1` avant `127.0.0.1`, ce
+ * qui oblige le serveur de rappel à écouter sur les deux adresses de bouclage.
+ */
+const OAUTH_REDIRECT_HOST = 'localhost';
+export const OAUTH_REDIRECT_URI = `http://${OAUTH_REDIRECT_HOST}:${String(OAUTH_REDIRECT_PORT)}/callback`;
 
 /** Clé du secret client dans le magasin chiffré. */
 const CLIENT_SECRET_KEY = 'twitch.clientSecret';
@@ -541,16 +558,26 @@ export function createApplication(options: ApplicationOptions): Application {
     createServer:
       options.createOAuthServer ??
       ((router) =>
-        createHttpServer({
-          router,
-          host: '127.0.0.1',
-          port: OAUTH_REDIRECT_PORT,
-          // Aucun repli : Twitch exige une correspondance exacte de la redirect
-          // URI. Écouter sur 37772 rendrait le rappel introuvable, ce qui serait
-          // bien plus déroutant qu'une erreur franche.
-          portFallbackAttempts: 0,
-          maxBodyBytes: 4_096,
-          logger,
+        // Les deux adresses de bouclage, parce que la redirect URI porte le nom
+        // `localhost` — seule forme non-HTTPS que Twitch accepte — et qu'un nom
+        // se résout : sous Windows, il mène souvent à `::1` avant `127.0.0.1`.
+        // N'écouter que l'une des deux ferait échouer le rappel après
+        // l'autorisation, c'est-à-dire une fois l'utilisateur convaincu d'avoir
+        // tout bien fait.
+        createLoopbackPair({
+          createFor: (host) =>
+            createHttpServer({
+              router,
+              host,
+              port: OAUTH_REDIRECT_PORT,
+              // Aucun repli : Twitch exige une correspondance exacte de la
+              // redirect URI. Écouter sur 37772 rendrait le rappel
+              // introuvable, ce qui serait bien plus déroutant qu'une erreur
+              // franche.
+              portFallbackAttempts: 0,
+              maxBodyBytes: 4_096,
+              logger,
+            }),
         })),
     timers: options.oauthTimers ?? options.eventSubTimers,
     logger,
