@@ -37,6 +37,17 @@ const BASE: OverlayConfig = {
   glow: { enabled: false, color: '#9146FF', radius: 20 },
   animation: { onAdd: 'pulse', durationMs: 600 },
   toast: { enabled: true, durationMs: 4_000, color: '#9146FF', fontSize: 28 },
+  gradient: { enabled: false, from: '#FF3D7F', to: '#FF9A3D', angleDeg: 100 },
+  frame: {
+    enabled: false,
+    color: '#9146FF',
+    width: 4,
+    radius: 18,
+    paddingX: 24,
+    paddingY: 12,
+    fillColor: '#000000',
+    fillOpacity: 0.4,
+  },
   enableCustomCss: false,
 };
 
@@ -144,6 +155,149 @@ describe('overlayCssVariables', () => {
       expect(variables['--cc-toast-color']).toBe('#00FF00');
       expect(variables['--cc-toast-font-size']).toBe('32px');
       expect(variables['--cc-toast-duration']).toBe('3000ms');
+    });
+  });
+
+  describe('dégradé', () => {
+    /*
+     * Le dégradé ne peut pas être une simple couleur : `color` n'accepte pas
+     * d'image. Le texte est donc peint par un fond découpé à la forme des
+     * glyphes (`background-clip: text`), ce qui impose de rendre la couleur du
+     * texte transparente — sans quoi elle recouvrirait le dégradé.
+     *
+     * Corollaire à ne jamais perdre de vue : la couleur de remplissage doit
+     * redevenir opaque dès que le dégradé est éteint, faute de quoi le compteur
+     * disparaît purement et simplement de la scène.
+     */
+    it('laisse la couleur unie peindre le texte quand il est éteint', () => {
+      const variables = overlayCssVariables(BASE);
+
+      expect(variables['--cc-text-background']).toBe('none');
+      expect(variables['--cc-text-fill']).toBe('#FFFFFF');
+    });
+
+    it('peint le texte par un fond découpé quand il est actif', () => {
+      const variables = overlayCssVariables({
+        ...BASE,
+        gradient: { enabled: true, from: '#FF3D7F', to: '#FF9A3D', angleDeg: 100 },
+      });
+
+      expect(variables['--cc-text-background']).toBe('linear-gradient(100deg, #FF3D7F, #FF9A3D)');
+      expect(variables['--cc-text-fill']).toBe('transparent');
+    });
+  });
+
+  describe('cadre', () => {
+    it('est parfaitement neutre quand il est éteint', () => {
+      // Rien ne doit changer pour qui ne l'a pas demandé : la scène OBS est
+      // déjà cadrée sur ce que le streamer voit aujourd'hui.
+      const variables = overlayCssVariables(BASE);
+
+      expect(variables['--cc-frame-width']).toBe('0px');
+      expect(variables['--cc-frame-radius']).toBe('0px');
+      expect(variables['--cc-frame-padding-x']).toBe('0px');
+      expect(variables['--cc-frame-padding-y']).toBe('0px');
+      expect(variables['--cc-frame-background']).toBe('transparent');
+      expect(variables['--cc-frame-fill']).toBe('transparent');
+    });
+
+    it('reporte ses grandeurs et sa couleur quand il est actif', () => {
+      const variables = overlayCssVariables({
+        ...BASE,
+        frame: { ...BASE.frame, enabled: true },
+      });
+
+      expect(variables['--cc-frame-width']).toBe('4px');
+      expect(variables['--cc-frame-radius']).toBe('18px');
+      expect(variables['--cc-frame-padding-x']).toBe('24px');
+      expect(variables['--cc-frame-padding-y']).toBe('12px');
+      expect(variables['--cc-frame-background']).toBe('#9146FF');
+    });
+
+    it('porte le même dégradé que le texte', () => {
+      // « Le dégradé sur l'ensemble » : une seule définition, deux endroits où
+      // elle s'applique. Deux réglages séparés donneraient surtout l'occasion
+      // de les désaccorder.
+      const variables = overlayCssVariables({
+        ...BASE,
+        gradient: { enabled: true, from: '#FF3D7F', to: '#FF9A3D', angleDeg: 100 },
+        frame: { ...BASE.frame, enabled: true },
+      });
+
+      expect(variables['--cc-frame-background']).toBe(variables['--cc-text-background']);
+    });
+
+    it('creuse le rayon intérieur de l’épaisseur du trait', () => {
+      // Sans cela, l'intérieur garde des coins plus ronds que le cadre et
+      // laisse apparaître un liseré aux quatre angles.
+      const variables = overlayCssVariables({
+        ...BASE,
+        frame: { ...BASE.frame, enabled: true, radius: 18, width: 4 },
+      });
+
+      expect(variables['--cc-frame-inner-radius']).toBe('14px');
+    });
+
+    it('ne creuse jamais le rayon intérieur sous zéro', () => {
+      const variables = overlayCssVariables({
+        ...BASE,
+        frame: { ...BASE.frame, enabled: true, radius: 2, width: 10 },
+      });
+
+      expect(variables['--cc-frame-inner-radius']).toBe('0px');
+    });
+
+    describe('remplissage', () => {
+      /*
+       * L'opacité est un réglage à part parce que `<input type="color">` ne
+       * sait pas exprimer la transparence : il rend toujours six chiffres
+       * hexadécimaux. Les deux sont donc recomposés ici.
+       */
+      it('compose la couleur et l’opacité en une notation à huit chiffres', () => {
+        const variables = overlayCssVariables({
+          ...BASE,
+          frame: { ...BASE.frame, enabled: true, fillColor: '#101820', fillOpacity: 0.4 },
+        });
+
+        expect(variables['--cc-frame-fill']).toBe('#10182066');
+      });
+
+      it('traite les deux extrêmes sans cas particulier', () => {
+        const transparent = overlayCssVariables({
+          ...BASE,
+          frame: { ...BASE.frame, enabled: true, fillOpacity: 0 },
+        });
+        const opaque = overlayCssVariables({
+          ...BASE,
+          frame: { ...BASE.frame, enabled: true, fillOpacity: 1 },
+        });
+
+        expect(transparent['--cc-frame-fill']).toBe('#00000000');
+        expect(opaque['--cc-frame-fill']).toBe('#000000ff');
+      });
+
+      it('développe la notation courte avant d’y ajouter l’opacité', () => {
+        // `#RGB` est une notation légale que le schéma accepte ; y coller deux
+        // chiffres de plus produirait une couleur silencieusement fausse.
+        const variables = overlayCssVariables({
+          ...BASE,
+          frame: { ...BASE.frame, enabled: true, fillColor: '#1AF', fillOpacity: 1 },
+        });
+
+        expect(variables['--cc-frame-fill']).toBe('#11AAFFff');
+      });
+
+      it('remplace l’opacité déjà portée par la couleur', () => {
+        // Une couleur venue d'une configuration importée peut déjà porter huit
+        // chiffres. Le réglage visible dans le panneau doit l'emporter, sans
+        // quoi le curseur d'opacité n'aurait aucun effet.
+        const variables = overlayCssVariables({
+          ...BASE,
+          frame: { ...BASE.frame, enabled: true, fillColor: '#101820FF', fillOpacity: 0.4 },
+        });
+
+        expect(variables['--cc-frame-fill']).toBe('#10182066');
+      });
     });
   });
 

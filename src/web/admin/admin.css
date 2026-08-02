@@ -47,9 +47,14 @@
 }
 
 .sidebar__mark {
-  color: var(--cc-accent);
-  font-size: var(--cc-text-xl);
-  line-height: 1;
+  /*
+   * Dimensions posées ici comme dans l'attribut : la place est réservée avant
+   * même que l'image arrive, et la barre latérale ne sursaute pas au chargement.
+   */
+  width: 32px;
+  height: 32px;
+  border-radius: var(--cc-radius);
+  flex: none;
 }
 
 .sidebar__foot {

@@ -33,13 +33,30 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ASSETS = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'assets');
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ASSETS = resolve(REPO_ROOT, 'assets');
+
+/**
+ * Le logo web va dans les sources, et non dans `assets/`.
+ *
+ * `copy-web-assets.mjs` ne recopie que `src/web/**` : un fichier laissé dans
+ * `assets/` ne serait jamais servi, et la page afficherait un cadre vide.
+ */
+const WEB_SHARED = resolve(REPO_ROOT, 'src', 'web', 'shared');
 
 /** Tailles attendues par Windows : barre des tâches, bureau, explorateur. */
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
 
 /** Taille de l'icône de la zone de notification. */
 const TRAY_SIZE = 32;
+
+/**
+ * Taille du logo servi aux pages web.
+ *
+ * Affiché autour de trente pixels dans le panneau : le double couvre les
+ * écrans à forte densité sans qu'on ait à livrer deux fichiers.
+ */
+const WEB_LOGO_SIZE = 128;
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -356,3 +373,7 @@ const logo = load('logo.png');
 const icoTarget = resolve(ASSETS, 'icon.ico');
 writeFileSync(icoTarget, encodeIco(ICO_SIZES.map((size) => resize(logo, size))));
 console.log(`[icons] assets/icon.ico engendrée : ${ICO_SIZES.join(', ')}.`);
+
+const webLogoTarget = resolve(WEB_SHARED, 'logo.png');
+writeFileSync(webLogoTarget, encodePng(resize(logo, WEB_LOGO_SIZE)));
+console.log(`[icons] src/web/shared/logo.png engendré en ${String(WEB_LOGO_SIZE)}×${String(WEB_LOGO_SIZE)}.`);

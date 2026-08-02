@@ -249,13 +249,29 @@ const APPEARANCE_FIELDS: readonly AdminField[] = [
   { selector: '#overlay-shadow-offset-x', path: 'overlay.shadow.offsetX', label: 'Décalage horizontal', view: 'appearance', kind: 'number' },
   { selector: '#overlay-shadow-offset-y', path: 'overlay.shadow.offsetY', label: 'Décalage vertical', view: 'appearance', kind: 'number' },
 
-  { selector: '#overlay-outline-enabled', path: 'overlay.outline.enabled', label: 'Contour', view: 'appearance', kind: 'boolean' },
+  { selector: '#overlay-outline-enabled', path: 'overlay.outline.enabled', label: 'Contour des chiffres', view: 'appearance', kind: 'boolean' },
   { selector: '#overlay-outline-color', path: 'overlay.outline.color', label: 'Couleur du contour', view: 'appearance', kind: 'color' },
   { selector: '#overlay-outline-width', path: 'overlay.outline.width', label: 'Épaisseur', view: 'appearance', kind: 'number', min: 0 },
 
   { selector: '#overlay-glow-enabled', path: 'overlay.glow.enabled', label: 'Halo', view: 'appearance', kind: 'boolean' },
   { selector: '#overlay-glow-color', path: 'overlay.glow.color', label: 'Couleur du halo', view: 'appearance', kind: 'color' },
   { selector: '#overlay-glow-radius', path: 'overlay.glow.radius', label: 'Rayon', view: 'appearance', kind: 'number', min: 0 },
+
+  // Le dégradé vaut pour le texte **et** pour le cadre : une seule définition,
+  // parce que deux réglages séparés n'auraient servi qu'à les désaccorder.
+  { selector: '#overlay-gradient-enabled', path: 'overlay.gradient.enabled', label: 'Dégradé de couleurs', hint: 'S’applique aux chiffres et au cadre.', view: 'appearance', kind: 'boolean' },
+  { selector: '#overlay-gradient-from', path: 'overlay.gradient.from', label: 'Première couleur', view: 'appearance', kind: 'color' },
+  { selector: '#overlay-gradient-to', path: 'overlay.gradient.to', label: 'Seconde couleur', view: 'appearance', kind: 'color' },
+  { selector: '#overlay-gradient-angle', path: 'overlay.gradient.angleDeg', label: 'Sens du dégradé, en degrés', hint: '0 monte, 90 va vers la droite.', view: 'appearance', kind: 'integer', min: 0, max: 360 },
+
+  { selector: '#overlay-frame-enabled', path: 'overlay.frame.enabled', label: 'Cadre autour du compteur', view: 'appearance', kind: 'boolean' },
+  { selector: '#overlay-frame-color', path: 'overlay.frame.color', label: 'Couleur du cadre', hint: 'Ignorée quand le dégradé est actif.', view: 'appearance', kind: 'color' },
+  { selector: '#overlay-frame-width', path: 'overlay.frame.width', label: 'Épaisseur du trait', view: 'appearance', kind: 'number', min: 0, max: 40 },
+  { selector: '#overlay-frame-radius', path: 'overlay.frame.radius', label: 'Arrondi des coins', view: 'appearance', kind: 'number', min: 0, max: 200 },
+  { selector: '#overlay-frame-padding-x', path: 'overlay.frame.paddingX', label: 'Marge intérieure horizontale', view: 'appearance', kind: 'number', min: 0, max: 400 },
+  { selector: '#overlay-frame-padding-y', path: 'overlay.frame.paddingY', label: 'Marge intérieure verticale', view: 'appearance', kind: 'number', min: 0, max: 400 },
+  { selector: '#overlay-frame-fill-color', path: 'overlay.frame.fillColor', label: 'Remplissage', view: 'appearance', kind: 'color' },
+  { selector: '#overlay-frame-fill-opacity', path: 'overlay.frame.fillOpacity', label: 'Opacité du remplissage', hint: 'De 0, invisible, à 1, opaque.', view: 'appearance', kind: 'number', min: 0, max: 1 },
 
   {
     selector: '#overlay-animation-on-add',
@@ -602,6 +618,8 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.raid.', 'Raids'],
   ['rewards.follow.', 'Follows'],
 
+  ['overlay.gradient.', 'Dégradé'],
+  ['overlay.frame.', 'Cadre'],
   ['overlay.shadow.', 'Ombre portée'],
   ['overlay.outline.', 'Contour'],
   ['overlay.glow.', 'Halo'],
