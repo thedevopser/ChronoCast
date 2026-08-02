@@ -56,6 +56,16 @@ export interface HelloMessage {
   readonly appVersion: string;
   /** Port réellement retenu, qui peut différer de celui demandé après un repli. */
   readonly port: number;
+  /**
+   * Port du WebSocket, égal au précédent en mode `shared`.
+   *
+   * Il n'est **pas** ce qui rend le mode `separate` utilisable : ce message
+   * arrive sur la connexion qu'il aurait fallu savoir ouvrir. C'est le
+   * marqueur substitué dans le HTML qui joue ce rôle. Il est annoncé ici pour
+   * que le contrat soit auto-descriptif et qu'un client puisse vérifier qu'il
+   * parle bien au port qu'il croit.
+   */
+  readonly wsPort: number;
   readonly overlay: OverlayConfig;
 }
 

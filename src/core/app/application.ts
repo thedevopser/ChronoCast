@@ -453,6 +453,21 @@ export function createApplication(options: ApplicationOptions): Application {
   let httpServer: HttpServer | null = null;
   const currentPort = (): number => httpServer?.getPort() ?? 0;
 
+  /**
+   * Port sur lequel le WebSocket écoute **réellement**.
+   *
+   * C'est aujourd'hui toujours celui du serveur HTTP : l'adaptateur est branché
+   * sur son événement `upgrade`, et `server.websocket.mode` n'est lu nulle part
+   * — le mode `separate` n'a jamais reçu d'implémentation côté serveur.
+   *
+   * Renvoyer `server.websocket.port` ici serait donc annoncer un port où rien
+   * n'écoute, et transformer un réglage aujourd'hui sans effet en panne franche
+   * de l'overlay. Le jour où un second écouteur existera, **cette fonction est
+   * le seul endroit à changer** : le marqueur du gabarit, le message `hello` et
+   * `web/shared/ws-url.ts` s'en accommoderont sans modification.
+   */
+  const currentWsPort = (): number => currentPort();
+
   const hub: WsHub = createWsHub({
     bus,
     getConfig: () => configService.get(),
@@ -460,6 +475,7 @@ export function createApplication(options: ApplicationOptions): Application {
     clock,
     timers: hubTimers,
     getPort: currentPort,
+    getWsPort: currentWsPort,
     appVersion,
     logger,
   });
@@ -625,7 +641,12 @@ export function createApplication(options: ApplicationOptions): Application {
       applyManualEvent: (event) => applyDomainEvent(event),
       logger,
     }),
-    pageHandler: createPageHandler({ staticHandler, getCsrfToken: () => csrfToken }),
+    pageHandler: createPageHandler({
+      staticHandler,
+      getCsrfToken: () => csrfToken,
+      getWsPort: currentWsPort,
+      isSetupCompleted: () => configService.get().setup.completed,
+    }),
     staticHandler,
     getCsrfToken: () => csrfToken,
     logger,

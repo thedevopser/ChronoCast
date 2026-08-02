@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 1er août 2026. Phases 0 à 4 terminées. **Phase 5 : PR A fusionnée (#7), PR B écrite et verte sur `feat/setup-oauth`, en attente de relecture.** Reste la **PR C** (panneau d'administration).
+**Dernière mise à jour :** 1er août 2026, après fusion de la PR #8. Phases 0 à 4 terminées. **Phase 5 : PR A (#7) et PR B (#8) fusionnées — l'overlay et l'assistant de première configuration sont livrés.** Reste la **PR C**, le panneau d'administration, décrite en section 8. C'est la plus lourde des trois : un découpage est proposé plus bas.
 
 ---
 
@@ -109,10 +109,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `feat/setup-oauth`**, partie de `main` à `67d9219`. La PR B y est écrite et verte, **non commitée** — l'utilisateur seul décide du moment. Les sept PR précédentes sont fusionnées en squash.
+**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. Les huit PR sont fusionnées en squash.
 
 ```
-67d9219 feat(web): fondations web et overlay OBS (#7)                 <- main
+6b1bec1 feat(setup): flux OAuth complet et assistant de configuration (#8)  <- main
+67d9219 feat(web): fondations web et overlay OBS (#7)
 eb02663 Phase 4 — Serveurs locaux et point d'entrée headless (#6)
 28cf0c4 docs: ajouter le document de reprise et rendre docs/ versionnable (#5)
 6da9bfd Module Twitch : OAuth, Helix, EventSub, conversion et déduplication (#4)
@@ -124,14 +125,18 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 
 **1 025 tests, 47 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur.**
 
-**Seule modification en attente : ce fichier.** ### Première action à la reprise
+**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #8 a été écrite après la fusion elle-même, elle ne pouvait donc pas y figurer. Comme les fois précédentes, elle **partira dans le premier commit de la PR C**, sur la branche `feat/admin-web`, plutôt que dans une PR de documentation à elle seule. `git status` ne doit signaler aucun autre fichier.
+
+### Première action à la reprise
 
 ```bash
-git branch --show-current    # doit afficher feat/setup-oauth
+git branch --show-current    # doit afficher main
+git pull --ff-only origin main
 ./scripts/dc.sh verify       # doit être intégralement vert (1 025 tests)
+git checkout -b feat/admin-web
 ```
 
-Puis, selon ce que décide l'utilisateur : committer la PR B, ou enchaîner sur la PR C (`feat/admin-web`) en suivant la section 8.
+La PR C peut alors commencer, en TDD, en suivant la section 8.
 
 ---
 
@@ -267,7 +272,7 @@ Découpée en trois branches successives (voir « Décisions actées » plus bas
 | PR | Branche | État |
 | --- | --- | --- |
 | A | `feat/overlay-web` | **Fusionnée (#7)** — dette `tsconfig.web.json` payée, `web/shared/` complet, overlay complet |
-| B | `feat/setup-oauth` | **Écrite, en attente de fusion** — serveur loopback OAuth, extension d'`Application`, assistant de première configuration |
+| B | `feat/setup-oauth` | **Fusionnée (#8)** — serveur loopback OAuth, extension d'`Application`, assistant de première configuration |
 | C | `feat/admin-web` | **Prochaine étape** — panneau d'administration et ses vues |
 
 `web/shared/` et `web/overlay/` sont livrés : voir le détail de la PR A plus bas. **Les PR B et C consomment `web/shared/` tel quel** — `protocol.ts`, `ws-client.ts`, `safe-dom.ts`, `time-format.ts`, `countdown.ts` — et n'ont aucune raison d'en réécrire une partie.
@@ -333,7 +338,7 @@ Dette `tsconfig.web.json` payée, `web/shared/` complet, overlay complet. `npm r
 2. **Le mode `server.websocket.mode: 'separate'` n'est pas découvrable depuis la page.** Le message `hello` ne porte que le port HTTP. L'overlay se connecte donc à `window.location.host`, ce qui ne vaut que pour le mode `shared` — qui est le défaut et la décision actée. Ajouter le port WebSocket au `hello` réglerait le sujet.
 3. **Les fichiers `.js.map` sont émis dans `dist/public` mais absents de la liste blanche du serveur statique**, donc servis en 404. Sans conséquence fonctionnelle, mais à trancher au packaging (Phase 7) : les exclure du build de production plutôt que les livrer inaccessibles.
 
-#### PR B — `feat/setup-oauth` — **écrite, en attente de fusion, 83 tests, 1 025 au total**
+#### PR B — `feat/setup-oauth` — **fusionnée (#8), 83 tests, 1 025 au total**
 
 Serveur loopback OAuth, extension d'`Application`, assistant de première configuration.
 
@@ -362,6 +367,66 @@ Serveur loopback OAuth, extension d'`Application`, assistant de première config
 - **Open Props n'est toujours pas vendoré.** `web/shared/theme.css` définit des tokens sémantiques que la PR C rebasera sur les primitives Open Props sans toucher à une seule règle de composant. Le vendorer maintenant n'aurait rien changé au rendu de l'assistant.
 
 **Un point resté ouvert :** l'assistant n'est atteignable qu'en tapant `/setup`, `/` redirigeant vers `/admin` depuis la Phase 4. Une fois `setup.completed` disponible, `/` devrait rediriger vers `/setup` tant qu'il vaut `false`. C'est une modification de `routes/pages.ts`, qui appartient naturellement à la PR C — celle qui livre `/admin`.
+
+#### PR C — `feat/admin-web` — **prochaine étape**
+
+C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies : huit vues, un routage par hash, une couche de liaison de formulaires pour environ soixante-dix réglages, l'aperçu d'apparence en `<iframe>`, la vendorisation d'Open Props, et la bascule de `/`. Ne pas l'attaquer d'un bloc.
+
+**Découpage retenu, chaque lot étant utilisable seul, les trois sur la branche `feat/admin-web` en trois commits pour une seule PR :**
+
+1. **Socle** — **fait, 87 tests, 1 112 au total.** Open Props 1.7.23 vendoré, `theme.css` rebasé, port WebSocket découvrable, redirection de `/` vers `/setup`, routage par hash, coquille du panneau avec navigation latérale, et vue *tableau de bord* branchée sur le WebSocket. Détail plus bas.
+2. **Vues de saisie** — barème, apparence avec aperçu live, paramètres, import/export. C'est ici que vit la couche de liaison de formulaires : la partie à concevoir soigneusement, sous peine d'écrire dix fois le même code.
+3. **Vues de consultation** — historique et journaux, avec pagination et filtres.
+
+**Travaux à ne pas oublier, tracés depuis les PR précédentes :**
+
+- **Vendorer Open Props** (lot 1) selon la décision actée : fichier unique dans `src/web/shared/`, non modifié, en-tête portant version, licence MIT et SHA-256, récupéré par `npm pack open-props@<version>` dans le conteneur puis extraction — pas de `curl`. `web/shared/theme.css` existe déjà et n'expose que des tokens sémantiques : le rebasage ne doit toucher **aucune** règle de composant, ni dans `setup.css`, ni ailleurs.
+- **Faire pointer `/` vers `/setup` tant que `setup.completed` vaut `false`.** La redirection actuelle vers `/admin` date de la Phase 4, avant que ce réglage existe. Un nouvel utilisateur doit tomber sur l'assistant, pas sur un panneau qu'il ne peut pas encore remplir. Modification de `routes/pages.ts`, qui devra recevoir un accès à la configuration.
+- **Route de `custom.css`** pour honorer `overlay.enableCustomCss`, tracé depuis la PR A. Le réglage existe au schéma depuis la Phase 1 mais `static-handler.ts` ne sert que `webRootDirectory` : il faut une route dédiée lisant le répertoire de données, avec les mêmes gardes de chemin.
+- **Le port WebSocket** : traité par le lot 1, mais le sujet ne se referme pas là. Voir la dette décrite juste après.
+
+#### Dette — le mode `separate` du WebSocket n'existe pas côté serveur
+
+Découvert pendant le lot 1 de la PR C, en câblant ce qui devait « rendre le mode `separate` utilisable ». Ce n'est pas une dette de la Phase 5 mais de la **Phase 4**, et elle est plus lourde que ce que la note laissée en PR A laissait croire.
+
+**Ce qui a été constaté.**
+
+1. **La note de la PR A était incomplète.** Elle disait qu'ajouter le port au message `hello` « réglerait le sujet ». C'est faux : le `hello` arrive **sur** la connexion WebSocket, donc pour le lire il faut déjà avoir su joindre le bon port. Le message ne peut servir qu'à vérifier après coup, ou à orienter une reconnexion — jamais la première connexion, qui est précisément le cas à traiter.
+2. **Le réglage n'est lu nulle part.** Un `grep` sur `websocket.mode` et `websocket.port` dans `src/` ne renvoie que leur déclaration dans `core/config/schema.ts`. Aucun consommateur. `createWsAdapter` est branché sur l'événement `upgrade` du serveur HTTP via `onUpgrade`, quel que soit le réglage : le socket est **toujours** en mode `shared` dans les faits.
+3. **Deux réglages sont donc inertes**, et l'un des deux est trompeur : régler `mode: 'separate'` ne produit aucun effet observable aujourd'hui, ni erreur ni changement de comportement.
+
+**Ce qui a été livré par le lot 1, et qui tient.** La chaîne côté client est complète et testée : marqueur `__CHRONOCAST_WS_PORT__` substitué par `routes/pages.ts` sur les **trois** pages — ce n'est pas un secret, contrairement au jeton CSRF, et c'est l'overlay qui en a le plus besoin puisqu'il n'a aucune autre voie pour interroger le serveur avant d'ouvrir son socket ; `web/shared/ws-url.ts` qui lit ce marqueur et compose l'URL, avec repli silencieux sur l'hôte courant pour toute valeur inattendue ; `wsPort` ajouté à `HelloMessage` des deux côtés du contrat. L'overlay et le panneau consomment ce module au lieu de coder l'URL en dur.
+
+**Ce qui a été délibérément écarté.** `application.ts` expose `currentWsPort()`, qui renvoie **le port HTTP réel** et non `config.server.websocket.port`. Renvoyer le réglage annoncerait un port où rien n'écoute : cela transformerait un réglage aujourd'hui sans effet en panne franche de l'overlay, en plein direct, pour quelqu'un qui aurait simplement exploré la configuration. Le commentaire posé sur cette fonction indique qu'elle est **le seul endroit à changer** le jour où un second écouteur existera.
+
+**Ce qu'il resterait à faire, si l'on décide d'implémenter.** Un second serveur HTTP minimal, bindé `127.0.0.1` sur `server.websocket.port`, ne servant que l'`upgrade` ; la garde d'`Host` posée sur cette poignée de main, comme elle l'est déjà dans `ws-adapter.ts` ; le contrôle d'`Origin` du CSRF conservé ; le repli de port explicitement **refusé**, sur le modèle du port de rappel OAuth — un socket qui écoute ailleurs qu'annoncé est introuvable ; le cycle de vie branché sur `start()` et `stop()` ; `currentWsPort()` rebasculé sur le réglage ; et des tests d'intégration ouvrant un vrai client sur le second port.
+
+**Avis sur la suite.** Trois issues cohérentes, une seule mauvaise. Implémenter proprement, en lot séparé et hors PR C — c'est du serveur, pas du panneau. Retirer les deux réglages du schéma, ce qui supprime la dette au lieu de la porter. Ou les documenter comme non implémentés. La seule option à écarter est de laisser en l'état un réglage qui promet un comportement qu'il ne produit pas. À noter que `shared` est la décision actée de la section 4, que rien dans le produit n'a besoin de `separate`, et qu'aucun utilisateur ne l'a demandé : le retrait est défendable, et il est gratuit.
+
+**Ce qui est déjà en place et ne doit pas être réécrit :** `web/shared/api-client.ts` (jeton CSRF, erreurs `ApiError` typées), `ws-client.ts`, `countdown.ts`, `safe-dom.ts`, `time-format.ts`, `protocol.ts`, `theme.css`, et depuis le lot 1 `ws-url.ts` et `open-props.css`. Le panneau les consomme tels quels.
+
+#### Lot 1 de la PR C — livré, 87 tests
+
+| Fichier | Rôle |
+| --- | --- |
+| `web/shared/open-props.css` | Open Props 1.7.23 vendoré, en-tête portant version, licence MIT et SHA-256 |
+| `web/shared/theme.css` | Tokens rebasés sur les primitives, plus ceux dont le panneau a besoin |
+| `web/shared/ws-url.ts` | Lecture du marqueur de port et composition de l'URL du socket |
+| `web/admin/router.ts` | Liste close des vues, hash tolérant en forme et strict en fond |
+| `web/admin/dashboard-model.ts` | Réducteur immuable des messages en modèle d'affichage |
+| `web/admin/index.html`, `admin.css`, `main.ts` | Coquille, navigation latérale, câblage |
+| `core/server/routes/pages.ts` | Second marqueur, et redirection de `/` selon `setup.completed` |
+| `tests/security/xss-admin.test.ts` | Audit du gabarit |
+| `tests/unit/assets/open-props-vendor.test.ts` | Recalcul du condensat du fichier vendoré |
+
+**Décisions prises pendant ce lot :**
+
+- **Le rebasage sur Open Props est partiel, et c'est délibéré.** Ses échelles ne coïncident pas avec les valeurs déjà livrées : rayons de 5px et 1rem là où l'assistant emploie 6px et 10px, pas de 2.5rem dans l'échelle d'espacement, ombres réglées sur `prefers-color-scheme` alors que le thème est sombre quoi qu'en dise le poste. Aligner de force aurait changé le rendu d'une page déjà relue — ce n'est pas un rebasage mais une refonte déguisée. La règle écrite en tête de `theme.css` : un token référence la primitive quand elle vaut **exactement** la valeur retenue, sinon il garde son littéral avec la raison en commentaire. Une couche de tokens sémantiques a le droit de porter des valeurs que les primitives ne fournissent pas ; c'est ce qui la distingue d'un alias. Les nouveaux tokens du panneau, eux, sont tous adossés aux primitives, n'ayant aucun rendu antérieur à préserver.
+- **Le condensat du fichier vendoré porte sur le contenu hors en-tête**, et un test le recalcule à chaque exécution de la suite. Un remplacement silencieux du fichier fait donc échouer la suite, ce qu'on attend d'un fichier réputé non modifié.
+- **La liste des vues s'allonge lot par lot** plutôt que d'annoncer d'emblée les huit. Une entrée de navigation menant à une section inexistante ferait lever `requireElement` au premier clic, et chaque lot doit rester utilisable seul.
+- **Le modèle du tableau de bord renvoie l'état identique par référence** quand un message ne change rien, exactement comme les réducteurs du noyau : la vue s'en sert pour ne pas repeindre une liste inchangée à chaque battement.
+- **Rien n'est assaini dans le modèle.** Les pseudos le traversent tels quels et ne sont nettoyés qu'à l'écriture, par `safe-dom`. Deux endroits où s'en souvenir, c'est un endroit où l'oublier.
+- **Le tableau de bord retient aussi les événements non crédités.** Un don écarté par le plafond est précisément celui qui intrigue.
 
 ### Phase 6 — Coquille Electron
 

@@ -185,6 +185,8 @@ export interface HelloMessage {
   readonly protocolVersion: number;
   readonly appVersion: string;
   readonly port: number;
+  /** Port du WebSocket, égal au précédent en mode `shared`. Voir `ws-url.ts`. */
+  readonly wsPort: number;
   readonly overlay: OverlayConfig;
 }
 

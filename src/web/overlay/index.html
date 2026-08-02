@@ -10,7 +10,15 @@
       marqueur que sur /admin et /setup. L'overlay ne mute rien, et une page
       affichée dans OBS n'a aucune raison de porter un secret.
 
-      Aucune ressource distante non plus. La CSP l'interdirait de toute façon,
+      Le port du WebSocket, lui, est bien substitué : ce n'est pas un secret, et
+      c'est la seule façon pour l'overlay de savoir où se connecter avant
+      d'ouvrir le socket. Le `hello` qui porte ce port arrive trop tard, puisque
+      c'est ce même socket qu'il aurait fallu joindre.
+    -->
+    <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
+
+    <!--
+      Aucune ressource distante. La CSP l'interdirait de toute façon,
       mais la vraie raison est ailleurs : l'application doit fonctionner sans
       connexion, et une Browser Source qui attend une police sur un CDN affiche
       un compteur vide pendant plusieurs secondes au démarrage de la scène.

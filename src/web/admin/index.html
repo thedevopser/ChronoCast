@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChronoCast — Administration</title>
+
+    <!--
+      Jeton CSRF, substitué par `routes/pages.ts` au moment de servir la page.
+      Il n'est exposé par aucune route : une page tierce ne peut ni le lire ni
+      le deviner, et c'est ce qui protège toutes les mutations de l'API.
+    -->
+    <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
+
+    <!-- Port du WebSocket, substitué lui aussi. Ce n'est pas un secret. -->
+    <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
+
+    <!--
+      Ordre imposé : les primitives d'Open Props d'abord, nos tokens
+      sémantiques ensuite — ils les référencent —, la feuille de page en
+      dernier. Elle ne connaît que nos tokens.
+    -->
+    <link rel="stylesheet" href="/shared/open-props.css" />
+    <link rel="stylesheet" href="/shared/theme.css" />
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
+
+  <body>
+    <!--
+      Aucun `<form>` : `form-action 'none'` interdit toute soumission. Les
+      boutons sont en `type="button"` et tout passe par `fetch`.
+    -->
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sidebar__brand">
+          <span class="sidebar__mark" aria-hidden="true">◷</span>
+          <span class="sidebar__name">ChronoCast</span>
+        </div>
+
+        <!-- Peuplée par `main.ts` depuis la liste close de `router.ts`. -->
+        <nav class="nav" id="nav" aria-label="Sections du panneau"></nav>
+
+        <div class="sidebar__foot">
+          <span class="sidebar__version" id="app-version"></span>
+          <span class="dot" id="link-state" title="État de la liaison au serveur"></span>
+        </div>
+      </aside>
+
+      <main class="content">
+        <p class="banner" id="banner" hidden></p>
+
+        <!-- Tableau de bord -->
+        <section class="view" id="view-dashboard" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Tableau de bord</h1>
+            <p class="view__subtitle">
+              L'état du subathon en direct, et les commandes qui agissent dessus.
+            </p>
+          </header>
+
+          <div class="board">
+            <div class="card card--counter">
+              <p class="card__label">Temps restant</p>
+              <p class="counter" id="counter">--:--:--</p>
+              <p class="card__meta">
+                <span class="pill" id="counter-status">—</span>
+                <span class="card__hint" id="counter-detail"></span>
+              </p>
+
+              <div class="actions">
+                <button class="button" type="button" id="pause">Mettre en pause</button>
+                <button class="button" type="button" id="resume">Reprendre</button>
+                <button class="button button--danger" type="button" id="reset">
+                  Remettre à zéro
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Twitch</p>
+              <p class="card__value">
+                <span class="pill" id="twitch-status">—</span>
+              </p>
+              <p class="card__hint" id="twitch-detail"></p>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Overlay</p>
+              <p class="card__hint">Adresse à coller dans une source Navigateur d'OBS.</p>
+              <span class="copyable copyable--wide">
+                <code id="overlay-url"></code>
+                <button class="button button--ghost" type="button" data-copy="overlay-url">
+                  Copier
+                </button>
+              </span>
+            </div>
+          </div>
+
+          <div class="board">
+            <div class="card">
+              <p class="card__label">Ajuster le compteur</p>
+
+              <div class="row">
+                <label class="field field--compact">
+                  <span class="field__label">Durée, en secondes</span>
+                  <input class="field__input" id="adjust-seconds" type="number" min="1" step="1" value="60" />
+                </label>
+                <label class="field field--grow">
+                  <span class="field__label">Motif</span>
+                  <input
+                    class="field__input"
+                    id="adjust-reason"
+                    type="text"
+                    maxlength="200"
+                    placeholder="ajout manuel"
+                    autocomplete="off"
+                  />
+                </label>
+              </div>
+
+              <div class="actions">
+                <button class="button button--primary" type="button" id="add-time">Ajouter</button>
+                <button class="button" type="button" id="remove-time">Retirer</button>
+              </div>
+
+              <hr class="rule" />
+
+              <label class="field field--compact">
+                <span class="field__label">Valeur de départ, en heures</span>
+                <input class="field__input" id="initial-hours" type="number" min="0.25" step="0.25" />
+              </label>
+              <p class="note">
+                Changer la valeur de départ en plein subathon ne touche pas au temps restant : le
+                répercuter effacerait le temps gagné par les spectateurs.
+              </p>
+              <div class="actions">
+                <button class="button" type="button" id="save-initial">Enregistrer</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <p class="card__label">Tester l'overlay</p>
+              <p class="card__hint">
+                Injecte un événement de démonstration : il crédite réellement du temps et apparaît
+                dans l'historique, marqué comme manuel.
+              </p>
+              <div class="actions actions--wrap" id="overlay-tests">
+                <button class="button" type="button" data-test-event="sub">Abonnement</button>
+                <button class="button" type="button" data-test-event="resub">Réabonnement</button>
+                <button class="button" type="button" data-test-event="gift">Dons</button>
+                <button class="button" type="button" data-test-event="bits">Bits</button>
+                <button class="button" type="button" data-test-event="raid">Raid</button>
+                <button class="button" type="button" data-test-event="follow">Follow</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="card__label">Derniers événements</p>
+            <ul class="events" id="events"></ul>
+            <p class="card__hint" id="events-empty">Aucun événement depuis l'ouverture du panneau.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/admin/main.js"></script>
+  </body>
+</html>
