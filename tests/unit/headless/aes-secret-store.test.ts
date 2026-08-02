@@ -38,6 +38,12 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
 }
 
 describe('createAesSecretStore', () => {
+  // Windows ne connaît pas les permissions POSIX : `stat` y rend `0o666` quoi
+  // qu'on demande. L'assertion n'a donc de sens que là où le mode existe, et
+  // c'est sans conséquence : sous Windows, la protection réelle des secrets
+  // vient de DPAPI, pas d'un bit de permission.
+  const itPosix = process.platform === 'win32' ? it.skip : it;
+
   let directory: string;
   let store: SecretStore;
   let sink: LogSink & { readonly records: LogRecord[] };
@@ -164,7 +170,7 @@ describe('createAesSecretStore', () => {
       expect(await fresh.read('twitch')).toBeNull();
     });
 
-    it('restreint les droits du fichier de clé', async () => {
+    itPosix('restreint les droits du fichier de clé', async () => {
       await store.write('twitch', 'jeton');
 
       const mode = (await stat(join(directory, 'secret.key'))).mode & 0o777;

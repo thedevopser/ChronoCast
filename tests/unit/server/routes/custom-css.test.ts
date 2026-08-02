@@ -151,3 +151,44 @@ describe('createCustomCssHandler', () => {
     expect((await handler.serve('/custom.css/'))?.status).toBe(200);
   });
 });
+
+/**
+ * Répertoire de données atteint par un chemin non canonique.
+ *
+ * Même défaut, même cause et même correction que dans `static-handler.ts` :
+ * comparer la forme canonique rendue par `realpath` à une racine qui ne l'est
+ * pas refuse tout. Sous Windows, un nom court 8.3 ou un `%APPDATA%` redirigé
+ * suffit — la feuille personnelle ne serait jamais servie, et l'utilisateur
+ * n'aurait que le réglage activé pour l'expliquer.
+ */
+describe('createCustomCssHandler — répertoire non canonique', () => {
+  let base: string;
+
+  beforeEach(async () => {
+    base = await mkdtemp(join(tmpdir(), 'chronocast-css-lien-'));
+  });
+
+  afterEach(async () => {
+    await rm(base, { recursive: true, force: true });
+  });
+
+  it('sert la feuille malgré un chemin de répertoire non canonique', async () => {
+    const real = join(base, 'reel');
+    await mkdir(real, { recursive: true });
+    await writeFile(join(real, 'custom.css'), 'body { color: red }', 'utf8');
+
+    const alias = join(base, 'alias');
+    await symlink(real, alias, 'dir');
+
+    const handler = createCustomCssHandler({
+      dataDirectory: alias,
+      isEnabled: () => true,
+      logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),
+    });
+
+    const response = await handler.serve('/custom.css');
+
+    expect(response?.status).toBe(200);
+    expect(response?.body.toString()).toContain('color: red');
+  });
+});

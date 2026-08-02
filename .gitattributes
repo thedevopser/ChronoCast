@@ -1,0 +1,27 @@
+# Fins de ligne, normalisées une fois pour toutes.
+#
+# Sans ce fichier, Git applique la configuration locale de chacun. Sur un runner
+# Windows — celui qui construit l'installeur — `core.autocrlf` vaut `true` par
+# défaut : les fichiers sont convertis en CRLF au checkout, et leur contenu
+# **change** entre le dépôt et le disque.
+#
+# Ce n'est pas une question de confort. Le fichier Open Props vendoré porte un
+# condensat SHA-256 vérifié par la suite de tests, précisément pour qu'un
+# remplacement silencieux se voie. La conversion en CRLF le fait échouer, et
+# c'est ce qui a fait tomber quatre tests au premier build Windows : le test a
+# détecté, à raison, que le fichier livré n'était plus celui qui avait été
+# vendoré.
+#
+# `text=auto eol=lf` fixe la règle : Git détecte ce qui est du texte, le stocke
+# en LF dans le dépôt, et le restitue en LF sur le disque, quelle que soit la
+# plateforme. Le projet n'a aucun fichier qui exige des CRLF — les scripts
+# `.ps1` de l'installeur sont engendrés par NSIS, pas versionnés ici.
+* text=auto eol=lf
+
+# Binaires : jamais touchés, sous aucun prétexte. Une conversion de fins de
+# ligne sur un PNG ou un ICO le corrompt silencieusement, et le fichier ne se
+# révèle illisible qu'au chargement.
+*.png binary
+*.ico binary
+*.woff binary
+*.woff2 binary

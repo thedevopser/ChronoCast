@@ -111,6 +111,31 @@ export function createStaticHandler(options: StaticHandlerOptions): StaticHandle
   const root = resolve(options.rootDirectory);
   const scoped = logger.child('static');
 
+  /**
+   * Forme canonique de la racine, résolue une fois puis mémorisée.
+   *
+   * Elle est indispensable : le contrôle anti-lien-symbolique compare un chemin
+   * passé par `realpath` à la racine, et comparer une forme canonique à une
+   * forme qui ne l'est pas refuse **tout**. C'est ce qui est arrivé au premier
+   * build Windows, où le répertoire temporaire du runner s'appelle
+   * `C:\Users\RUNNER~1\...` — un nom court 8.3 — quand `realpath` rend
+   * `C:\Users\runneradmin\...`. Les noms courts, les jonctions et un `%TEMP%`
+   * redirigé produisent le même écart sur un poste réel : l'application
+   * n'aurait servi ni overlay, ni panneau, ni assistant.
+   *
+   * Mémorisée parce que la racine ne change pas de la vie du serveur, et qu'un
+   * appel système par ressource servie serait payé à chaque image de l'overlay.
+   *
+   * Repli sur `root` si la racine n'existe pas encore : mieux vaut se comporter
+   * comme avant que refuser de démarrer. Le contrôle reste alors strictement
+   * aussi sévère qu'auparavant.
+   */
+  let canonicalRoot: Promise<string> | null = null;
+  function resolveCanonicalRoot(): Promise<string> {
+    canonicalRoot ??= realpath(root).catch(() => root);
+    return canonicalRoot;
+  }
+
   function notFound(): HttpResponse {
     return {
       status: 404,
@@ -135,7 +160,10 @@ export function createStaticHandler(options: StaticHandlerOptions): StaticHandle
         // symboliques. Sans ce second contrôle, un lien déposé dans la racine
         // ouvrirait l'ensemble du disque.
         const canonical = await realpath(filePath);
-        if (!isInside(root, canonical)) {
+        // Les deux côtés de la comparaison sont canoniques : c'est la seule
+        // façon de n'accepter que ce qui est réellement sous la racine, sans
+        // refuser ce qui y est par un chemin d'un autre nom.
+        if (!isInside(await resolveCanonicalRoot(), canonical)) {
           scoped.warning('lien symbolique sortant de la racine refusé', { pathname });
           return notFound();
         }

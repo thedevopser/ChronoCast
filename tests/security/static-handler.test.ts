@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -38,7 +38,11 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
 }
 
 describe('resolveStaticPath', () => {
-  const root = '/srv/chronocast/public';
+  // `resolve` d'un chemin POSIX écrit en dur y ajoute la lettre de lecteur sous
+  // Windows — `/srv/...` devient `D:\srv\...` — et l'égalité attendue ne tient
+  // plus. La racine est donc construite par la plateforme elle-même, ce qui est
+  // de toute façon plus proche de la réalité : elle vient d'un `PathProvider`.
+  const root = resolve('/srv/chronocast/public');
 
   it('résout un chemin simple', () => {
     expect(resolveStaticPath(root, '/overlay/index.html')).toBe(
@@ -222,5 +226,64 @@ describe('createStaticHandler', () => {
     expect(absent.status).toBe(404);
     expect(forbiddenExtension.status).toBe(404);
     expect(absent.body).toEqual(forbiddenExtension.body);
+  });
+});
+
+/**
+ * Racine atteinte par un chemin qui n'est pas sa forme canonique.
+ *
+ * Ce cas a fait tomber vingt et un tests au premier build Windows, et il aurait
+ * rendu l'application muette chez une partie des utilisateurs. Le répertoire
+ * temporaire du runner s'appelle `C:\Users\RUNNER~1\...` — un nom court 8.3 —
+ * alors que `realpath` renvoie `C:\Users\runneradmin\...`. La racine était
+ * comparée telle qu'elle avait été fournie, donc **tout** était refusé : ni
+ * overlay, ni panneau, ni assistant, et un 404 sans explication.
+ *
+ * Le lien symbolique reproduit exactement cet écart sous Linux : la racine
+ * désigne le bon répertoire par un chemin qui n'est pas celui que `realpath`
+ * rend. Windows a d'autres façons d'y arriver — noms courts, jonctions,
+ * `%TEMP%` redirigé — mais le défaut est le même, et c'est celui-ci qu'il faut
+ * tenir.
+ */
+describe('createStaticHandler — racine non canonique', () => {
+  let base: string;
+  let handler: StaticHandler;
+
+  beforeEach(async () => {
+    base = await mkdtemp(join(tmpdir(), 'chronocast-static-lien-'));
+
+    const real = join(base, 'reel');
+    await mkdir(join(real, 'overlay'), { recursive: true });
+    await writeFile(join(real, 'overlay', 'index.html'), '<!doctype html><p>overlay</p>', 'utf8');
+
+    // La racine passée au gestionnaire n'est pas la forme canonique du
+    // répertoire : c'est un autre chemin qui y mène.
+    const alias = join(base, 'alias');
+    await symlink(real, alias, 'dir');
+
+    handler = createStaticHandler({
+      rootDirectory: alias,
+      logger: createLogger({ level: 'debug', sinks: [createMemorySink()] }),
+    });
+  });
+
+  afterEach(async () => {
+    await rm(base, { recursive: true, force: true });
+  });
+
+  it('sert les fichiers de la racine malgré tout', async () => {
+    const response = await handler.serve('/overlay/index.html');
+
+    expect(response.status).toBe(200);
+    expect(response.body.toString()).toContain('overlay');
+  });
+
+  it('refuse toujours ce qui sort de la racine', async () => {
+    // La correction ne doit pas se payer d'un relâchement de la garde : élargir
+    // ce qui est accepté est précisément le risque quand on assouplit une
+    // comparaison de chemins.
+    const response = await handler.serve('/../../etc/passwd.json');
+
+    expect(response.status).toBe(404);
   });
 });

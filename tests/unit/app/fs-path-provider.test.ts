@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -93,7 +94,7 @@ describe('createFsPathProvider', () => {
         webRootDirectory: '/app/dist/public',
       });
 
-      expect(paths.webRootDirectory).toBe('/app/dist/public');
+      expect(paths.webRootDirectory).toBe(resolve('/app/dist/public'));
       expect(paths.webRootDirectory.startsWith(paths.dataDirectory)).toBe(false);
     });
   });
@@ -162,17 +163,24 @@ describe('defaultWebRoot', () => {
     vi.unstubAllEnvs();
   });
 
+  // `file:///app/...` n'est pas une URL de fichier valide sous Windows, où un
+  // chemin absolu porte une lettre de lecteur : `fileURLToPath` y lève. Les URL
+  // sont donc construites depuis un chemin de la plateforme, comme le fait
+  // `import.meta.url` en vrai.
+  const entryUrl = (...segments: string[]): string =>
+    pathToFileURL(resolve(join('/app/dist', ...segments))).href;
+
   it('place la racine web à côté du code compilé du point d’entrée', () => {
     vi.stubEnv('CHRONOCAST_WEB_ROOT', undefined);
 
-    expect(defaultWebRoot('file:///app/dist/headless/index.js')).toBe('/app/dist/public');
+    expect(defaultWebRoot(entryUrl('headless', 'index.js'))).toBe(resolve('/app/dist/public'));
   });
 
   it('donne la même racine aux deux points d’entrée', () => {
     vi.stubEnv('CHRONOCAST_WEB_ROOT', undefined);
 
-    expect(defaultWebRoot('file:///app/dist/main/main.js')).toBe(
-      defaultWebRoot('file:///app/dist/headless/index.js'),
+    expect(defaultWebRoot(entryUrl('main', 'main.js'))).toBe(
+      defaultWebRoot(entryUrl('headless', 'index.js')),
     );
   });
 
@@ -181,12 +189,12 @@ describe('defaultWebRoot', () => {
     // développement, sans toucher au code.
     vi.stubEnv('CHRONOCAST_WEB_ROOT', '/ailleurs/public');
 
-    expect(defaultWebRoot('file:///app/dist/headless/index.js')).toBe('/ailleurs/public');
+    expect(defaultWebRoot(entryUrl('headless', 'index.js'))).toBe('/ailleurs/public');
   });
 
   it('ignore une variable vide', () => {
     vi.stubEnv('CHRONOCAST_WEB_ROOT', '');
 
-    expect(defaultWebRoot('file:///app/dist/headless/index.js')).toBe('/app/dist/public');
+    expect(defaultWebRoot(entryUrl('headless', 'index.js'))).toBe(resolve('/app/dist/public'));
   });
 });
