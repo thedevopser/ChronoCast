@@ -30,7 +30,7 @@ import { createConsoleSink } from '../core/logging/sinks/console-sink.js';
 import { createAesSecretStore } from './aes-secret-store.js';
 
 /** Version affichée aux clients WebSocket. Alignée sur `package.json` au packaging. */
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 
 /**
  * Ouverture de navigateur dégradée.

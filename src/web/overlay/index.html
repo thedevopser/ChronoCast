@@ -41,22 +41,17 @@
     -->
     <div class="overlay" id="overlay">
       <!--
-        Deux enveloppes autour du compteur, et non une bordure sur lui.
+        Une enveloppe autour du compteur, qui porte le remplissage ; le trait du
+        cadre est peint par son pseudo-élément, masqué en son centre. Le
+        remplissage ne peut pas vivre sur le compteur lui-même : un dégradé de
+        texte se peint par `background-clip: text`, qui le découperait à la
+        forme des chiffres.
 
-        Le trait du cadre est le `padding` de la première, peint par son fond :
-        c'est le seul moyen d'avoir à la fois un dégradé et des coins arrondis,
-        là où `border-image` fait perdre le rayon. La seconde porte le
-        remplissage, qui ne peut pas vivre sur le compteur lui-même — un
-        dégradé de texte se peint par `background-clip: text`, qui découperait
-        ce remplissage à la forme des chiffres.
-
-        Cadre éteint, les deux enveloppes sont transparentes et sans épaisseur :
+        Cadre éteint, l'enveloppe est transparente et sans épaisseur :
         l'overlay est alors strictement identique à ce qu'il était.
       -->
       <div class="frame">
-        <div class="frame__inner">
-          <div class="countdown" id="countdown">--:--:--</div>
-        </div>
+        <div class="countdown" id="countdown">--:--:--</div>
       </div>
 
       <div class="toast" id="toast" hidden>

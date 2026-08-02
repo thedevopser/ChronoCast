@@ -272,24 +272,18 @@ describe('overlayCssVariables', () => {
       expect(variables['--cc-frame-fill']).toBe('#00000000');
     });
 
-    it('creuse le rayon intérieur de l’épaisseur du trait', () => {
-      // Sans cela, l'intérieur garde des coins plus ronds que le cadre et
-      // laisse apparaître un liseré aux quatre angles.
+    it('ne calcule aucun rayon intérieur', () => {
+      // Il l'était, du temps où le trait était le `padding` d'une enveloppe et
+      // le remplissage celui d'une seconde. Le trait étant désormais peint par
+      // un pseudo-élément dont on soustrait la boîte intérieure, les rayons
+      // intérieurs sont calculés par le moteur — les recalculer ici les ferait
+      // diverger au premier arrondi non entier.
       const variables = overlayCssVariables({
         ...BASE,
         frame: { ...BASE.frame, enabled: true, radius: 18, width: 4 },
       });
 
-      expect(variables['--cc-frame-inner-radius']).toBe('14px');
-    });
-
-    it('ne creuse jamais le rayon intérieur sous zéro', () => {
-      const variables = overlayCssVariables({
-        ...BASE,
-        frame: { ...BASE.frame, enabled: true, radius: 2, width: 10 },
-      });
-
-      expect(variables['--cc-frame-inner-radius']).toBe('0px');
+      expect(variables).not.toHaveProperty('--cc-frame-inner-radius');
     });
 
     describe('remplissage', () => {
