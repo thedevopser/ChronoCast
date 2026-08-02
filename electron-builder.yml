@@ -36,6 +36,13 @@ files:
   - dist/**/*
   - assets/**/*
   - package.json
+  # Les cartes de source ne servent qu'au développement, et les outils de
+  # développement sont fermés dans une application packagée : personne ne les
+  # lira jamais. Elles pèsent en revanche plusieurs centaines de kilooctets, et
+  # celles du code web étaient de surcroît servies en 404, la liste blanche du
+  # serveur statique ne les connaissant pas. Un fichier à la fois inutile et
+  # inaccessible n'a rien à faire dans un installeur.
+  - '!**/*.map'
 
 # Archive asar : les sources compilées ne traînent pas en clair dans
 # `resources/app`. Ce n'est pas une protection — une archive asar se lit — mais

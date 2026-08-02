@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isStepReachable,
+  resumeHint,
   resumeStep,
   SETUP_STEPS,
   type SetupState,
@@ -148,5 +149,30 @@ describe('isStepReachable', () => {
     for (const state of states) {
       expect(isStepReachable(resumeStep(state), state)).toBe(true);
     }
+  });
+
+  describe('phrase de reprise', () => {
+    it('n’annonce pas une reprise au tout premier lancement', () => {
+      // « Reprise là où vous vous étiez arrêté », affiché à l'étape 1 d'une
+      // installation neuve, est faux — et c'est la première phrase que lit un
+      // nouvel utilisateur.
+      expect(resumeHint(FRESH)).not.toMatch(/reprise|arrêté/i);
+    });
+
+    it('annonce une reprise dès que quelque chose a été commencé', () => {
+      expect(resumeHint(CREDENTIALS)).toMatch(/arrêté/i);
+      expect(resumeHint({ ...FRESH, clientId: 'abc' })).toMatch(/arrêté/i);
+    });
+
+    it('annonce une configuration terminée quand elle l’est', () => {
+      expect(resumeHint({ ...CONNECTED, completed: true })).toMatch(/terminée/i);
+    });
+
+    it('donne la priorité à l’achèvement sur la reprise', () => {
+      // Une configuration terminée dont le jeton a été révoqué depuis Twitch
+      // reprend à `connect` : la phrase doit dire qu'elle est faite, pas
+      // laisser croire qu'elle n'a jamais été menée à son terme.
+      expect(resumeHint({ ...CREDENTIALS, completed: true })).toMatch(/terminée/i);
+    });
   });
 });
