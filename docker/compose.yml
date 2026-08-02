@@ -3,6 +3,12 @@
 # Aucun binaire Node n'est installé sur l'hôte : toutes les commandes de
 # développement passent par ces services, pilotés par ./scripts/dc.sh.
 #
+# **Il n'y a pas de service de packaging.** L'installeur Windows est construit
+# par le workflow `Release`, sur un runner `windows-latest`, nativement. Un
+# service Wine local a existé jusqu'à la version 0.2.0 : il pesait plusieurs
+# gigaoctets, construisait en croisé ce que GitHub construit nativement, et
+# n'était plus le chemin de release depuis la Phase 7. Voir docs/BUILD.md.
+#
 # Le dossier node_modules est un volume nommé et non un bind-mount. Deux raisons :
 #   - les performances d'E/S sur un bind-mount WSL2 sont médiocres pour des
 #     arborescences de dizaines de milliers de fichiers ;
@@ -29,23 +35,6 @@ services:
     # Le conteneur reste disponible pour des exécutions successives via `run`.
     command: ["sleep", "infinity"]
 
-  # Packaging de l'installeur Windows NSIS via Wine.
-  # Isolé derrière un profil : cette image pèse plusieurs gigaoctets et n'a pas à
-  # être construite pour un simple cycle de test.
-  build-win:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.build
-    working_dir: /project
-    volumes:
-      - ..:/project
-      # node_modules distinct de celui du service `dev` : le packaging a besoin du
-      # runtime Electron, que l'image de développement ne télécharge délibérément pas.
-      - node_modules_win:/project/node_modules
-      - electron_cache:/root/.cache/electron
-      - electron_builder_cache:/root/.cache/electron-builder
-    profiles: ["build"]
-
   # Serveur EventSub factice fourni par la Twitch CLI, utilisé par les tests
   # d'intégration et par ./scripts/twitch-mock.sh.
   twitch-cli:
@@ -59,6 +48,3 @@ services:
 
 volumes:
   node_modules:
-  node_modules_win:
-  electron_cache:
-  electron_builder_cache:

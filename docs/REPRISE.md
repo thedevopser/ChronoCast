@@ -2,57 +2,11 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, après fusion de la PR #16. **Phases 0 à 7 terminées.** L'installeur Windows est produit, s'installe et se lance, et **le flux OAuth aboutit de bout en bout** — autorisation Twitch, rappel reçu, chaîne détectée. Le défaut d'ergonomie qui le suivait — la configuration se poursuivait dans le navigateur — **est corrigé et fusionné** ; il reste à le voir fonctionner sur poste Windows, ce que le conteneur ne peut pas montrer (section 0). **La version est passée à `0.2.0`.** S'y ajoutent deux nouveautés d'apparence livrées à la demande de l'utilisateur — **cadre et dégradé**, PR #17 — décrites en section 0 bis, dont une correction d'ergonomie reste à fusionner. Il ne reste ensuite que la **Phase 8, la documentation**.
+**Dernière mise à jour :** 2 août 2026, sur la branche `docs/documentation-complete`. **Les huit phases sont terminées.** Le produit est installé, éprouvé sur poste Windows, et documenté. La version est en `0.3.0`. Il ne reste aucun chantier planifié : ce qui vient désormais vient de l'usage.
 
-**Le `.exe` existe, il s'installe et il se lance.** Le workflow `Release` a produit l'installeur, l'installation aboutit, et l'application démarre sur l'assistant de première configuration avec son icône. **La Phase 7 est donc éprouvée, et pas seulement écrite.** Il reste à valider le reste du parcours sur poste Windows — la liste est en section 8, sous Phase 7.
+**Le produit fonctionne de bout en bout sur un vrai poste.** Le workflow `Release` produit l'installeur, l'installation aboutit, l'application démarre, se configure, se connecte à Twitch, se replie dans le tray où le compteur se lit, et sert l'overlay à OBS. **La Phase 7 n'est pas seulement écrite : tout ce que le conteneur ne pouvait pas vérifier a été éprouvé à la main.** Le détail est en section 7, sous « Validation sur poste Windows ».
 
 **La dette actée pendant la PR C a été tranchée par le retrait** : `server.websocket.mode` et `server.websocket.port` ne sont plus au schéma. L'arbitrage et ses conséquences sont en **section 7, sous « Dette soldée »**. Il n'y a plus rien à décider sur ce sujet.
-
----
-
-## 0. Retour dans la fenêtre après le flux OAuth — corrigé, à voir tourner sur poste
-
-> **À lire en premier.** Correctif fusionné (PR #16), vérifié en conteneur. **Reste à observer sur poste Windows** : la moitié qui ramène la fenêtre au premier plan est la seule chose que le conteneur ne peut pas montrer. La `0.2.0` est la première version qui la porte.
-
-**Le défaut, tel qu'il a été constaté.** Le flux OAuth aboutissait — Twitch autorisait, le rappel arrivait, la chaîne était détectée — mais l'assistant **se poursuivait dans le navigateur**. L'utilisateur se retrouvait avec deux assistants ouverts : celui de la fenêtre ChronoCast, resté à l'étape 3, et celui du navigateur, à l'étape 5. Il terminait sa configuration dans le mauvais des deux, et la fenêtre ne se mettait jamais à jour.
-
-**La cause était de conception, pas d'implémentation.** `core/server/oauth-callback.ts` répondait `302` vers `/setup?oauth=ok`, et le navigateur suivait. C'était la décision de la PR B — « le rappel redirige vers l'assistant plutôt que de rendre une page morte » — et elle était **juste pour le point d'entrée headless**, où le navigateur est la seule interface. La Phase 6 a introduit une fenêtre applicative sans que cette décision soit rouverte : elle est devenue fausse à ce moment-là.
-
-**La correction, en deux moitiés dont aucune ne suffit seule.**
-
-1. **Côté navigateur** — `oauth-callback.ts` rend désormais une **page terminale** : un message par issue, et rien d'autre. Ce que la PR B avait acté est préservé et vérifié par des tests : ni code d'autorisation, ni message d'erreur de Twitch — texte contrôlé par un tiers — n'y figure, et la CSP reste `default-src 'none'`.
-2. **Côté application** — nouvel événement de bus **`oauth:settled`**, émis par `application.ts` à la clôture du flux, avec l'issue. `main/main.ts` s'y abonne, ramène la fenêtre par `showWindow()` et la recharge.
-
-**Trois décisions valent d'être connues avant d'y toucher.**
-
-- **Un événement dédié, et non `twitch:status`.** Celui-ci change à chaque reconnexion EventSub, y compris en plein direct : y accrocher le retour au premier plan ferait passer la fenêtre par-dessus OBS pendant un stream. `oauth:settled` n'est émis qu'à la clôture d'un flux d'autorisation.
-- **L'issue voyage avec l'événement, et un échec ramène la fenêtre autant qu'une réussite.** C'est même là que c'est le plus utile : sans cela, l'utilisateur reste devant un assistant muet qui ne dit pas pourquoi rien ne s'est passé. Le test d'intégration couvre exactement ce cas — l'échange échoue, faute de réseau, et le bus annonce `failed`.
-- **La destination du rechargement est prise dans un ensemble clos de deux pages** (`/setup`, `/admin`), décidée par le module pur `main/oauth-return.ts` — la coquille ne décide de rien. Cette URL part dans `loadURL` : filtrer les formes hostiles une à une aurait laissé passer la suivante, une liste blanche non. Tout ce qui n'est pas l'une de ces deux pages sous l'origine applicative retombe sur l'assistant.
-
-**Le mode headless ne régresse pas.** La page terminale porte un lien vers `/setup?oauth=<issue>` quand le port applicatif est connu — c'est le seul retour possible sans fenêtre. Il est formulé comme un **recours** (« si ChronoCast ne réagit pas ») et non comme la suite du parcours : dans l'application, le suivre ramènerait exactement le défaut qu'on vient de corriger.
-
-**Ce qui reste à valider à la main, sur poste Windows :** que la fenêtre revienne réellement au premier plan à la fin du flux, y compris repliée dans le tray, et que l'assistant s'y remette à l'étape suivante. Le conteneur ne dira rien de cette partie — c'est `showWindow()` et `loadURL`, dans les trois fichiers qui importent `electron`.
-
----
-
-## 0 bis. Apparence — cadre et dégradé
-
-Deux sections de plus au schéma de l'overlay, **éteintes par défaut** : la scène OBS d'un utilisateur existant est déjà cadrée sur ce qu'il voit, et une nouveauté d'apparence ne doit rien y déplacer tant qu'il ne l'a pas demandée.
-
-- **`overlay.gradient`** — deux couleurs, un angle, et **deux cibles indépendantes** : `onText` et `onFrame`. Vouloir le dégradé sur les chiffres n'implique pas de le vouloir sur le cadre. Les couleurs, elles, restent communes : les dédoubler n'aurait servi qu'à donner l'occasion de les désaccorder.
-- **`overlay.frame`** — épaisseur, arrondi, marges intérieures, couleur, remplissage et son opacité. À ne pas confondre avec `overlay.outline`, qui cerne les glyphes ; le champ correspondant a d'ailleurs été renommé « Contour des chiffres », la confusion ayant eu lieu pour de vrai.
-
-**Trois contraintes de rendu expliquent la forme du code, et se paieraient cher à redécouvrir.**
-
-1. **Le trait du cadre est un `padding` peint par le fond, pas une bordure.** `border-image` est la façon évidente de faire un trait en dégradé, et elle fait perdre `border-radius`. Il fallait choisir entre le dégradé et les coins ronds : cette construction garde les deux.
-2. **Un dégradé de texte passe par `background-clip: text`**, ce qui impose `color: transparent`. D'où le couple `--cc-text-fill` / `--cc-text-background`, et la règle qui va avec : la couleur doit redevenir opaque dès que le dégradé s'éteint, sans quoi **le compteur disparaît de la scène**.
-3. **D'où deux enveloppes autour du compteur** (`.frame`, `.frame__inner`) : le remplissage ne peut pas vivre sur l'élément du texte, il serait découpé à la forme des chiffres.
-
-**L'intérieur du cadre est libre par défaut** (`fillOpacity: 0`). Un cadre est un trait, pas un pavé : le premier défaut retenu, un noir à 0,4, laissait le dégradé transparaître à travers et faisait passer le cadre pour un fond plein — défaut corrigé sur retour d'usage, avant même la fusion.
-
-**L'opacité du remplissage est un réglage distinct de sa couleur** parce que `<input type="color">` ne sait pas exprimer la transparence. Les deux sont recomposés en notation à huit chiffres par `withOpacity`, qui développe la notation courte `#RGB` et remplace une opacité déjà portée par la couleur.
-
-**Le logo du panneau** était resté un caractère `◷` posé en Phase 5. `scripts/prepare-icons.mjs` engendre désormais aussi `src/web/shared/logo.png` en 128 px depuis `assets/logo.png` — dans les sources et non dans `assets/`, car `copy-web-assets.mjs` ne recopie que `src/web/**`. Il sert de marque dans la barre latérale et de favicon sur le panneau comme sur l'assistant. `icon.ico` et `tray.png` ressortent identiques au bit près de la régénération.
 
 ---
 
@@ -110,7 +64,7 @@ Tout passe par `./scripts/dc.sh`, qui exécute dans un conteneur.
 ./scripts/dc.sh test [motif] # Vitest
 ./scripts/dc.sh verify       # lint + typecheck + test + audit
 ./scripts/dc.sh build        # compilation TypeScript + copie des assets web
-./scripts/dc.sh build:win    # installeur Windows NSIS via Wine
+./scripts/dc.sh twitch <args># Twitch CLI (serveur EventSub factice)
 ./scripts/dc.sh shell        # shell interactif
 ./scripts/dc.sh npm <args>   # commande npm arbitraire
 ./scripts/dc.sh down         # arrêt et nettoyage
@@ -159,10 +113,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `fix/cadre-anneau-et-degrade-ciblable`**, PR non fusionnée à l'heure où ces lignes sont écrites. Les dix-sept PR précédentes sont fusionnées en squash ; `main` est sur `0937d9b`.
+**Branche courante : `docs/documentation-complete`**, PR non fusionnée à l'heure où ces lignes sont écrites. Une seconde branche, `fix/cadre-sans-fond`, est commitée et attend elle aussi sa fusion. Les dix-huit PR précédentes sont fusionnées en squash ; `main` est sur `29ac239`.
 
 ```
-0937d9b feat(overlay): cadre et dégradé (#17)                                <- main
+29ac239 fix(overlay): cadre en anneau, dégradé ciblable (#18)                 <- main
+0937d9b feat(overlay): cadre et dégradé (#17)
 0c9fa9c fix(oauth): ramener la configuration dans la fenêtre (#16)
 ae3f7de fix(oauth): rediriger vers localhost (#15)
 a01167c fix(windows): canoniser la racine servie, figer les fins de ligne (#14)
@@ -184,15 +139,15 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 
 **1 515 tests, 70 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth, les **10** du retour dans la fenêtre et les **19** du cadre et du dégradé.)
 
-**Rien en attente hors du travail de la branche.** `git status` ne doit signaler aucun fichier une fois la branche commitée — `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #18 a été écrite après la fusion elle-même. Comme les fois précédentes, elle partira dans le premier commit du prochain lot. `git status` ne doit signaler aucun autre fichier — `dist/`, `release/` et `PR-*.md` sont ignorés.
 
 **La version est passée à `0.2.0`**, à deux endroits qui doivent rester alignés : `package.json` — d'où electron-builder tire le nom de l'installeur et `app.getVersion()` — et la constante `APP_VERSION` de `src/headless/index.ts`, qui n'a pas accès au premier. Rien ne vérifie automatiquement cet alignement : la seule garde est de les modifier ensemble.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # fix/cadre-anneau-et-degrade-ciblable tant que la PR n'est pas fusionnée
-./scripts/dc.sh verify       # doit être intégralement vert (1 515 tests)
+git branch --show-current    # deux branches en attente de fusion, voir ci-dessus
+./scripts/dc.sh verify       # doit être intégralement vert
 ```
 
 **La suite de la Phase 7 ne commence pas par du code, mais par un clic** : déclencher manuellement le workflow `Release` pour obtenir un premier `.exe`. La marche à suivre est en section 8. Tant que ce build n'a pas tourné, rien de ce qui a été écrit n'a jamais été exécuté sous Windows.
@@ -201,7 +156,7 @@ git branch --show-current    # fix/cadre-anneau-et-degrade-ciblable tant que la 
 
 ---
 
-## 7. Ce qui est fait — Phases 0 à 7
+## 7. Ce qui est fait — Phases 0 à 8
 
 ### Phase 0 — Socle d'outillage (PR #1, fusionnée)
 
@@ -415,7 +370,7 @@ Serveur loopback OAuth, extension d'`Application`, assistant de première config
 
 - **Le gestionnaire de rappel ne voit jamais le `state` attendu.** Il ne reçoit qu'un `verifyState()` qui répond oui ou non : il ne peut donc ni le journaliser, ni le renvoyer dans une page, ni le laisser fuir dans une URL de redirection.
 - **Un `state` erroné ne consomme rien.** N'importe quelle page distante peut provoquer une navigation vers la boucle locale ; si un `state` faux suffisait à clore le flux, le premier venu ferait échouer la connexion du streamer, à distance et en boucle. C'est ce qui a fait remplacer `takePendingOAuthState()` par `verifyOAuthState()`.
-- **Le rappel rend une page terminale portant un code d'issue clos** — `ok`, `denied` ou `failed`. Il redirigeait à l'origine vers `/setup?oauth=…`, ce qui a dû être défait dès qu'une fenêtre applicative a existé : voir section 0. Ce qui n'a pas bougé, et qui était le fond de la décision : le serveur éphémère n'a presque aucune surface HTML, et seul ce code transite — ni le code d'autorisation, ni un message d'erreur de Twitch, qui est du texte contrôlé par un tiers.
+- **Le rappel rend une page terminale portant un code d'issue clos** — `ok`, `denied` ou `failed`. Il redirigeait à l'origine vers `/setup?oauth=…`, ce qui a dû être défait dès qu'une fenêtre applicative a existé : voir « Après la Phase 7 », en fin de section 7. Ce qui n'a pas bougé, et qui était le fond de la décision : le serveur éphémère n'a presque aucune surface HTML, et seul ce code transite — ni le code d'autorisation, ni un message d'erreur de Twitch, qui est du texte contrôlé par un tiers.
 - **Le port de rappel ne se replie jamais.** Twitch exige une correspondance exacte de la redirect URI : écouter sur 37772 rendrait le rappel introuvable, ce qui serait bien plus déroutant qu'une erreur franche au moment du clic.
 - **L'étape de l'assistant est dérivée de l'état réel**, jamais d'un numéro d'étape enregistré — qui se désynchroniserait au premier jeton révoqué depuis Twitch. Seul `setup.completed` est persisté, parce qu'il ne se déduit de rien : la valeur de départ du compteur a toujours une valeur par défaut, on ne peut pas distinguer « laissée telle quelle » de « jamais vue ».
 - **La reprise s'arrête à l'écran « chaîne détectée »** et ne va jamais directement au barème : c'est l'écran qui confirme que la connexion a abouti, et déposer quelqu'un sur un formulaire sans le lui montrer laisserait le doute sur l'étape précédente.
@@ -646,29 +601,94 @@ Le workflow `Release` a **deux déclencheurs**, et c'est sa principale décision
 
 Sans ce second mode, la seule façon de savoir si le build aboutit serait de créer une release — c'est-à-dire de publier avant d'avoir vérifié, puis de supprimer des tags après coup.
 
-#### Ce qui reste à faire
+#### Validation sur poste Windows — faite
 
-- **Valider le reste du parcours sur poste Windows.** Sont déjà confirmés : l'installation, le lancement, l'icône de fenêtre, et le service des pages — donc la canonisation de racine tient sur un vrai poste.
-- **Restent à vérifier :** l'icône et le menu du tray, le repli de la fenêtre à la fermeture avec sa notification, `%APPDATA%\ChronoCast` et son contenu, le lancement au démarrage, l'instance unique, DPAPI par un flux OAuth complet, **le retour de la fenêtre au premier plan à la fin de ce flux** (section 0), l'overlay collé dans OBS, et la désinstallation qui conserve les données.
-- **Décider du sort de `build-win`** une fois la CI éprouvée : le garder comme confort local, ou le retirer avec son image de plusieurs gigaoctets.
+**L'intégralité du parcours a été éprouvée par l'utilisateur, le 2 août 2026.** Installation, lancement, icône de fenêtre, service des pages — donc la canonisation de racine tient sur un vrai poste —, icône et menu du tray avec l'état du compteur qui s'y lit, repli de la fenêtre à la fermeture, `%APPDATA%\ChronoCast` et son contenu, lancement au démarrage, instance unique, DPAPI par un flux OAuth complet, retour de la fenêtre au premier plan à la fin de ce flux, overlay collé dans OBS, et désinstallation qui conserve les données.
+
+**Ce que cela règle :** plus rien de ce que le conteneur ne peut pas vérifier ne reste en suspens. Les trois fichiers qui importent `electron` — `main.ts`, `windows.ts`, `tray.ts` — ont tourné pour de vrai, et le pari de la Phase 6 se vérifie : ils ne portaient aucune décision, et rien n'a dû y être corrigé après coup.
+
+**Seul point encore ouvert : le sort de `build-win`.** La CI étant éprouvée, il reste à décider si on le garde comme confort local ou si on le retire avec son image de plusieurs gigaoctets.
+
+### Après la Phase 7 — corrections et ajouts sur retour d'usage
+
+Trois PR livrées après le premier installeur, à mesure que l'usage réel les a fait apparaître. Elles ne relèvent d'aucune phase du plan initial : c'est le produit qui rencontre son utilisateur.
+
+#### Le retour dans la fenêtre après le flux OAuth (PR #16)
+
+Livré dans la `0.2.0`, **validé sur poste Windows**.
+
+**Le défaut, tel qu'il a été constaté.** Le flux OAuth aboutissait — Twitch autorisait, le rappel arrivait, la chaîne était détectée — mais l'assistant **se poursuivait dans le navigateur**. L'utilisateur se retrouvait avec deux assistants ouverts : celui de la fenêtre ChronoCast, resté à l'étape 3, et celui du navigateur, à l'étape 5. Il terminait sa configuration dans le mauvais des deux, et la fenêtre ne se mettait jamais à jour.
+
+**La cause était de conception, pas d'implémentation.** `core/server/oauth-callback.ts` répondait `302` vers `/setup?oauth=ok`, et le navigateur suivait. C'était la décision de la PR B — « le rappel redirige vers l'assistant plutôt que de rendre une page morte » — et elle était **juste pour le point d'entrée headless**, où le navigateur est la seule interface. La Phase 6 a introduit une fenêtre applicative sans que cette décision soit rouverte : elle est devenue fausse à ce moment-là.
+
+**La correction, en deux moitiés dont aucune ne suffit seule.**
+
+1. **Côté navigateur** — `oauth-callback.ts` rend désormais une **page terminale** : un message par issue, et rien d'autre. Ce que la PR B avait acté est préservé et vérifié par des tests : ni code d'autorisation, ni message d'erreur de Twitch — texte contrôlé par un tiers — n'y figure, et la CSP reste `default-src 'none'`.
+2. **Côté application** — nouvel événement de bus **`oauth:settled`**, émis par `application.ts` à la clôture du flux, avec l'issue. `main/main.ts` s'y abonne, ramène la fenêtre par `showWindow()` et la recharge.
+
+**Trois décisions valent d'être connues avant d'y toucher.**
+
+- **Un événement dédié, et non `twitch:status`.** Celui-ci change à chaque reconnexion EventSub, y compris en plein direct : y accrocher le retour au premier plan ferait passer la fenêtre par-dessus OBS pendant un stream. `oauth:settled` n'est émis qu'à la clôture d'un flux d'autorisation.
+- **L'issue voyage avec l'événement, et un échec ramène la fenêtre autant qu'une réussite.** C'est même là que c'est le plus utile : sans cela, l'utilisateur reste devant un assistant muet qui ne dit pas pourquoi rien ne s'est passé. Le test d'intégration couvre exactement ce cas — l'échange échoue, faute de réseau, et le bus annonce `failed`.
+- **La destination du rechargement est prise dans un ensemble clos de deux pages** (`/setup`, `/admin`), décidée par le module pur `main/oauth-return.ts` — la coquille ne décide de rien. Cette URL part dans `loadURL` : filtrer les formes hostiles une à une aurait laissé passer la suivante, une liste blanche non. Tout ce qui n'est pas l'une de ces deux pages sous l'origine applicative retombe sur l'assistant.
+
+**Le mode headless ne régresse pas.** La page terminale porte un lien vers `/setup?oauth=<issue>` quand le port applicatif est connu — c'est le seul retour possible sans fenêtre. Il est formulé comme un **recours** (« si ChronoCast ne réagit pas ») et non comme la suite du parcours : dans l'application, le suivre ramènerait exactement le défaut qu'on vient de corriger.
+
+**Vérifié à la main :** la fenêtre revient bien au premier plan à la fin du flux et l'assistant s'y remet à l'étape suivante. C'était la seule moitié que le conteneur ne pouvait pas montrer.
 
 ---
 
-## 8. Ce qui reste à faire — Phase 8
+#### Cadre et dégradé de l’overlay (PR #17 et #18)
 
-### Phase 8 — Documentation
+Deux sections de plus au schéma de l'overlay, **éteintes par défaut** : la scène OBS d'un utilisateur existant est déjà cadrée sur ce qu'il voit, et une nouveauté d'apparence ne doit rien y déplacer tant qu'il ne l'a pas demandée.
 
-Branche suggérée : `docs/documentation-complete`.
+- **`overlay.gradient`** — deux couleurs, un angle, et **deux cibles indépendantes** : `onText` et `onFrame`. Vouloir le dégradé sur les chiffres n'implique pas de le vouloir sur le cadre. Les couleurs, elles, restent communes : les dédoubler n'aurait servi qu'à donner l'occasion de les désaccorder.
+- **`overlay.frame`** — épaisseur, arrondi, marges intérieures, couleur, remplissage et son opacité. À ne pas confondre avec `overlay.outline`, qui cerne les glyphes ; le champ correspondant a d'ailleurs été renommé « Contour des chiffres », la confusion ayant eu lieu pour de vrai.
 
-Neuf documents dans `docs/` : `ARCHITECTURE.md` (avec diagrammes Mermaid des flux), `DEVELOPER.md`, `USER-GUIDE.md` (avec la procédure SmartScreen), `BUILD.md`, `RELEASE.md`, `SECURITY.md`, `TESTING-TWITCH-CLI.md`, `CRASH-RECOVERY.md`, `OVERLAY-CUSTOMIZATION.md`.
+**Trois contraintes de rendu expliquent la forme du code, et se paieraient cher à redécouvrir.**
 
-Le `README.md` référence déjà ces documents : les liens sont actuellement morts.
+1. **Le trait du cadre est un `padding` peint par le fond, pas une bordure.** `border-image` est la façon évidente de faire un trait en dégradé, et elle fait perdre `border-radius`. Il fallait choisir entre le dégradé et les coins ronds : cette construction garde les deux.
+2. **Un dégradé de texte passe par `background-clip: text`**, ce qui impose `color: transparent`. D'où le couple `--cc-text-fill` / `--cc-text-background`, et la règle qui va avec : la couleur doit redevenir opaque dès que le dégradé s'éteint, sans quoi **le compteur disparaît de la scène**.
+3. **D'où deux enveloppes autour du compteur** (`.frame`, `.frame__inner`) : le remplissage ne peut pas vivre sur l'élément du texte, il serait découpé à la forme des chiffres.
 
-Prévoir aussi `scripts/twitch-mock.sh`, qui pilote le conteneur `twitch-cli` : `twitch event websocket start-server`, l'application pointée dessus via `twitch.eventsubUrl`, puis `twitch event trigger subscribe|subscription-message|subscription-gift|cheer --transport=websocket`.
+**L'intérieur du cadre est libre par défaut** (`fillOpacity: 0`). Un cadre est un trait, pas un pavé : le premier défaut retenu, un noir à 0,4, laissait le dégradé transparaître à travers et faisait passer le cadre pour un fond plein. Corrigé en PR #18, sur retour d'usage — la construction tenait, c'est la valeur choisie qui décrivait un cadre plein.
+
+**L'opacité du remplissage est un réglage distinct de sa couleur** parce que `<input type="color">` ne sait pas exprimer la transparence. Les deux sont recomposés en notation à huit chiffres par `withOpacity`, qui développe la notation courte `#RGB` et remplace une opacité déjà portée par la couleur.
+
+**Le logo du panneau** était resté un caractère `◷` posé en Phase 5. `scripts/prepare-icons.mjs` engendre désormais aussi `src/web/shared/logo.png` en 128 px depuis `assets/logo.png` — dans les sources et non dans `assets/`, car `copy-web-assets.mjs` ne recopie que `src/web/**`. Il sert de marque dans la barre latérale et de favicon sur le panneau comme sur l'assistant. `icon.ico` et `tray.png` ressortent identiques au bit près de la régénération.
+
+
+### Phase 8 — Documentation — **livrée**
+
+Les neuf documents annoncés par le README existent, et ses liens ne sont plus morts.
+
+| Document | Pour qui |
+| --- | --- |
+| `USER-GUIDE.md` | Le streamer : installation, application Twitch, OBS, dépannage |
+| `OVERLAY-CUSTOMIZATION.md` | Le streamer : réglages d'apparence et `custom.css` |
+| `CRASH-RECOVERY.md` | Le streamer : ce qu'il perd au pire, et comment le rattraper |
+| `ARCHITECTURE.md` | Le développeur : couches, flux, décisions à ne pas rouvrir |
+| `DEVELOPER.md` | Le développeur : environnement, règles, points d'extension |
+| `SECURITY.md` | Le développeur : modèle de menace et contrôles |
+| `BUILD.md` | Compilation en conteneur, packaging en CI |
+| `RELEASE.md` | Publier une version |
+| `TESTING-TWITCH-CLI.md` | Simuler des événements sans attendre un vrai sub |
+
+**Un garde-fou tient la documentation**, `tests/unit/assets/documentation.test.ts` : tout lien relatif doit mener quelque part, les neuf documents doivent exister, et **aucun document ne doit citer une commande que `dc.sh` ne connaît plus**. Ce dernier point n'est pas théorique — il a attrapé deux mentions de `build:win` restées dans ce fichier même après le retrait du service. La documentation ne s'exécute pas : sans garde mécanique, elle pourrit sans bruit et on ne s'en aperçoit qu'au pire moment, celui où quelqu'un en avait besoin.
+
+`scripts/twitch-mock.sh` accompagne le tout : `serve`, `trigger <event>`, `scenario` — les quatre événements du barème à la file — et `stop`.
+
+#### Le service `build-win` a été retiré
+
+**Arbitrage tranché.** `docker/Dockerfile.build`, le service `build-win` et ses trois volumes de cache ont disparu, ainsi que la commande de packaging local qui les pilotait. L'installeur est construit par le workflow `Release`, sur un runner `windows-latest`, nativement — c'est le seul chemin de packaging qui existe désormais.
+
+Le garder aurait voulu dire entretenir **deux chemins de packaging dont un seul est éprouvé**, ce qui est le plus sûr moyen que celui qu'on n'utilise pas casse en silence. Il pesait par ailleurs plusieurs gigaoctets et construisait en croisé ce que GitHub construit nativement.
+
+`./scripts/dc.sh twitch` prend sa place dans l'aiguillage, pour piloter la Twitch CLI. Au passage, l'aide de `dc.sh` ne recrache plus le début du code : elle s'arrête à la première ligne qui n'est plus un commentaire, au lieu d'une plage de lignes figée qui avait dérivé.
 
 ---
 
-## 9. Modèle de menace — à respecter en Phase 8
+## 8. Modèle de menace
 
 L'application écoute sur loopback, manipule des secrets OAuth, et **affiche du contenu contrôlé par des tiers non fiables**.
 
@@ -680,21 +700,21 @@ L'application écoute sur loopback, manipule des secrets OAuth, et **affiche du 
 
 **Chaîne d'approvisionnement.** Dépendances de production minimales (`electron`, `ws`, `zod`). `npm ci --ignore-scripts`, `npm audit --audit-level=high` bloquant en CI.
 
-Les tests de sécurité doivent vivre dans `tests/security/` : injection XSS via pseudo, `Host` non-loopback rejeté, mutation sans jeton CSRF refusée, traversée `../../` bloquée, `state` OAuth invalide rejeté, import de configuration malveillant refusé, secrets absents des logs.
+Les tests de sécurité vivent dans `tests/security/` : injection XSS via pseudo, `Host` non-loopback rejeté, mutation sans jeton CSRF refusée, traversée `../../` bloquée, `state` OAuth invalide rejeté, import de configuration malveillant refusé, secrets absents des logs.
 
 ---
 
-## 10. Vérification finale attendue à la fin du projet
+## 9. Vérification finale attendue à la fin du projet
 
 1. `./scripts/dc.sh verify` intégralement vert.
 2. Tests d'intégration : notification simulée → incrément, persistance, historique, diffusion. Doublon de `message_id` → aucun second incrément. Redémarrage → état restauré.
 3. Twitch CLI : `subscribe`, `subscription-message`, `subscription-gift`, `cheer` validés contre le serveur factice.
 4. Reprise après crash : `kill -9` pendant un décompte, redémarrage, temps restant conservé (perte ≤ 5 s, toujours en faveur du streamer), aucun fichier corrompu.
-5. `./scripts/dc.sh build:win` produit l'installeur, taille et SHA-256 vérifiés.
+5. Le workflow `Release` produit l'installeur, taille et SHA-256 vérifiés. **Fait, sur la 0.2.0.**
 6. **Validation manuelle sur poste Windows — revient à l'utilisateur** : installation, assistant, URL overlay dans OBS, événement de test, redémarrage du PC pour confirmer la restauration.
 
 ---
 
-## 11. Plan d'origine
+## 10. Plan d'origine
 
 Le plan validé initialement se trouve dans `/home/thedevopser/.claude/plans/tu-es-un-architecte-swirling-rabbit.md`. Ce document de reprise le remplace pour tout ce qui concerne l'état d'avancement, mais le plan reste la référence pour les intentions de départ.

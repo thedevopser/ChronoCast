@@ -13,9 +13,10 @@
 # release — c'est-à-dire de publier avant d'avoir vérifié, ou de supprimer des
 # tags après coup.
 #
-# Le build tourne sur un runner **Windows**, nativement. Le service Docker
-# `build-win` et son Wine restent un confort local ; ils ne sont pas le chemin
-# de release, et n'ont pas à l'être quand GitHub fournit la vraie plateforme.
+# Le build tourne sur un runner **Windows**, nativement, et c'est le seul chemin
+# de packaging qui existe. Un service Docker sous Wine a servi jusqu'à la 0.2.0 :
+# il pesait plusieurs gigaoctets et construisait en croisé ce que GitHub
+# construit nativement. Voir docs/BUILD.md.
 
 name: Release
 

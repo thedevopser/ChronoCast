@@ -14,7 +14,7 @@
 #   ./scripts/dc.sh audit              npm audit (seuil : high)
 #   ./scripts/dc.sh verify             lint + typecheck + test + audit
 #   ./scripts/dc.sh build              compilation TypeScript
-#   ./scripts/dc.sh build:win          installeur Windows NSIS
+#   ./scripts/dc.sh twitch <args...>   Twitch CLI (serveur EventSub factice)
 #   ./scripts/dc.sh shell              shell interactif dans le conteneur
 #   ./scripts/dc.sh npm <args...>      commande npm arbitraire
 #   ./scripts/dc.sh down               arrête et nettoie les conteneurs
@@ -78,7 +78,10 @@ require_dependencies() {
 }
 
 usage() {
-  sed -n '3,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # S'arrête à la première ligne qui n'est plus un commentaire, plutôt que sur
+  # une plage figée : l'en-tête peut gagner ou perdre une commande sans que
+  # l'aide se mette à recracher le début du code, ce qu'elle faisait.
+  awk 'NR < 3 { next } !/^#/ { exit } { sub(/^# ?/, ""); print }' "${BASH_SOURCE[0]}"
 }
 
 # --- Commandes ----------------------------------------------------------------
@@ -96,24 +99,16 @@ cmd_install() {
   fi
 }
 
-cmd_build_win() {
-  info "construction de l'installeur Windows NSIS (Wine)"
-
+# Twitch CLI, dans son conteneur.
+#
+# Le serveur EventSub factice écoute sur 127.0.0.1:8080 et se lance par
+# `./scripts/twitch-mock.sh serve` ; cette commande-ci sert à tout le reste,
+# `twitch event trigger …` en particulier. Voir docs/TESTING-TWITCH-CLI.md.
+cmd_twitch() {
   local -a tty_flag=()
   [[ -t 0 && -t 1 ]] || tty_flag=(-T)
 
-  # Le conteneur de packaging s'exécute en root ; les artefacts produits dans le
-  # volume monté appartiendraient donc à root sur l'hôte. On restitue la
-  # propriété à l'utilisateur appelant en fin de construction.
-  compose --profile build run --rm "${tty_flag[@]}" build-win bash -euo pipefail -c "
-    npm ci
-    npm run build
-    npx electron-builder --windows --publish never
-    chown -R $(id -u):$(id -g) /project/release /project/dist 2>/dev/null || true
-  "
-
-  info "artefacts disponibles dans ./release"
-  ls -lh "${REPO_ROOT}/release" 2>/dev/null || true
+  compose --profile twitch run --rm --no-deps "${tty_flag[@]}" twitch-cli "$@"
 }
 
 main() {
@@ -160,9 +155,9 @@ main() {
       require_docker && require_dependencies
       dev_run npm run build "$@"
       ;;
-    build:win)
+    twitch)
       require_docker
-      cmd_build_win "$@"
+      cmd_twitch "$@"
       ;;
     shell)
       require_docker
@@ -174,7 +169,7 @@ main() {
       ;;
     down)
       require_docker
-      compose --profile build --profile twitch down --remove-orphans "$@"
+      compose --profile twitch down --remove-orphans "$@"
       ;;
     *)
       printf '\033[31merreur :\033[0m commande inconnue « %s »\n\n' "${command}" >&2
