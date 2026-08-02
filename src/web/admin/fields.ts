@@ -359,6 +359,22 @@ const MAX_INITIAL_SECONDS = 2_592_000;
 
 const SETTINGS_FIELDS: readonly AdminField[] = [
   {
+    selector: '#app-launch-at-startup',
+    path: 'app.launchAtStartup',
+    label: 'Lancer ChronoCast à l’ouverture de la session',
+    hint: 'Sans effet hors de l’application Windows.',
+    view: 'settings',
+    kind: 'boolean',
+  },
+  {
+    selector: '#app-start-minimized',
+    path: 'app.startMinimized',
+    label: 'Démarrer dans la zone de notification',
+    hint: 'La fenêtre reste accessible par un clic sur l’icône. Fermer la fenêtre n’arrête jamais le compteur.',
+    view: 'settings',
+    kind: 'boolean',
+  },
+  {
     selector: '#counter-initial',
     path: 'counter.initialSeconds',
     label: 'Valeur de départ, en secondes',
@@ -594,6 +610,8 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['overlay.', 'Texte du compteur'],
 
   ['twitch.', 'Connexion et souscriptions'],
+
+  ['app.', 'Application'],
 
   ['counter.', 'Compteur'],
   ['server.websocket.', 'WebSocket'],

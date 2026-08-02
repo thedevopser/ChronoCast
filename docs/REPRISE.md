@@ -2,7 +2,9 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, sur la branche `chore/retirer-websocket-separate`. **Phases 0 à 5 terminées**, et **la dette du mode WebSocket `separate` est soldée**. Les trois interfaces web sont livrées : overlay, assistant de première configuration, panneau d'administration et ses huit vues. La prochaine étape est la **Phase 6, la coquille Electron** — c'est la première fois que le projet touche à Electron, tout ayant été vérifiable en conteneur jusqu'ici.
+**Dernière mise à jour :** 2 août 2026, sur la branche `feat/coquille-electron`. **Phases 0 à 6 terminées**, dette du mode WebSocket `separate` soldée au passage. Les trois interfaces web sont livrées, et la coquille Electron aussi : cycle de vie, fenêtre durcie, zone de notification, et les trois ports Windows — chemins, `safeStorage`, navigateur système.
+
+**Il n'y a pas encore de `.exe`.** L'application est fonctionnellement complète mais pas empaquetée : `electron-builder` n'est pas une dépendance, aucun `electron-builder.yml` n'existe, et le service Docker `build-win` n'a jamais été exécuté. C'est l'objet de la **Phase 7**, qui est la prochaine étape et le premier livrable réellement lançable sous Windows. Le détail de ce qui manque est en section 8, sous Phase 7.
 
 **La dette actée pendant la PR C a été tranchée par le retrait** : `server.websocket.mode` et `server.websocket.port` ne sont plus au schéma. L'arbitrage et ses conséquences sont en **section 8, sous « Dette soldée »**. Il n'y a plus rien à décider sur ce sujet.
 
@@ -103,7 +105,7 @@ Conséquences directes, et raison d'être de tout le reste :
 
 - l'intégralité de la logique se vérifie dans un Node nu, sans Chromium ni serveur graphique — indispensable puisque la toolchain est en conteneur Linux alors que la cible est Windows ;
 - le point d'entrée `src/headless/index.ts` (Phase 4) lance l'application complète sans Electron, ce qui rend la vérification bout en bout possible en conteneur ;
-- `src/main/**` (à écrire, Phase 6) sera une coquille Electron mince : cycle de vie, fenêtre, tray, et implémentations concrètes des ports.
+- `src/main/**` (Phase 6) est une coquille Electron mince : cycle de vie, fenêtre, tray, et implémentations concrètes des ports. **Trois fichiers seulement y importent `electron`**, et aucun ne prend de décision — la politique de navigation, le modèle du menu, le magasin de secrets et l'ouverture de navigateur sont tous purs et testés.
 
 De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodatages, qui peut reculer lors d'un changement d'heure, et `monotonicMs()` pour mesurer des durées, qui ne recule jamais. C'est `monotonicMs()` qui fait décompter le compteur, faute de quoi le passage à l'heure d'hiver offrirait une heure de subathon.
 
@@ -111,10 +113,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `chore/retirer-websocket-separate`**, partie d'un `main` à jour. Un commit, celui du solde de la dette WebSocket, qui emporte aussi cette mise à jour. Les neuf PR précédentes sont fusionnées en squash.
+**Branche courante : `feat/coquille-electron`**, partie d'un `main` à jour. Deux commits, ceux de la Phase 6, dont le second emporte cette mise à jour. Les dix PR précédentes sont fusionnées en squash.
 
 ```
-1726b53 Phase 5 : PR C - Panneau d'administration (#9)                      <- main
+1720d70 refactor(config): retirer le mode WebSocket « separate » (#10)      <- main
+1726b53 Phase 5 : PR C - Panneau d'administration (#9)
 6b1bec1 feat(setup): flux OAuth complet et assistant de configuration (#8)
 67d9219 feat(web): fondations web et overlay OBS (#7)
 eb02663 Phase 4 — Serveurs locaux et point d'entrée headless (#6)
@@ -126,27 +129,27 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 339 tests, 60 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur.** (1 337 après la PR C, plus les **2 tests** du retrait de la dette.)
+**1 457 tests, 66 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6 : 68 au commit 1, 50 au commit 2.)
 
 `git status` ne doit signaler aucun fichier hors de ceux du commit en cours — `dist/` et `PR-*.md` sont ignorés.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # chore/retirer-websocket-separate tant que sa PR n'est pas fusionnée
-./scripts/dc.sh verify       # doit être intégralement vert (1 339 tests)
+git branch --show-current    # feat/coquille-electron tant que sa PR n'est pas fusionnée
+./scripts/dc.sh verify       # doit être intégralement vert (1 457 tests)
 ```
 
 Une fois cette PR fusionnée, et le nettoyage de la règle 5 fait :
 
 ```bash
 git checkout main && git pull --ff-only origin main
-git checkout -b feat/coquille-electron
+git checkout -b chore/packaging-ci
 ```
 
-La Phase 6 peut alors commencer, en TDD, en suivant la section 8.
+La Phase 7 peut alors commencer, en suivant la section 8.
 
-**Attention, changement de régime :** c'est la première phase que le conteneur ne peut pas vérifier entièrement. `src/main/**` importe `electron`, que l'image `dev` ne télécharge pas et qu'aucun Chromium ne peut lancer ici. Trois conséquences à accepter d'emblée plutôt qu'à découvrir : `src/main/**` est déjà exclu de la couverture dans `vitest.config.ts` ; ce qui est testable doit être **extrait** de la coquille en modules purs, exactement comme `src/core/**` l'a été des ports ; et la vérification finale du reste passe par vos mains, sur Windows.
+**Le changement de régime a eu lieu en Phase 6, et il vaut aussi pour la suite :** le conteneur ne vérifie plus tout. `main/main.ts`, `main/windows.ts` et `main/tray.ts` importent `electron`, qu'aucun Chromium ne peut lancer ici — ils sont nommément exclus de la couverture, et éprouver leur comportement passe par vos mains sous Windows. La parade tient en une phrase : **tout ce qui décide est extrait de la coquille en modules purs**, exactement comme `src/core/**` l'a été des ports. La Phase 7 va plus loin encore, puisqu'elle produit un artefact que seul un poste Windows peut exécuter.
 
 ---
 
@@ -488,13 +491,60 @@ Le retrait a été **gratuit en migration**, et c'est le mode `strip` du schéma
 
 **Ce qui est déjà en place et ne doit pas être réécrit :** `web/shared/api-client.ts` (jeton CSRF, erreurs `ApiError` typées), `ws-client.ts`, `countdown.ts`, `safe-dom.ts`, `time-format.ts`, `protocol.ts`, `theme.css`, `ws-url.ts` et `open-props.css`. Les trois pages les consomment tels quels.
 
-### Phase 6 — Coquille Electron
+### Phase 6 — Coquille Electron — **livrée**, branche `feat/coquille-electron`, 2 commits, 118 tests
 
-Branche suggérée : `feat/coquille-electron`.
+**Principe qui gouverne toute la phase :** seuls **trois fichiers** importent `electron` — `main/main.ts`, `main/windows.ts`, `main/tray.ts` — et aucun des trois ne prend de décision. Tout ce qui se décide vit dans des modules purs, testés dans le conteneur. L'exclusion de couverture de `vitest.config.ts` est **nominative** sur ces trois fichiers, et non plus `src/main/**` : une logique laissée dans la coquille s'y verrait désormais par son absence de la couverture.
 
-`main/main.ts` (instance unique, cycle de vie, lancement au démarrage), `main/windows.ts`, `main/tray.ts`, `main/electron-path-provider.ts` (`%APPDATA%\ChronoCast`), `main/safe-storage-secret-store.ts` (`safeStorage` après vérification d'`isEncryptionAvailable()`).
+`electron` est en **devDependency, version exacte `43.2.0`**. En dépendance de développement parce qu'electron-builder refuse de packager autrement ; en version figée parce qu'elle détermine le Chromium embarqué, seul composant dont le runtime n'est vérifiable ni en conteneur ni en CI. `ELECTRON_SKIP_BINARY_DOWNLOAD=1` et `--ignore-scripts` font qu'aucun binaire n'est téléchargé : `electron.d.ts` suffit au typecheck. `npm audit --audit-level=high` reste à zéro.
 
-**Durcissement obligatoire** : `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, `webSecurity: true`, aucun preload exposant Node. `setWindowOpenHandler` et `will-navigate` bloquent toute navigation hors liste blanche (`id.twitch.tv`, `twitch.tv`) et renvoient vers le navigateur système. DevTools désactivés en production. `asar` activé.
+#### Commit 1 — ports et runtime partagé, 68 tests
+
+| Fichier | Rôle |
+| --- | --- |
+| `core/app/fs-path-provider.ts` | **Déplacé** depuis `src/headless/`, aux côtés de `system-clock` et `system-ticker` : il a désormais deux appelants. N'était couvert par aucun test alors qu'il porte une garde de chemin |
+| `core/app/node-runtime.ts` | Câblage commun aux deux points d'entrée : minuteurs, fabrique de sockets, `fetch` lié, temporisation |
+| `main/safe-storage-secret-store.ts` | `SecretStore` sur `safeStorage` **injecté** — aucun import d'`electron`, donc entièrement testable |
+| `main/browser-opener.ts` | `BrowserOpener` sur `openExternal` injecté, garde `https:` couverte dans `tests/security/` |
+
+**Décisions prises pendant ce commit :**
+
+- **`defaultWebRoot` prend l'URL du point d'entrée appelant**, au lieu de se mesurer depuis son propre module. Enfouie dans `core/app`, elle aurait renvoyé `dist/core/public`. `dist/headless/index.js` et `dist/main/main.js` sont chacun à un niveau sous `dist/`, si bien que les deux donnent `dist/public` et qu'une réorganisation de `src/core` ne peut plus la casser.
+- **Le magasin `safeStorage` ne se replie jamais en clair.** Chiffrement indisponible, écriture refusée : un jeton OAuth lisible sur le disque serait pire que l'échec, puisqu'il donnerait l'illusion inverse de la vérité.
+- **Sa lecture ne lève jamais.** Un blob indéchiffrable vaut un secret absent, et l'utilisateur retombe sur l'assistant plutôt que sur un écran de crash. Le cas est réel : DPAPI liant le chiffrement au compte Windows, un répertoire de données recopié depuis un autre compte est illisible par construction.
+- **`safeStorage` n'est jamais interrogé à la construction**, seulement à l'usage : il n'est utilisable qu'après `app.whenReady()`, alors que la composition de l'application le précède.
+- **L'ouverture de navigateur analyse l'URL** au lieu de comparer un préfixe : elle accepte `HTTPS://` et rejette ce qui n'a d'URL que l'apparence. Elle rejette sans jamais lever de façon synchrone, faute de quoi l'erreur passerait à côté du `catch` de l'appelant.
+- **Un test s'est révélé faux, pas le code** : `resolveDataFile('/etc/passwd')` ne lève pas, parce que `join` aplatit un segment absolu — c'est `resolve` seul qui l'aurait laissé reprendre la main. Le chemin reste sous la racine, ce que le contrat exige.
+
+#### Commit 2 — la coquille, 50 tests
+
+| Fichier | Rôle |
+| --- | --- |
+| `main/navigation-policy.ts` | **Pur.** `allow` / `external` / `block`. Pièce de sécurité de la phase, couverte par `tests/security/` |
+| `main/tray-menu.ts` | **Pur.** Modèle du menu et mise en forme de la durée |
+| `main/windows.ts` | Fenêtre durcie, repli vers le tray à la fermeture |
+| `main/tray.ts` | Icône, conversion du modèle en `Menu.buildFromTemplate` |
+| `main/main.ts` | Instance unique, cycle de vie, réglages `app.*`, arrêt propre |
+| `core/config/schema.ts` | Section `app` : `launchAtStartup`, `startMinimized` |
+| `web/admin/fields.ts` | Deux champs et un groupe « Application » dans la vue Paramètres |
+| `scripts/generate-placeholder-icon.mjs`, `assets/tray.png` | Icône provisoire, engendrée sans dépendance |
+
+**Décisions prises pendant ce commit :**
+
+- **La liste blanche de navigation comporte quatre hôtes**, et non les deux annoncés : `id.twitch.tv`, `dev.twitch.tv`, `twitch.tv`, `www.twitch.tv`. L'assistant renvoie vers la console développeur, qui est sur `dev.twitch.tv` ; l'omettre aurait bloqué un lien que l'assistant affiche lui-même.
+- **Twitch est renvoyé au navigateur système, jamais rendu dans la fenêtre.** Le flux OAuth passe par le navigateur et le rappel loopback depuis la PR B : la fenêtre n'a aucune raison légitime d'afficher une page Twitch, et montrer une page d'authentification tierce dans une fenêtre applicative est précisément ce qu'on apprend aux utilisateurs à ne pas croire.
+- **La comparaison d'hôte est exacte, et le port doit être vide.** Twitch écoute sur 443 ; un port explicite désigne autre chose, quel que soit le nom qui le précède. Le suffixe est refusé par principe — `id.twitch.tv.evil.test` se termine par `twitch.tv` sans rapport avec Twitch — et `hostname` ignore l'identifiant qui précéderait une arobase, qui est l'usurpation la plus lisible.
+- **Fermer la fenêtre replie vers le tray, sans réglage possible.** Un compteur de subathon ne doit pas pouvoir être tué par réflexe ; on ne rend pas configurable ce dont la mauvaise valeur coûte le direct. Une notification le dit à la première fermeture, et quitter reste possible par le menu du tray, qui est un geste délibéré.
+- **Le tray se rafraîchit toutes les cinq secondes**, et non à chaque changement du compteur : celui-ci change à chaque battement, et reconstruire le menu une fois par seconde ne servirait qu'à fermer celui que l'utilisateur vient d'ouvrir.
+- **`app.setName('ChronoCast')` est posé avant toute lecture de chemin.** `app.getPath('userData')` en dérive ; sans lui, les données atterriraient dans un répertoire qui changerait le jour où electron-builder posera `productName`. Un répertoire de données qui se déplace entre deux versions, c'est un compteur perdu.
+- **Aucun `await` avant l'enregistrement des écouteurs de cycle de vie.** Le processus principal en ESM se charge de façon asynchrone : une attente placée trop tôt ferait manquer l'événement `ready`. Contrainte réelle d'Electron, à respecter à la lettre.
+- **`before-quit` est annulé pour laisser l'arrêt propre se dérouler.** Il est synchrone alors que `application.stop()` ne l'est pas : on l'annule, on arrête sockets, serveur puis journaux, et on sort par `app.exit(0)`.
+- **Un échec de démarrage ouvre une `dialog.showErrorBox`.** Dans une application packagée il n'y a pas de console : un port occupé se traduirait sinon par un lancement qui ne fait rien, le pire des retours.
+- **La mise en forme de la durée du tray est une redite assumée** de `web/shared/time-format.ts`, et non un partage : ce module-là est compilé pour le navigateur avec sa propre racine, et l'y raccorder ferait entrer du code serveur dans le paquet servi au client. La règle qui compte est la même — tronquer, jamais arrondir au supérieur.
+- **Les champs `app.*` n'ont rien exigé du gabarit.** `renderFieldGroups` engendre les champs depuis la table : ajouter la section au schéma a fait passer `fields.test.ts` au rouge tout seul, et le groupe « Application » est apparu sans qu'une ligne de HTML soit écrite.
+
+**L'icône est provisoire et assumée comme telle.** `assets/tray.png` est engendrée par `scripts/generate-placeholder-icon.mjs` — un disque à l'accent Twitch, écrit octet par octet sans aucune dépendance d'image. Elle est versionnée avec son script pour la même raison qui fait vérifier le condensat d'Open Props : un binaire sans provenance ne s'audite pas. **L'identité visuelle reste à décider avant la première release**, et l'icône de l'application comme celle de l'installeur — un `.ico` — relèvent de la Phase 7.
+
+**Ce que le conteneur n'a pas vérifié, et qui reste à éprouver sous Windows :** le lancement réel de la fenêtre, le tray et son menu, DPAPI, le lancement au démarrage, l'instance unique, et la notification de premier repli. Trois fichiers, sans logique de décision — c'est le reliquat que le découpage cherchait à réduire.
 
 ### Phase 7 — Packaging et CI
 
@@ -503,6 +553,13 @@ Branche suggérée : `chore/packaging-ci`.
 `electron-builder.yml` (cible NSIS Windows uniquement), `.github/workflows/ci.yml` (lint, typecheck, tests, `npm audit` bloquant), `.github/workflows/release.yml` (tag `vX.Y.Z` → contrôle de cohérence avec `package.json` → build `.exe` → changelog depuis les commits → GitHub Release avec l'installeur et son SHA-256).
 
 Le service `build-win` de `docker/compose.yml` existe déjà mais **n'a jamais été exécuté** : il faudra le vérifier.
+
+**Constaté à la fin de la Phase 6, à traiter ici** — rien de tout cela n'existe encore, et c'est ce qui sépare aujourd'hui le dépôt d'un `.exe` lançable :
+
+- **`electron-builder` n'est pas une dépendance.** `./scripts/dc.sh build:win` appelle `npx electron-builder` et échouera tant qu'il n'est pas en devDependency.
+- **Aucun `electron-builder.yml`.** Rien ne décrit la cible NSIS, le `productName` — qui doit valoir exactement `ChronoCast`, comme l'`app.setName` de `main/main.ts`, faute de quoi le répertoire de données se déplacerait — ni l'`asar`.
+- **`assets/` doit figurer dans les `files` du paquet.** `main/main.ts` résout l'icône du tray en `../../assets/tray.png` depuis `dist/main/` : l'oublier donnerait un tray sans icône, et Electron n'en dit rien.
+- **Il faut un `.ico`** pour l'application et l'installeur. `assets/tray.png` est un placeholder engendré, et l'identité visuelle reste à décider.
 
 ### Phase 8 — Documentation
 

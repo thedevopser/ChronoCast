@@ -450,6 +450,40 @@ const setupSchema = z
   })
   .strip();
 
+/* -------------------------------------------------------------------------- */
+/* Application de bureau                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Comportements propres à la coquille Electron.
+ *
+ * Ces réglages n'ont d'effet que dans l'application Windows. C'est assumé, et
+ * ce n'est pas le défaut qui a fait retirer `server.websocket.mode` : ils
+ * agissent dans l'exécutable, seul artefact que l'utilisateur reçoit. Le point
+ * d'entrée headless est un outil de développement, pas un livrable.
+ *
+ * Ce qui n'y figure pas compte autant. **Fermer la fenêtre replie toujours vers
+ * le tray**, et cela ne se configure pas : le compteur doit survivre à un clic
+ * sur la croix comme il survit à un crash. On ne rend pas réglable ce dont la
+ * mauvaise valeur coûte le direct ; quitter reste possible, par le menu du
+ * tray, qui est un geste délibéré.
+ */
+const appSchema = z
+  .object({
+    /** Lancement automatique à l'ouverture de la session Windows. */
+    launchAtStartup: z.boolean().default(false),
+
+    /**
+     * Démarrage fenêtre masquée, dans le tray.
+     *
+     * Confort de qui lance au démarrage, et rien d'autre : au premier
+     * lancement, une application qui ne montre rien passe pour une application
+     * qui n'a pas démarré.
+     */
+    startMinimized: z.boolean().default(false),
+  })
+  .strip();
+
 export const configSchema = z
   .object({
     /**
@@ -468,6 +502,7 @@ export const configSchema = z
     logging: loggingSchema.default({}),
     history: historySchema.default({}),
     setup: setupSchema.default({}),
+    app: appSchema.default({}),
   })
   .strip();
 
