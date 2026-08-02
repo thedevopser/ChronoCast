@@ -2,11 +2,11 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, sur la branche `feat/coquille-electron`. **Phases 0 à 6 terminées**, dette du mode WebSocket `separate` soldée au passage. Les trois interfaces web sont livrées, et la coquille Electron aussi : cycle de vie, fenêtre durcie, zone de notification, et les trois ports Windows — chemins, `safeStorage`, navigateur système.
+**Dernière mise à jour :** 2 août 2026, après fusion de la PR #11. **Phases 0 à 6 terminées**, dette du mode WebSocket `separate` soldée au passage. Les trois interfaces web sont livrées, et la coquille Electron aussi : cycle de vie, fenêtre durcie, zone de notification, et les trois ports Windows — chemins, `safeStorage`, navigateur système.
 
 **Il n'y a pas encore de `.exe`.** L'application est fonctionnellement complète mais pas empaquetée : `electron-builder` n'est pas une dépendance, aucun `electron-builder.yml` n'existe, et le service Docker `build-win` n'a jamais été exécuté. C'est l'objet de la **Phase 7**, qui est la prochaine étape et le premier livrable réellement lançable sous Windows. Le détail de ce qui manque est en section 8, sous Phase 7.
 
-**La dette actée pendant la PR C a été tranchée par le retrait** : `server.websocket.mode` et `server.websocket.port` ne sont plus au schéma. L'arbitrage et ses conséquences sont en **section 8, sous « Dette soldée »**. Il n'y a plus rien à décider sur ce sujet.
+**La dette actée pendant la PR C a été tranchée par le retrait** : `server.websocket.mode` et `server.websocket.port` ne sont plus au schéma. L'arbitrage et ses conséquences sont en **section 7, sous « Dette soldée »**. Il n'y a plus rien à décider sur ce sujet.
 
 ---
 
@@ -86,7 +86,7 @@ Ces décisions ont été validées par l'utilisateur. **Ne pas les rouvrir.**
 | Reprise | **Mode gel** | Le temps hors-ligne n'est jamais décompté ; un crash nocturne ne coûte rien au streamer |
 | Signature | **Binaire non signé** | Certificat à 300-500 €/an. SmartScreen documenté, SHA-256 publié |
 | Release | **Push d'un tag `vX.Y.Z`** | Build + GitHub Release avec l'installeur attaché |
-| WebSocket | **Attaché au serveur HTTP, sans alternative** | Un seul port à configurer. Le mode `separate`, jamais implémenté, a été retiré du schéma — voir « Dette soldée » en section 8 |
+| WebSocket | **Attaché au serveur HTTP, sans alternative** | Un seul port à configurer. Le mode `separate`, jamais implémenté, a été retiré du schéma — voir « Dette soldée » en section 7 |
 | Redirect URI OAuth | **Port fixe 37771**, serveur loopback éphémère | Twitch exige une correspondance exacte, or le port HTTP applicatif est configurable |
 
 ### Hors périmètre V1, explicitement
@@ -113,10 +113,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `feat/coquille-electron`**, partie d'un `main` à jour. Deux commits, ceux de la Phase 6, dont le second emporte cette mise à jour. Les dix PR précédentes sont fusionnées en squash.
+**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. Les onze PR sont fusionnées en squash.
 
 ```
-1720d70 refactor(config): retirer le mode WebSocket « separate » (#10)      <- main
+c93202f Phase 6 — Coquille Electron (#11)                                   <- main
+1720d70 refactor(config): retirer le mode WebSocket « separate » (#10)
 1726b53 Phase 5 : PR C - Panneau d'administration (#9)
 6b1bec1 feat(setup): flux OAuth complet et assistant de configuration (#8)
 67d9219 feat(web): fondations web et overlay OBS (#7)
@@ -131,29 +132,24 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 
 **1 457 tests, 66 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6 : 68 au commit 1, 50 au commit 2.)
 
-`git status` ne doit signaler aucun fichier hors de ceux du commit en cours — `dist/` et `PR-*.md` sont ignorés.
+**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #11 a été écrite après la fusion elle-même, elle ne pouvait donc pas y figurer. Comme les fois précédentes, elle **partira dans le premier commit de la Phase 7**, sur la branche `chore/packaging-ci`, plutôt que dans une PR de documentation à elle seule. `git status` ne doit signaler aucun autre fichier — `dist/`, `release/` et `PR-*.md` sont ignorés.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # feat/coquille-electron tant que sa PR n'est pas fusionnée
+git branch --show-current    # doit afficher main
+git pull --ff-only origin main
 ./scripts/dc.sh verify       # doit être intégralement vert (1 457 tests)
-```
-
-Une fois cette PR fusionnée, et le nettoyage de la règle 5 fait :
-
-```bash
-git checkout main && git pull --ff-only origin main
 git checkout -b chore/packaging-ci
 ```
 
-La Phase 7 peut alors commencer, en suivant la section 8.
+La Phase 7 peut alors commencer, en suivant la section 8. C'est elle qui produit le premier livrable lançable : jusqu'ici, rien de ce qui a été écrit ne peut être exécuté sous Windows.
 
 **Le changement de régime a eu lieu en Phase 6, et il vaut aussi pour la suite :** le conteneur ne vérifie plus tout. `main/main.ts`, `main/windows.ts` et `main/tray.ts` importent `electron`, qu'aucun Chromium ne peut lancer ici — ils sont nommément exclus de la couverture, et éprouver leur comportement passe par vos mains sous Windows. La parade tient en une phrase : **tout ce qui décide est extrait de la coquille en modules purs**, exactement comme `src/core/**` l'a été des ports. La Phase 7 va plus loin encore, puisqu'elle produit un artefact que seul un poste Windows peut exécuter.
 
 ---
 
-## 7. Ce qui est fait — Phases 0 à 5
+## 7. Ce qui est fait — Phases 0 à 6
 
 ### Phase 0 — Socle d'outillage (PR #1, fusionnée)
 
@@ -344,7 +340,7 @@ Dette `tsconfig.web.json` payée, `web/shared/` complet, overlay complet. `npm r
 **Trois points restés ouverts, à traiter plus tard :**
 
 1. **`overlay.enableCustomCss` n'a aucune route serveur.** Le réglage existe au schéma depuis la Phase 1, mais `static-handler.ts` ne sert que `webRootDirectory` : rien ne lit `custom.css` dans le répertoire de données. Il faudra une route dédiée, avec les mêmes gardes de chemin.
-2. **Le mode `server.websocket.mode: 'separate'` n'est pas découvrable depuis la page.** ~~Le message `hello` ne porte que le port HTTP.~~ **Clos autrement que prévu :** l'analyse du lot 1 de la PR C a montré que le `hello` ne pouvait rien y faire — il arrive *sur* la connexion, donc il faut déjà avoir joint le bon port pour le lire. Le mode n'ayant par ailleurs aucune implémentation, il a été retiré. Voir « Dette soldée » en section 8.
+2. **Le mode `server.websocket.mode: 'separate'` n'est pas découvrable depuis la page.** ~~Le message `hello` ne porte que le port HTTP.~~ **Clos autrement que prévu :** l'analyse du lot 1 de la PR C a montré que le `hello` ne pouvait rien y faire — il arrive *sur* la connexion, donc il faut déjà avoir joint le bon port pour le lire. Le mode n'ayant par ailleurs aucune implémentation, il a été retiré. Voir « Dette soldée » en section 7.
 3. **Les fichiers `.js.map` sont émis dans `dist/public` mais absents de la liste blanche du serveur statique**, donc servis en 404. Sans conséquence fonctionnelle, mais à trancher au packaging (Phase 7) : les exclure du build de production plutôt que les livrer inaccessibles.
 
 #### PR B — `feat/setup-oauth` — **fusionnée (#8), 83 tests, 1 025 au total**
@@ -392,7 +388,7 @@ C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies
 - **Vendorer Open Props** (lot 1) selon la décision actée : fichier unique dans `src/web/shared/`, non modifié, en-tête portant version, licence MIT et SHA-256, récupéré par `npm pack open-props@<version>` dans le conteneur puis extraction — pas de `curl`. `web/shared/theme.css` existe déjà et n'expose que des tokens sémantiques : le rebasage ne doit toucher **aucune** règle de composant, ni dans `setup.css`, ni ailleurs.
 - **Faire pointer `/` vers `/setup` tant que `setup.completed` vaut `false`.** La redirection actuelle vers `/admin` date de la Phase 4, avant que ce réglage existe. Un nouvel utilisateur doit tomber sur l'assistant, pas sur un panneau qu'il ne peut pas encore remplir. Modification de `routes/pages.ts`, qui devra recevoir un accès à la configuration.
 - **Route de `custom.css`** pour honorer `overlay.enableCustomCss`, tracé depuis la PR A. Le réglage existe au schéma depuis la Phase 1 mais `static-handler.ts` ne sert que `webRootDirectory` : il faut une route dédiée lisant le répertoire de données, avec les mêmes gardes de chemin.
-- **Le port WebSocket** : traité par le lot 1 côté client, et refermé depuis par le retrait du mode `separate`. Voir « Dette soldée » en section 8.
+- **Le port WebSocket** : traité par le lot 1 côté client, et refermé depuis par le retrait du mode `separate`. Voir « Dette soldée » en section 7.
 
 #### Lot 1 de la PR C — livré, 87 tests
 
@@ -433,7 +429,7 @@ C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies
 
 - **Les champs sont engendrés depuis la table, pas écrits dans le gabarit.** Recopier soixante-dix champs en HTML créerait une seconde source de vérité, et une faute de frappe entre un sélecteur et son descripteur ne se verrait qu'à l'usage — un réglage « qui ne s'enregistre pas », sans message ni trace.
 - **La table est confrontée au schéma par un test.** `tests/unit/web/admin/fields.test.ts` vérifie que chaque descripteur désigne un chemin réel, que son genre correspond au type de la valeur par défaut, que ses bornes la laissent passer, et surtout que **chaque feuille de la configuration est liée ou explicitement écartée**. C'est l'exigence « aucune valeur métier codée en dur » rendue mécanique : un réglage ajouté au schéma sans champ fait échouer la suite.
-- **Cinq réglages sont écartés, chacun avec sa raison** dans `UNBOUND_PATHS` : `schemaVersion` et `setup.completed` ne sont pas des réglages, `twitch.broadcasterUserId` et `broadcasterLogin` viennent d'OAuth, et `rewards.bits.tiers` a son éditeur. (Ils étaient sept : `server.websocket.mode` et `port` y figuraient comme sans effet, jusqu'à leur retrait du schéma — voir « Dette soldée » en section 8.)
+- **Cinq réglages sont écartés, chacun avec sa raison** dans `UNBOUND_PATHS` : `schemaVersion` et `setup.completed` ne sont pas des réglages, `twitch.broadcasterUserId` et `broadcasterLogin` viennent d'OAuth, et `rewards.bits.tiers` a son éditeur. (Ils étaient sept : `server.websocket.mode` et `port` y figuraient comme sans effet, jusqu'à leur retrait du schéma — voir « Dette soldée » en section 7.)
 - **Seuls les champs modifiés partent.** Renvoyer les soixante-dix à chaque enregistrement écraserait une valeur changée entre-temps par l'assistant resté ouvert dans une fenêtre voisine.
 - **Rien ne part tant qu'une saisie est fautive.** Un enregistrement partiel laisserait l'utilisateur croire au succès. Chaque faute est nommée sous son champ plutôt que renvoyée en `400` générique.
 - **La virgule décimale est acceptée.** Un clavier français en produit une, et la refuser serait une régression d'ergonomie par rapport au soin mis dans les messages du serveur.
@@ -466,13 +462,9 @@ C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies
 - **Le test d'injection est un test de caractérisation**, écrit après le code qu'il couvre, et il est passé vert du premier coup. C'est assumé : il ne pilote aucun code neuf, il fige la garantie exigée par la section 9 pour deux vues qui affichent du contenu **stocké** puis relu longtemps après. Sa non-vacuité a été vérifiée séparément — happy-dom crée bien des éléments quand du HTML est réellement analysé, donc `querySelectorAll('*')` à zéro veut dire quelque chose.
 - **Le nom d'un fichier de test décide de son environnement.** Un fichier de `tests/security/` qui ne commence pas par `xss-` tourne dans le projet `node`, sans DOM. Constaté en direct pendant ce lot, sur un fichier temporaire : `DOMParser` y est simplement absent, et l'échec ne dit pas pourquoi.
 
----
-
-## 8. Ce qui reste à faire — Phases 6 à 8
-
 ### Dette soldée — le mode `separate` du WebSocket a été retiré
 
-> **Statut : soldée.** Traitée sur `chore/retirer-websocket-separate`, avant la Phase 6. **Ne pas rouvrir le sujet** : cette section n'est conservée que pour que la décision et sa raison survivent au retrait du code.
+> **Statut : soldée (PR #10).** Traitée sur sa propre branche, avant la Phase 6. **Ne pas rouvrir le sujet** : cette section n'est conservée que pour que la décision et sa raison survivent au retrait du code.
 
 Le constat, découvert pendant le lot 1 de la PR C : `server.websocket.mode` et `server.websocket.port` étaient déclarés au schéma et **lus nulle part**. L'adaptateur WebSocket est branché sur l'événement `upgrade` du serveur HTTP sans condition, quel que soit le réglage. Régler `mode: 'separate'` ne produisait donc aucun effet observable — ni erreur, ni changement de comportement. C'était une dette de la **Phase 4**, pas de la Phase 5.
 
@@ -491,7 +483,7 @@ Le retrait a été **gratuit en migration**, et c'est le mode `strip` du schéma
 
 **Ce qui est déjà en place et ne doit pas être réécrit :** `web/shared/api-client.ts` (jeton CSRF, erreurs `ApiError` typées), `ws-client.ts`, `countdown.ts`, `safe-dom.ts`, `time-format.ts`, `protocol.ts`, `theme.css`, `ws-url.ts` et `open-props.css`. Les trois pages les consomment tels quels.
 
-### Phase 6 — Coquille Electron — **livrée**, branche `feat/coquille-electron`, 2 commits, 118 tests
+### Phase 6 — Coquille Electron — **livrée (PR #11)**, 2 commits, 118 tests
 
 **Principe qui gouverne toute la phase :** seuls **trois fichiers** importent `electron` — `main/main.ts`, `main/windows.ts`, `main/tray.ts` — et aucun des trois ne prend de décision. Tout ce qui se décide vit dans des modules purs, testés dans le conteneur. L'exclusion de couverture de `vitest.config.ts` est **nominative** sur ces trois fichiers, et non plus `src/main/**` : une logique laissée dans la coquille s'y verrait désormais par son absence de la couverture.
 
@@ -526,7 +518,7 @@ Le retrait a été **gratuit en migration**, et c'est le mode `strip` du schéma
 | `main/main.ts` | Instance unique, cycle de vie, réglages `app.*`, arrêt propre |
 | `core/config/schema.ts` | Section `app` : `launchAtStartup`, `startMinimized` |
 | `web/admin/fields.ts` | Deux champs et un groupe « Application » dans la vue Paramètres |
-| `scripts/generate-placeholder-icon.mjs`, `assets/tray.png` | Icône provisoire, engendrée sans dépendance |
+| `assets/tray.png` | Icône du tray — placeholder à l’époque, remplacé depuis (voir « Identité visuelle ») |
 
 **Décisions prises pendant ce commit :**
 
@@ -542,9 +534,35 @@ Le retrait a été **gratuit en migration**, et c'est le mode `strip` du schéma
 - **La mise en forme de la durée du tray est une redite assumée** de `web/shared/time-format.ts`, et non un partage : ce module-là est compilé pour le navigateur avec sa propre racine, et l'y raccorder ferait entrer du code serveur dans le paquet servi au client. La règle qui compte est la même — tronquer, jamais arrondir au supérieur.
 - **Les champs `app.*` n'ont rien exigé du gabarit.** `renderFieldGroups` engendre les champs depuis la table : ajouter la section au schéma a fait passer `fields.test.ts` au rouge tout seul, et le groupe « Application » est apparu sans qu'une ligne de HTML soit écrite.
 
-**L'icône est provisoire et assumée comme telle.** `assets/tray.png` est engendrée par `scripts/generate-placeholder-icon.mjs` — un disque à l'accent Twitch, écrit octet par octet sans aucune dépendance d'image. Elle est versionnée avec son script pour la même raison qui fait vérifier le condensat d'Open Props : un binaire sans provenance ne s'audite pas. **L'identité visuelle reste à décider avant la première release**, et l'icône de l'application comme celle de l'installeur — un `.ico` — relèvent de la Phase 7.
+**L'icône livrée en Phase 6 était un placeholder ;** elle a été remplacée aussitôt après par l'identité visuelle définitive — voir « Identité visuelle » ci-dessous.
 
 **Ce que le conteneur n'a pas vérifié, et qui reste à éprouver sous Windows :** le lancement réel de la fenêtre, le tray et son menu, DPAPI, le lancement au démarrage, l'instance unique, et la notification de premier repli. Trois fichiers, sans logique de décision — c'est le reliquat que le découpage cherchait à réduire.
+
+---
+
+### Identité visuelle — livrée
+
+Deux visuels sources, fournis par l'utilisateur et versionnés : `assets/logo.png` (528 × 529, chronomètre et mot-symbole) et `assets/tray-icon.png` (202 × 223, chronomètre seul). **Ils sont la source de vérité** : les icônes livrées en sont engendrées, et rien n'est retouché à la main.
+
+`scripts/prepare-icons.mjs` produit deux artefacts, eux aussi versionnés :
+
+| Artefact | Emploi |
+| --- | --- |
+| `assets/tray.png` | Zone de notification. Carré 32 × 32, issu du chronomètre seul — le mot-symbole est illisible sous 32 px |
+| `assets/icon.ico` | Application, fenêtre et installeur NSIS. Sept tailles de 16 à 256, issues du logo complet |
+
+**Décisions prises à cette occasion :**
+
+- **Aucune dépendance de traitement d'images.** Le décodage PNG — 8 bits RGBA non entrelacé uniquement, et une erreur franche sinon — tient en une centaine de lignes, et le format ICO n'est qu'un index suivi de PNG concaténés. Une bibliothèque, avec son arbre transitif et souvent ses binaires natifs, élargirait durablement la surface d'un `npm audit` qui a un droit de veto sur chaque PR, pour un travail qu'on refait trois fois dans la vie du projet.
+- **Mise au carré par remplissage transparent, jamais par étirement ni recadrage.** Le visuel du tray fait 202 × 223 : l'étirer le déformerait, le recadrer lui couperait une part.
+- **L'alpha est prémultiplié avant le rééchantillonnage**, puis retiré. Sans cela, la couleur des pixels transparents — souvent du noir — se mélangerait à celle des pixels visibles et cernerait l'icône d'un halo sombre, d'autant plus visible qu'elle est petite.
+- **Les images du `.ico` sont enfermées au format PNG**, ce que Windows accepte depuis Vista. Le format DIB historique imposerait un masque de transparence en plus des pixels, pour un gain nul sur les cibles du projet.
+- **La fenêtre reçoit `icon.ico` explicitement.** Une fois l'application packagée, Windows lit l'icône dans l'exécutable ; la poser sert au développement, où elle vaut sinon l'icône par défaut d'Electron — celle qu'on finit par livrer sans s'en apercevoir.
+- **`tests/unit/assets/icons.test.ts` vérifie le produit**, pas la source : le tray est carré et transparent, le `.ico` porte exactement les sept tailles, ses entrées sont carrées, ses décalages tombent dans le fichier, et chaque image est bien un PNG. Ce sont des défauts qui ne se voient jamais au moment où on les commet — une icône déformée par Windows, une taille manquante remplacée en silence par une mise à l'échelle floue, un décalage qui déborde et n'échoue qu'au packaging.
+
+---
+
+## 8. Ce qui reste à faire — Phases 7 et 8
 
 ### Phase 7 — Packaging et CI
 
@@ -558,8 +576,8 @@ Le service `build-win` de `docker/compose.yml` existe déjà mais **n'a jamais �
 
 - **`electron-builder` n'est pas une dépendance.** `./scripts/dc.sh build:win` appelle `npx electron-builder` et échouera tant qu'il n'est pas en devDependency.
 - **Aucun `electron-builder.yml`.** Rien ne décrit la cible NSIS, le `productName` — qui doit valoir exactement `ChronoCast`, comme l'`app.setName` de `main/main.ts`, faute de quoi le répertoire de données se déplacerait — ni l'`asar`.
-- **`assets/` doit figurer dans les `files` du paquet.** `main/main.ts` résout l'icône du tray en `../../assets/tray.png` depuis `dist/main/` : l'oublier donnerait un tray sans icône, et Electron n'en dit rien.
-- **Il faut un `.ico`** pour l'application et l'installeur. `assets/tray.png` est un placeholder engendré, et l'identité visuelle reste à décider.
+- **`assets/` doit figurer dans les `files` du paquet.** `main/main.ts` y résout ses deux icônes depuis `dist/main/` : l'oublier donnerait une fenêtre et un tray sans icône, et Electron n'en dit rien.
+- **`assets/icon.ico` existe déjà** et couvre les sept tailles : c'est lui qu'attendent `nsis.installerIcon` et `win.icon`.
 
 ### Phase 8 — Documentation
 
@@ -573,7 +591,7 @@ Prévoir aussi `scripts/twitch-mock.sh`, qui pilote le conteneur `twitch-cli` : 
 
 ---
 
-## 9. Modèle de menace — à respecter dans les phases 6 à 8
+## 9. Modèle de menace — à respecter dans les phases 7 et 8
 
 L'application écoute sur loopback, manipule des secrets OAuth, et **affiche du contenu contrôlé par des tiers non fiables**.
 
