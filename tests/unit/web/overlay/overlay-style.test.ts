@@ -37,7 +37,7 @@ const BASE: OverlayConfig = {
   glow: { enabled: false, color: '#9146FF', radius: 20 },
   animation: { onAdd: 'pulse', durationMs: 600 },
   toast: { enabled: true, durationMs: 4_000, color: '#9146FF', fontSize: 28 },
-  gradient: { enabled: false, from: '#FF3D7F', to: '#FF9A3D', angleDeg: 100 },
+  gradient: { onText: false, onFrame: false, from: '#FF3D7F', to: '#FF9A3D', angleDeg: 100 },
   frame: {
     enabled: false,
     color: '#9146FF',
@@ -46,7 +46,7 @@ const BASE: OverlayConfig = {
     paddingX: 24,
     paddingY: 12,
     fillColor: '#000000',
-    fillOpacity: 0.4,
+    fillOpacity: 0,
   },
   enableCustomCss: false,
 };
@@ -176,14 +176,28 @@ describe('overlayCssVariables', () => {
       expect(variables['--cc-text-fill']).toBe('#FFFFFF');
     });
 
-    it('peint le texte par un fond découpé quand il est actif', () => {
+    it('peint le texte par un fond découpé quand il vise le texte', () => {
       const variables = overlayCssVariables({
         ...BASE,
-        gradient: { enabled: true, from: '#FF3D7F', to: '#FF9A3D', angleDeg: 100 },
+        gradient: { ...BASE.gradient, onText: true },
       });
 
       expect(variables['--cc-text-background']).toBe('linear-gradient(100deg, #FF3D7F, #FF9A3D)');
       expect(variables['--cc-text-fill']).toBe('transparent');
+    });
+
+    it('laisse le texte tranquille quand il ne vise que le cadre', () => {
+      // Les deux cibles sont indépendantes : un dégradé sur le cadre ne doit
+      // pas rendre les chiffres transparents, sous peine de les faire
+      // disparaître si le cadre est éteint.
+      const variables = overlayCssVariables({
+        ...BASE,
+        gradient: { ...BASE.gradient, onFrame: true },
+        frame: { ...BASE.frame, enabled: true },
+      });
+
+      expect(variables['--cc-text-background']).toBe('none');
+      expect(variables['--cc-text-fill']).toBe('#FFFFFF');
     });
   });
 
@@ -214,17 +228,48 @@ describe('overlayCssVariables', () => {
       expect(variables['--cc-frame-background']).toBe('#9146FF');
     });
 
-    it('porte le même dégradé que le texte', () => {
-      // « Le dégradé sur l'ensemble » : une seule définition, deux endroits où
-      // elle s'applique. Deux réglages séparés donneraient surtout l'occasion
-      // de les désaccorder.
+    it('porte le dégradé quand celui-ci le vise', () => {
       const variables = overlayCssVariables({
         ...BASE,
-        gradient: { enabled: true, from: '#FF3D7F', to: '#FF9A3D', angleDeg: 100 },
+        gradient: { ...BASE.gradient, onFrame: true },
+        frame: { ...BASE.frame, enabled: true },
+      });
+
+      expect(variables['--cc-frame-background']).toBe('linear-gradient(100deg, #FF3D7F, #FF9A3D)');
+    });
+
+    it('garde sa couleur unie quand le dégradé ne vise que le texte', () => {
+      const variables = overlayCssVariables({
+        ...BASE,
+        gradient: { ...BASE.gradient, onText: true },
+        frame: { ...BASE.frame, enabled: true },
+      });
+
+      expect(variables['--cc-frame-background']).toBe('#9146FF');
+    });
+
+    it('partage la même définition que le texte quand les deux sont visés', () => {
+      // Une seule paire de couleurs et un seul angle : les dédoubler n'aurait
+      // servi qu'à donner l'occasion de les désaccorder.
+      const variables = overlayCssVariables({
+        ...BASE,
+        gradient: { ...BASE.gradient, onText: true, onFrame: true },
         frame: { ...BASE.frame, enabled: true },
       });
 
       expect(variables['--cc-frame-background']).toBe(variables['--cc-text-background']);
+    });
+
+    it('laisse l’intérieur libre par défaut', () => {
+      // Un cadre est un trait, pas un pavé : un remplissage opaque par défaut
+      // masquerait la scène derrière lui, et c'est le contraire de ce qu'on
+      // attend d'un cadre.
+      const variables = overlayCssVariables({
+        ...BASE,
+        frame: { ...BASE.frame, enabled: true },
+      });
+
+      expect(variables['--cc-frame-fill']).toBe('#00000000');
     });
 
     it('creuse le rayon intérieur de l’épaisseur du trait', () => {

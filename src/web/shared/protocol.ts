@@ -144,7 +144,8 @@ export interface OverlayConfig {
     radius: number;
   };
   gradient: {
-    enabled: boolean;
+    onText: boolean;
+    onFrame: boolean;
     from: string;
     to: string;
     angleDeg: number;

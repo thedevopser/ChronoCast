@@ -367,15 +367,21 @@ const overlaySchema = z
       .default({}),
 
     /**
-     * Dégradé à deux couleurs, appliqué au texte **et** au cadre.
+     * Dégradé à deux couleurs, et les endroits où il s'applique.
      *
-     * Une seule définition pour les deux : les désaccorder n'a jamais rendu
-     * personne heureux, et deux réglages séparés n'auraient servi qu'à cela.
-     * Éteint par défaut, comme tout ce qui change l'apparence existante.
+     * Deux cibles indépendantes plutôt qu'un interrupteur unique : le dégradé
+     * sur les chiffres et le dégradé sur le cadre sont deux envies distinctes,
+     * et rien ne dit qu'on veuille les deux à la fois. Elles partagent en
+     * revanche la **même** paire de couleurs et le même angle : les dédoubler
+     * n'aurait servi qu'à donner l'occasion de les désaccorder.
+     *
+     * Éteint des deux côtés par défaut, comme tout ce qui change l'apparence
+     * existante.
      */
     gradient: z
       .object({
-        enabled: z.boolean().default(false),
+        onText: z.boolean().default(false),
+        onFrame: z.boolean().default(false),
         from: hexColor.default('#FF3D7F'),
         to: hexColor.default('#FF9A3D'),
         /** Sens du dégradé. 0° monte, 90° va vers la droite. */
@@ -405,7 +411,13 @@ const overlaySchema = z
         paddingX: z.number().nonnegative().max(400).default(24),
         paddingY: z.number().nonnegative().max(400).default(12),
         fillColor: hexColor.default('#000000'),
-        fillOpacity: z.number().min(0).max(1).default(0.4),
+        /*
+         * Intérieur libre par défaut : un cadre est un trait, pas un pavé.
+         * Un remplissage d'emblée visible masque la scène derrière le compteur
+         * et fait passer le cadre pour un fond — c'est exactement l'effet qu'on
+         * ne veut pas quand on en active un.
+         */
+        fillOpacity: z.number().min(0).max(1).default(0),
       })
       .strip()
       .default({}),

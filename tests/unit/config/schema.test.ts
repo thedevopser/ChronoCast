@@ -46,11 +46,18 @@ describe('configSchema', () => {
       // changer à l'overlay des utilisateurs existants tant qu'ils ne l'ont pas
       // demandée — leur scène OBS est déjà cadrée sur ce qu'ils voient.
       expect(DEFAULT_CONFIG.overlay.frame.enabled).toBe(false);
-      expect(DEFAULT_CONFIG.overlay.gradient.enabled).toBe(false);
+      expect(DEFAULT_CONFIG.overlay.gradient.onText).toBe(false);
+      expect(DEFAULT_CONFIG.overlay.gradient.onFrame).toBe(false);
       expect(DEFAULT_CONFIG.overlay.frame.width).toBeGreaterThan(0);
       expect(DEFAULT_CONFIG.overlay.frame.radius).toBeGreaterThan(0);
       expect(DEFAULT_CONFIG.overlay.gradient.from).toMatch(/^#/);
       expect(DEFAULT_CONFIG.overlay.gradient.to).toMatch(/^#/);
+    });
+
+    it('laisse l’intérieur du cadre libre', () => {
+      // Un cadre est un trait, pas un pavé. Un remplissage par défaut masque la
+      // scène derrière le compteur et fait passer le cadre pour un fond.
+      expect(DEFAULT_CONFIG.overlay.frame.fillOpacity).toBe(0);
     });
 
     it('porte le numéro de version courant du schéma', () => {
