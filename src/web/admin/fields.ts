@@ -57,12 +57,6 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
 
   'rewards.bits.tiers':
     'Tableau de paliers à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Barème avec son propre module.',
-
-  'server.websocket.mode':
-    'Sans effet : le mode « separate » n’a aucune implémentation côté serveur. L’afficher promettrait un comportement inexistant. Voir la dette décrite dans docs/REPRISE.md.',
-
-  'server.websocket.port':
-    'Sans effet pour la même raison que le mode : l’adaptateur WebSocket est attaché au serveur HTTP quel que soit le réglage. Voir la dette décrite dans docs/REPRISE.md.',
 };
 
 /* -------------------------------------------------------------------------- */

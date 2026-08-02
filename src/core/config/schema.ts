@@ -266,14 +266,18 @@ const serverSchema = z
      */
     host: z.enum(['127.0.0.1', 'localhost']).default('127.0.0.1'),
 
+    /**
+     * Réglages du canal WebSocket.
+     *
+     * Il n'y a ni mode ni port ici, et c'est structurel : le socket est attaché
+     * au serveur HTTP par son événement `upgrade`, si bien qu'un seul port est
+     * à configurer et qu'il est déjà déclaré au-dessus. Les deux réglages qui
+     * ont existé ici — `mode: 'shared' | 'separate'` et `port` — n'ont jamais
+     * eu de lecteur : ils se réglaient sans rien produire. Ils ont été retirés
+     * plutôt que documentés, un réglage inerte étant pire qu'un réglage absent.
+     */
     websocket: z
       .object({
-        /**
-         * `shared` réutilise le port HTTP, ce qui n'expose qu'un seul port à
-         * configurer. `separate` reste possible pour les cas particuliers.
-         */
-        mode: z.enum(['shared', 'separate']).default('shared'),
-        port: z.number().int().min(1).max(65_535).default(3_778),
         /** Période des pings de vivacité. */
         heartbeatIntervalMs: millisecondsAboveZero.default(30_000),
 

@@ -455,17 +455,17 @@ export function createApplication(options: ApplicationOptions): Application {
   const currentPort = (): number => httpServer?.getPort() ?? 0;
 
   /**
-   * Port sur lequel le WebSocket écoute **réellement**.
+   * Port sur lequel le WebSocket écoute.
    *
-   * C'est aujourd'hui toujours celui du serveur HTTP : l'adaptateur est branché
-   * sur son événement `upgrade`, et `server.websocket.mode` n'est lu nulle part
-   * — le mode `separate` n'a jamais reçu d'implémentation côté serveur.
+   * C'est celui du serveur HTTP, par construction : l'adaptateur est branché sur
+   * son événement `upgrade`, il n'existe aucun second écouteur, et le schéma ne
+   * déclare plus rien qui laisserait croire le contraire.
    *
-   * Renvoyer `server.websocket.port` ici serait donc annoncer un port où rien
-   * n'écoute, et transformer un réglage aujourd'hui sans effet en panne franche
-   * de l'overlay. Le jour où un second écouteur existera, **cette fonction est
-   * le seul endroit à changer** : le marqueur du gabarit, le message `hello` et
-   * `web/shared/ws-url.ts` s'en accommoderont sans modification.
+   * La fonction subsiste néanmoins, plutôt que d'être remplacée par `currentPort`
+   * à ses deux points d'appel : elle nomme une question — « où le socket
+   * écoute-t-il ? » — dont la réponse se trouve être aujourd'hui le port HTTP.
+   * Le jour où elle cesserait de l'être, c'est ici, et nulle part ailleurs, que
+   * cela s'écrirait.
    */
   const currentWsPort = (): number => currentPort();
 

@@ -56,6 +56,17 @@ describe('configSchema', () => {
       expect(DEFAULT_CONFIG.server.websocket.maxMessageBytes).toBeLessThanOrEqual(64 * 1_024);
     });
 
+    it('n’annonce aucun mode ni port propre au WebSocket', () => {
+      // Le socket est attaché au serveur HTTP, sans condition ni alternative :
+      // c'est la décision d'architecture, et elle n'a jamais eu de second
+      // écouteur. Déclarer `mode` et `port` promettait un comportement que le
+      // serveur ne produit pas — régler `mode: 'separate'` n'avait aucun effet
+      // observable, ni erreur ni changement. Un réglage inerte est pire qu'un
+      // réglage absent : il se règle, et il ment.
+      expect(DEFAULT_CONFIG.server.websocket).not.toHaveProperty('mode');
+      expect(DEFAULT_CONFIG.server.websocket).not.toHaveProperty('port');
+    });
+
     it('plafonne la taille du corps des requêtes HTTP', () => {
       // Une configuration exportée puis réimportée est le plus gros corps
       // légitime : le plafond doit lui laisser de la marge, pas davantage.
@@ -131,6 +142,20 @@ describe('configSchema', () => {
       configSchema.parse(hostile);
 
       expect(({} as Record<string, unknown>)['pollue']).toBeUndefined();
+    });
+
+    it('accepte une configuration héritée portant l’ancien mode WebSocket', () => {
+      // Ces deux clés ont existé au schéma : un fichier écrit par une version
+      // antérieure les contient. Le mode `strip` les écarte sans rien rejeter,
+      // ce qui rend leur retrait indolore — aucune migration à écrire, et
+      // surtout aucun démarrage refusé à qui met simplement à jour.
+      const parsed = configSchema.parse({
+        server: { websocket: { mode: 'separate', port: 3778, heartbeatIntervalMs: 15_000 } },
+      });
+
+      expect(parsed.server.websocket).not.toHaveProperty('mode');
+      expect(parsed.server.websocket).not.toHaveProperty('port');
+      expect(parsed.server.websocket.heartbeatIntervalMs).toBe(15_000);
     });
 
     it('refuse un barème de bits par paliers vide', () => {
