@@ -112,16 +112,13 @@ export function overlayCssVariables(config: OverlayConfig): Record<string, strin
     /*
      * Cadre.
      *
-     * Le trait est un `padding` sur l'enveloppe, et non une bordure : c'est le
-     * seul moyen d'avoir à la fois un dégradé et des coins arrondis, là où
-     * `border-image` fait perdre le rayon. Le rayon intérieur est creusé de
-     * l'épaisseur du trait, faute de quoi un liseré apparaît aux angles.
+     * Le trait est peint par un pseudo-élément dont on soustrait la boîte
+     * intérieure, et non par une bordure : c'est le seul moyen d'avoir un
+     * dégradé, des coins arrondis **et** un intérieur qui laisse voir la scène.
+     * Les rayons intérieurs sont calculés par le moteur, pas ici.
      */
     '--cc-frame-width': frame.enabled ? `${String(frame.width)}px` : '0px',
     '--cc-frame-radius': frame.enabled ? `${String(frame.radius)}px` : '0px',
-    '--cc-frame-inner-radius': frame.enabled
-      ? `${String(Math.max(frame.radius - frame.width, 0))}px`
-      : '0px',
     '--cc-frame-padding-x': frame.enabled ? `${String(frame.paddingX)}px` : '0px',
     '--cc-frame-padding-y': frame.enabled ? `${String(frame.paddingY)}px` : '0px',
     '--cc-frame-background': frameBackground(config),

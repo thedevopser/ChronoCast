@@ -24,7 +24,6 @@
   /* Cadre éteint : sans épaisseur et sans couleur, donc sans effet. */
   --cc-frame-width: 0px;
   --cc-frame-radius: 0px;
-  --cc-frame-inner-radius: 0px;
   --cc-frame-padding-x: 0px;
   --cc-frame-padding-y: 0px;
   --cc-frame-background: transparent;
@@ -68,24 +67,55 @@ body {
 /*
  * Cadre.
  *
- * L'enveloppe extérieure peint le trait : son fond, révélé par un `padding` de
- * l'épaisseur voulue. C'est ce qui permet un trait en dégradé **et** des coins
- * arrondis, que `border-image` ferait perdre.
+ * L'enveloppe porte le remplissage — qui peut être parfaitement transparent —
+ * et c'est un **pseudo-élément** qui peint le trait.
+ *
+ * Cette séparation n'est pas un raffinement. La première version peignait le
+ * dégradé sur le fond de l'enveloppe et comptait sur un `padding` pour n'en
+ * laisser voir que le pourtour : c'est faux, le fond d'un élément peint toute
+ * sa boîte, marge intérieure comprise. Le trait n'apparaissait donc que si
+ * l'intérieur était masqué par un remplissage opaque — autrement dit, le cadre
+ * ne pouvait pas être un cadre et laisser voir la scène en même temps.
+ *
+ * `border-image` réglerait le problème d'un trait, mais ferait perdre
+ * `border-radius`. Reste le masque : le pseudo-élément peint le dégradé sur
+ * toute sa surface, puis on en **soustrait la boîte intérieure**. Les rayons
+ * intérieurs sont alors calculés par le moteur, ce qui vaut mieux que de les
+ * calculer nous-mêmes.
+ *
+ * Le masque est posé sur le pseudo-élément et non sur l'enveloppe : appliqué à
+ * celle-ci, il effacerait aussi les chiffres, qui en sont un descendant.
  */
 .frame {
-  padding: var(--cc-frame-width);
+  position: relative;
+  padding: var(--cc-frame-padding-y) var(--cc-frame-padding-x);
   border-radius: var(--cc-frame-radius);
-  background: var(--cc-frame-background);
+  background-color: var(--cc-frame-fill);
 }
 
-/*
- * L'enveloppe intérieure porte le remplissage, et le rayon creusé de
- * l'épaisseur du trait — sans quoi un liseré apparaît aux quatre angles.
- */
-.frame__inner {
-  padding: var(--cc-frame-padding-y) var(--cc-frame-padding-x);
-  border-radius: var(--cc-frame-inner-radius);
-  background-color: var(--cc-frame-fill);
+.frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* La marge intérieure du pseudo-élément **est** l'épaisseur du trait. */
+  padding: var(--cc-frame-width);
+  background: var(--cc-frame-background);
+
+  /*
+   * Deux couches de masque : la boîte intérieure, et la boîte entière. Leur
+   * soustraction ne laisse que le pourtour.
+   *
+   * La forme préfixée est conservée pour les Chromium plus anciens — une
+   * Browser Source OBS n'est pas toujours à jour, et `mask-composite` n'est
+   * arrivé que tardivement. La forme standard est déclarée après, elle
+   * l'emporte là où elle existe. L'ordre compte : la propriété raccourcie
+   * réinitialise la composition, elle doit donc précéder.
+   */
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 
 .countdown {
