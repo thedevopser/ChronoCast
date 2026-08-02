@@ -366,6 +366,50 @@ const overlaySchema = z
       .strip()
       .default({}),
 
+    /**
+     * Dégradé à deux couleurs, appliqué au texte **et** au cadre.
+     *
+     * Une seule définition pour les deux : les désaccorder n'a jamais rendu
+     * personne heureux, et deux réglages séparés n'auraient servi qu'à cela.
+     * Éteint par défaut, comme tout ce qui change l'apparence existante.
+     */
+    gradient: z
+      .object({
+        enabled: z.boolean().default(false),
+        from: hexColor.default('#FF3D7F'),
+        to: hexColor.default('#FF9A3D'),
+        /** Sens du dégradé. 0° monte, 90° va vers la droite. */
+        angleDeg: z.number().int().min(0).max(360).default(100),
+      })
+      .strip()
+      .default({}),
+
+    /**
+     * Cadre entouré autour du compteur.
+     *
+     * À ne pas confondre avec `outline`, qui cerne les glyphes eux-mêmes. Le
+     * cadre est une boîte, avec son trait, ses coins, sa marge intérieure et
+     * son remplissage.
+     *
+     * L'opacité du remplissage est un réglage distinct de sa couleur parce que
+     * `<input type="color">` ne sait pas exprimer la transparence : il rend
+     * toujours six chiffres hexadécimaux. Les deux sont recomposés à
+     * l'affichage.
+     */
+    frame: z
+      .object({
+        enabled: z.boolean().default(false),
+        color: hexColor.default('#9146FF'),
+        width: z.number().nonnegative().max(40).default(4),
+        radius: z.number().nonnegative().max(200).default(18),
+        paddingX: z.number().nonnegative().max(400).default(24),
+        paddingY: z.number().nonnegative().max(400).default(12),
+        fillColor: hexColor.default('#000000'),
+        fillOpacity: z.number().min(0).max(1).default(0.4),
+      })
+      .strip()
+      .default({}),
+
     animation: z
       .object({
         /** Effet déclenché à chaque ajout de temps. */

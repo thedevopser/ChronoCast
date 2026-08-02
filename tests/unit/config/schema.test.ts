@@ -41,6 +41,18 @@ describe('configSchema', () => {
       expect(DEFAULT_CONFIG.rewards.follow.seconds).toBeGreaterThan(0);
     });
 
+    it('laisse le cadre et le dégradé éteints, tout en les gardant réglables', () => {
+      // Même règle que raid et follow : une nouveauté d'apparence ne doit rien
+      // changer à l'overlay des utilisateurs existants tant qu'ils ne l'ont pas
+      // demandée — leur scène OBS est déjà cadrée sur ce qu'ils voient.
+      expect(DEFAULT_CONFIG.overlay.frame.enabled).toBe(false);
+      expect(DEFAULT_CONFIG.overlay.gradient.enabled).toBe(false);
+      expect(DEFAULT_CONFIG.overlay.frame.width).toBeGreaterThan(0);
+      expect(DEFAULT_CONFIG.overlay.frame.radius).toBeGreaterThan(0);
+      expect(DEFAULT_CONFIG.overlay.gradient.from).toMatch(/^#/);
+      expect(DEFAULT_CONFIG.overlay.gradient.to).toMatch(/^#/);
+    });
+
     it('porte le numéro de version courant du schéma', () => {
       expect(DEFAULT_CONFIG.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
     });
@@ -122,6 +134,14 @@ describe('configSchema', () => {
 
     it('refuse une couleur qui n\'est pas une notation hexadécimale', () => {
       expect(() => configSchema.parse({ overlay: { color: 'rouge vif' } })).toThrow();
+    });
+
+    it('refuse un angle de dégradé hors du tour complet', () => {
+      expect(() => configSchema.parse({ overlay: { gradient: { angleDeg: 400 } } })).toThrow();
+    });
+
+    it('refuse une opacité de remplissage hors de [0, 1]', () => {
+      expect(() => configSchema.parse({ overlay: { frame: { fillOpacity: 1.5 } } })).toThrow();
     });
 
     it('refuse un intervalle de tick nul', () => {

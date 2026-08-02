@@ -17,7 +17,18 @@
   --cc-font-weight: 700;
   --cc-letter-spacing: 0px;
   --cc-color: #ffffff;
+  --cc-text-fill: #ffffff;
+  --cc-text-background: none;
   --cc-text-align: center;
+
+  /* Cadre éteint : sans épaisseur et sans couleur, donc sans effet. */
+  --cc-frame-width: 0px;
+  --cc-frame-radius: 0px;
+  --cc-frame-inner-radius: 0px;
+  --cc-frame-padding-x: 0px;
+  --cc-frame-padding-y: 0px;
+  --cc-frame-background: transparent;
+  --cc-frame-fill: transparent;
   --cc-text-shadow: 0px 4px 12px #000000cc;
   --cc-outline-width: 0px;
   --cc-outline-color: #000000;
@@ -54,14 +65,49 @@ body {
   pointer-events: none;
 }
 
+/*
+ * Cadre.
+ *
+ * L'enveloppe extérieure peint le trait : son fond, révélé par un `padding` de
+ * l'épaisseur voulue. C'est ce qui permet un trait en dégradé **et** des coins
+ * arrondis, que `border-image` ferait perdre.
+ */
+.frame {
+  padding: var(--cc-frame-width);
+  border-radius: var(--cc-frame-radius);
+  background: var(--cc-frame-background);
+}
+
+/*
+ * L'enveloppe intérieure porte le remplissage, et le rayon creusé de
+ * l'épaisseur du trait — sans quoi un liseré apparaît aux quatre angles.
+ */
+.frame__inner {
+  padding: var(--cc-frame-padding-y) var(--cc-frame-padding-x);
+  border-radius: var(--cc-frame-inner-radius);
+  background-color: var(--cc-frame-fill);
+}
+
 .countdown {
   font-family: var(--cc-font-family);
   font-size: var(--cc-font-size);
   font-weight: var(--cc-font-weight);
   letter-spacing: var(--cc-letter-spacing);
-  color: var(--cc-color);
   text-align: var(--cc-text-align);
   text-shadow: var(--cc-text-shadow);
+
+  /*
+   * Peinture du texte.
+   *
+   * `color` n'accepte pas d'image : un dégradé ne peut être appliqué qu'en
+   * découpant un fond à la forme des glyphes. Le découpage est toujours actif —
+   * sans fond, il ne peint rien — et c'est `--cc-text-fill` qui décide : la
+   * couleur unie, ou `transparent` pour laisser voir le dégradé dessous.
+   */
+  color: var(--cc-text-fill);
+  background-image: var(--cc-text-background);
+  -webkit-background-clip: text;
+  background-clip: text;
 
   -webkit-text-stroke: var(--cc-outline-width) var(--cc-outline-color);
 

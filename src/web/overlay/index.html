@@ -40,7 +40,24 @@
       sans barre oblique finale, où « overlay.css » se résoudrait en /overlay.css.
     -->
     <div class="overlay" id="overlay">
-      <div class="countdown" id="countdown">--:--:--</div>
+      <!--
+        Deux enveloppes autour du compteur, et non une bordure sur lui.
+
+        Le trait du cadre est le `padding` de la première, peint par son fond :
+        c'est le seul moyen d'avoir à la fois un dégradé et des coins arrondis,
+        là où `border-image` fait perdre le rayon. La seconde porte le
+        remplissage, qui ne peut pas vivre sur le compteur lui-même — un
+        dégradé de texte se peint par `background-clip: text`, qui découperait
+        ce remplissage à la forme des chiffres.
+
+        Cadre éteint, les deux enveloppes sont transparentes et sans épaisseur :
+        l'overlay est alors strictement identique à ce qu'il était.
+      -->
+      <div class="frame">
+        <div class="frame__inner">
+          <div class="countdown" id="countdown">--:--:--</div>
+        </div>
+      </div>
 
       <div class="toast" id="toast" hidden>
         <span class="toast__user" id="toast-user"></span>

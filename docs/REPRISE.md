@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, sur la branche `fix/retour-dans-la-fenetre`, non commitée. **Phases 0 à 7 terminées.** L'installeur Windows est produit, s'installe et se lance, et **le flux OAuth aboutit de bout en bout** — autorisation Twitch, rappel reçu, chaîne détectée. Le défaut d'ergonomie qui le suivait — la configuration se poursuivait dans le navigateur — **est corrigé et vérifié en conteneur** ; la section 0 dit ce qui a été fait et ce qui reste à valider sur poste. **La version est passée à `0.2.0`.** Il ne reste ensuite que la **Phase 8, la documentation**.
+**Dernière mise à jour :** 2 août 2026, après fusion de la PR #16. **Phases 0 à 7 terminées.** L'installeur Windows est produit, s'installe et se lance, et **le flux OAuth aboutit de bout en bout** — autorisation Twitch, rappel reçu, chaîne détectée. Le défaut d'ergonomie qui le suivait — la configuration se poursuivait dans le navigateur — **est corrigé et fusionné** ; il reste à le voir fonctionner sur poste Windows, ce que le conteneur ne peut pas montrer (section 0). **La version est passée à `0.2.0`.** S'y ajoutent deux nouveautés d'apparence livrées à la demande de l'utilisateur — **cadre et dégradé** — décrites en section 0 bis. Il ne reste ensuite que la **Phase 8, la documentation**.
 
 **Le `.exe` existe, il s'installe et il se lance.** Le workflow `Release` a produit l'installeur, l'installation aboutit, et l'application démarre sur l'assistant de première configuration avec son icône. **La Phase 7 est donc éprouvée, et pas seulement écrite.** Il reste à valider le reste du parcours sur poste Windows — la liste est en section 8, sous Phase 7.
 
@@ -10,9 +10,9 @@ Ce document permet de reprendre le développement depuis une fenêtre de context
 
 ---
 
-## 0. Correctif en cours — le retour dans la fenêtre après le flux OAuth
+## 0. Retour dans la fenêtre après le flux OAuth — corrigé, à voir tourner sur poste
 
-> **À lire en premier.** Le défaut est corrigé sur la branche `fix/retour-dans-la-fenetre`, vérifié en conteneur, **pas encore commité ni validé sur poste Windows**.
+> **À lire en premier.** Correctif fusionné (PR #16), vérifié en conteneur. **Reste à observer sur poste Windows** : la moitié qui ramène la fenêtre au premier plan est la seule chose que le conteneur ne peut pas montrer. La `0.2.0` est la première version qui la porte.
 
 **Le défaut, tel qu'il a été constaté.** Le flux OAuth aboutissait — Twitch autorisait, le rappel arrivait, la chaîne était détectée — mais l'assistant **se poursuivait dans le navigateur**. L'utilisateur se retrouvait avec deux assistants ouverts : celui de la fenêtre ChronoCast, resté à l'étape 3, et celui du navigateur, à l'étape 5. Il terminait sa configuration dans le mauvais des deux, et la fenêtre ne se mettait jamais à jour.
 
@@ -32,6 +32,25 @@ Ce document permet de reprendre le développement depuis une fenêtre de context
 **Le mode headless ne régresse pas.** La page terminale porte un lien vers `/setup?oauth=<issue>` quand le port applicatif est connu — c'est le seul retour possible sans fenêtre. Il est formulé comme un **recours** (« si ChronoCast ne réagit pas ») et non comme la suite du parcours : dans l'application, le suivre ramènerait exactement le défaut qu'on vient de corriger.
 
 **Ce qui reste à valider à la main, sur poste Windows :** que la fenêtre revienne réellement au premier plan à la fin du flux, y compris repliée dans le tray, et que l'assistant s'y remette à l'étape suivante. Le conteneur ne dira rien de cette partie — c'est `showWindow()` et `loadURL`, dans les trois fichiers qui importent `electron`.
+
+---
+
+## 0 bis. Apparence — cadre et dégradé (branche `feat/cadre-et-degrade`)
+
+Deux sections de plus au schéma de l'overlay, **éteintes par défaut** : la scène OBS d'un utilisateur existant est déjà cadrée sur ce qu'il voit, et une nouveauté d'apparence ne doit rien y déplacer tant qu'il ne l'a pas demandée.
+
+- **`overlay.gradient`** — deux couleurs et un angle, appliqués **au texte et au cadre**. Une seule définition pour les deux : deux réglages séparés n'auraient servi qu'à les désaccorder.
+- **`overlay.frame`** — épaisseur, arrondi, marges intérieures, couleur, remplissage et son opacité. À ne pas confondre avec `overlay.outline`, qui cerne les glyphes ; le champ correspondant a d'ailleurs été renommé « Contour des chiffres », la confusion ayant eu lieu pour de vrai.
+
+**Trois contraintes de rendu expliquent la forme du code, et se paieraient cher à redécouvrir.**
+
+1. **Le trait du cadre est un `padding` peint par le fond, pas une bordure.** `border-image` est la façon évidente de faire un trait en dégradé, et elle fait perdre `border-radius`. Il fallait choisir entre le dégradé et les coins ronds : cette construction garde les deux.
+2. **Un dégradé de texte passe par `background-clip: text`**, ce qui impose `color: transparent`. D'où le couple `--cc-text-fill` / `--cc-text-background`, et la règle qui va avec : la couleur doit redevenir opaque dès que le dégradé s'éteint, sans quoi **le compteur disparaît de la scène**.
+3. **D'où deux enveloppes autour du compteur** (`.frame`, `.frame__inner`) : le remplissage ne peut pas vivre sur l'élément du texte, il serait découpé à la forme des chiffres.
+
+**L'opacité du remplissage est un réglage distinct de sa couleur** parce que `<input type="color">` ne sait pas exprimer la transparence. Les deux sont recomposés en notation à huit chiffres par `withOpacity`, qui développe la notation courte `#RGB` et remplace une opacité déjà portée par la couleur.
+
+**Le logo du panneau** était resté un caractère `◷` posé en Phase 5. `scripts/prepare-icons.mjs` engendre désormais aussi `src/web/shared/logo.png` en 128 px depuis `assets/logo.png` — dans les sources et non dans `assets/`, car `copy-web-assets.mjs` ne recopie que `src/web/**`. Il sert de marque dans la barre latérale et de favicon sur le panneau comme sur l'assistant. `icon.ico` et `tray.png` ressortent identiques au bit près de la régénération.
 
 ---
 
@@ -138,10 +157,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `fix/retour-dans-la-fenetre`**, non commitée à l'heure où ces lignes sont écrites. Les quinze PR sont fusionnées en squash ; `main` est sur `ae3f7de`.
+**Branche courante : `feat/cadre-et-degrade`**, commitée, PR non fusionnée à l'heure où ces lignes sont écrites. Les seize PR précédentes sont fusionnées en squash ; `main` est sur `0c9fa9c`.
 
 ```
-ae3f7de fix(oauth): rediriger vers localhost (#15)                          <- main
+0c9fa9c fix(oauth): ramener la configuration dans la fenêtre (#16)          <- main
+ae3f7de fix(oauth): rediriger vers localhost (#15)
 a01167c fix(windows): canoniser la racine servie, figer les fins de ligne (#14)
 0bc9120 chore(packaging): electron-builder et workflows GitHub (#13)
 4078cb6 chore(assets): identité visuelle définitive (#12)
@@ -159,17 +179,17 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 496 tests, 70 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth et les **10** du retour dans la fenêtre.)
+**1 510 tests, 70 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth, les **10** du retour dans la fenêtre et les **14** du cadre et du dégradé.)
 
-**Modifications en attente de commit : le correctif décrit en section 0, la version portée à `0.2.0`, et ce fichier.** `git status` ne doit rien signaler d'autre — `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Rien en attente hors du travail de la branche.** `git status` ne doit signaler aucun fichier une fois la branche commitée — `dist/`, `release/` et `PR-*.md` sont ignorés.
 
 **La version est passée à `0.2.0`**, à deux endroits qui doivent rester alignés : `package.json` — d'où electron-builder tire le nom de l'installeur et `app.getVersion()` — et la constante `APP_VERSION` de `src/headless/index.ts`, qui n'a pas accès au premier. Rien ne vérifie automatiquement cet alignement : la seule garde est de les modifier ensemble.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # fix/retour-dans-la-fenetre tant que la PR n'est pas fusionnée
-./scripts/dc.sh verify       # doit être intégralement vert (1 496 tests)
+git branch --show-current    # feat/cadre-et-degrade tant que la PR n'est pas fusionnée
+./scripts/dc.sh verify       # doit être intégralement vert (1 510 tests)
 ```
 
 **La suite de la Phase 7 ne commence pas par du code, mais par un clic** : déclencher manuellement le workflow `Release` pour obtenir un premier `.exe`. La marche à suivre est en section 8. Tant que ce build n'a pas tourné, rien de ce qui a été écrit n'a jamais été exécuté sous Windows.

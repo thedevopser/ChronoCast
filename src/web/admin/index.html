@@ -12,6 +12,13 @@
     -->
     <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
 
+    <!--
+      Le logo engendré depuis `assets/logo.png` par `scripts/prepare-icons.mjs`.
+      Servi par la même origine : `img-src 'self'` l'autorise, et l'application
+      doit fonctionner sans connexion.
+    -->
+    <link rel="icon" type="image/png" href="/shared/logo.png" />
+
     <!-- Port du WebSocket, substitué lui aussi. Ce n'est pas un secret. -->
     <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
 
@@ -33,7 +40,12 @@
     <div class="shell">
       <aside class="sidebar">
         <div class="sidebar__brand">
-          <span class="sidebar__mark" aria-hidden="true">◷</span>
+          <!--
+            Le logo, et non un glyphe d'horloge : il est la marque du produit.
+            `alt` vide et non un texte : le nom suit immédiatement, et le
+            répéter ferait dire deux fois la même chose à un lecteur d'écran.
+          -->
+          <img class="sidebar__mark" src="/shared/logo.png" alt="" width="32" height="32" />
           <span class="sidebar__name">ChronoCast</span>
         </div>
 

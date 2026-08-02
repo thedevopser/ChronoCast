@@ -44,9 +44,83 @@ function composeTextShadow(config: OverlayConfig): string {
   return layers.length === 0 ? 'none' : layers.join(', ');
 }
 
+/**
+ * Compose le dégradé, ou `null` s'il est éteint.
+ *
+ * `null` et non `'none'` : les deux consommateurs — le texte et le cadre — en
+ * font quelque chose de différent, et c'est à eux de le dire.
+ */
+function composeGradient(config: OverlayConfig): string | null {
+  if (!config.gradient.enabled) {
+    return null;
+  }
+
+  const { angleDeg, from, to } = config.gradient;
+  return `linear-gradient(${String(angleDeg)}deg, ${from}, ${to})`;
+}
+
+/**
+ * Recompose une couleur et son opacité en une notation à huit chiffres.
+ *
+ * L'opacité est un réglage séparé parce que `<input type="color">` ne sait pas
+ * exprimer la transparence. Deux précautions valent d'être signalées : la
+ * notation courte `#RGB` est légale au schéma et doit être développée avant
+ * qu'on y colle deux chiffres — sans quoi la couleur serait silencieusement
+ * fausse — et une opacité déjà portée par la couleur est **remplacée**, faute
+ * de quoi le réglage visible dans le panneau n'aurait aucun effet.
+ */
+function withOpacity(color: string, opacity: number): string {
+  const digits = color.replace(/^#/, '');
+
+  // `#RGB` et `#RGBA` : chaque chiffre vaut pour deux. Par `replace` et non par
+  // un découpage caractère à caractère, qui casserait sur autre chose que de
+  // l'ASCII — ce que le schéma interdit ici, mais la règle vaut par sa constance.
+  const expanded = digits.length <= 4 ? digits.replace(/./g, (digit) => `${digit}${digit}`) : digits;
+
+  const rgb = expanded.slice(0, 6);
+  const alpha = Math.round(Math.min(Math.max(opacity, 0), 1) * 255)
+    .toString(16)
+    .padStart(2, '0');
+
+  return `#${rgb}${alpha}`;
+}
+
 /** Variables CSS décrivant l'apparence de l'overlay. */
 export function overlayCssVariables(config: OverlayConfig): Record<string, string> {
+  const gradient = composeGradient(config);
+  const { frame } = config;
+
   return {
+    /*
+     * Peinture du texte.
+     *
+     * `color` n'accepte pas d'image : un dégradé ne peut être appliqué qu'en
+     * découpant un fond à la forme des glyphes, ce qui impose de rendre la
+     * couleur transparente. D'où le couple de variables, et la règle qui va
+     * avec — la couleur doit redevenir opaque dès que le dégradé s'éteint,
+     * sans quoi le compteur disparaît de la scène.
+     */
+    '--cc-text-background': gradient ?? 'none',
+    '--cc-text-fill': gradient === null ? config.color : 'transparent',
+
+    /*
+     * Cadre.
+     *
+     * Le trait est un `padding` sur l'enveloppe, et non une bordure : c'est le
+     * seul moyen d'avoir à la fois un dégradé et des coins arrondis, là où
+     * `border-image` fait perdre le rayon. Le rayon intérieur est creusé de
+     * l'épaisseur du trait, faute de quoi un liseré apparaît aux angles.
+     */
+    '--cc-frame-width': frame.enabled ? `${String(frame.width)}px` : '0px',
+    '--cc-frame-radius': frame.enabled ? `${String(frame.radius)}px` : '0px',
+    '--cc-frame-inner-radius': frame.enabled
+      ? `${String(Math.max(frame.radius - frame.width, 0))}px`
+      : '0px',
+    '--cc-frame-padding-x': frame.enabled ? `${String(frame.paddingX)}px` : '0px',
+    '--cc-frame-padding-y': frame.enabled ? `${String(frame.paddingY)}px` : '0px',
+    '--cc-frame-background': frame.enabled ? (gradient ?? frame.color) : 'transparent',
+    '--cc-frame-fill': frame.enabled ? withOpacity(frame.fillColor, frame.fillOpacity) : 'transparent',
+
     '--cc-font-family': config.fontFamily,
     '--cc-font-size': `${String(config.fontSize)}px`,
     '--cc-font-weight': String(config.fontWeight),

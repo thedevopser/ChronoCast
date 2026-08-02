@@ -143,6 +143,22 @@ export interface OverlayConfig {
     color: string;
     radius: number;
   };
+  gradient: {
+    enabled: boolean;
+    from: string;
+    to: string;
+    angleDeg: number;
+  };
+  frame: {
+    enabled: boolean;
+    color: string;
+    width: number;
+    radius: number;
+    paddingX: number;
+    paddingY: number;
+    fillColor: string;
+    fillOpacity: number;
+  };
   animation: {
     onAdd: 'none' | 'flash' | 'pulse' | 'shake';
     durationMs: number;

@@ -12,6 +12,13 @@
     -->
     <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
 
+    <!--
+      Le logo engendré depuis `assets/logo.png` par `scripts/prepare-icons.mjs`.
+      Servi par la même origine : `img-src 'self'` l'autorise, et l'application
+      doit fonctionner sans connexion.
+    -->
+    <link rel="icon" type="image/png" href="/shared/logo.png" />
+
     <!-- Port du WebSocket, substitué lui aussi. Ce n'est pas un secret. -->
     <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
 
