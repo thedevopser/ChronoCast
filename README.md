@@ -16,6 +16,23 @@ abonnement : la seule communication sortante est celle qui va vers Twitch.
 - **Un état persistant** : le compteur survit à une fermeture, à un crash et à un
   redémarrage du PC, et repart exactement là où il s'était arrêté.
 
+## Aperçu
+
+Le tableau de bord : l'état du subathon, les commandes qui agissent dessus, et
+l'adresse à coller dans OBS.
+
+![Tableau de bord](docs/images/dashboard.png)
+
+L'apparence se règle entièrement depuis le panneau, et l'aperçu affiché **est
+l'overlay réel** — ce que vous y voyez est ce qu'OBS affichera.
+
+![Vue Apparence](docs/images/apparence.png)
+
+L'historique dit d'où vient le temps gagné, y compris les événements qui n'ont
+rien crédité.
+
+![Vue Historique](docs/images/historique.png)
+
 ## Installation
 
 Téléchargez le dernier installeur `.exe` depuis la page des
