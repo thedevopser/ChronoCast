@@ -57,9 +57,13 @@ besoin d'être installé sur la machine.
 ./scripts/dc.sh install     # installe les dépendances
 ./scripts/dc.sh test        # suite de tests
 ./scripts/dc.sh verify      # lint + typecheck + tests + audit
-./scripts/dc.sh build:win   # installeur Windows NSIS
+./scripts/dc.sh build       # compilation TypeScript
 ./scripts/dc.sh help        # toutes les commandes
 ```
+
+L'installeur Windows, lui, n'est pas construit en local : il l'est par le
+workflow `Release`, nativement sur un runner Windows. Voir
+[docs/BUILD.md](docs/BUILD.md).
 
 Le développement suit un TDD strict : aucune ligne de code de production n'est
 écrite sans un test qui a d'abord échoué. Voir [docs/DEVELOPER.md](docs/DEVELOPER.md).
