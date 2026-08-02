@@ -55,6 +55,17 @@ describe('createRouter', () => {
     },
   };
 
+  const customCssHandler: PageHandler = {
+    serve: (pathname) => {
+      handled.push(`css:${pathname}`);
+      return Promise.resolve(
+        pathname === '/custom.css'
+          ? { status: 200, headers: { 'content-type': 'text/css; charset=utf-8' }, body: 'a{}' }
+          : null,
+      );
+    },
+  };
+
   const routes: Route[] = [
     { method: 'GET', path: '/api/state', handler: () => jsonResponse(200, { ok: true }) },
     { method: 'POST', path: '/api/counter/pause', handler: () => jsonResponse(200, { paused: true }) },
@@ -76,6 +87,7 @@ describe('createRouter', () => {
     router = createRouter({
       routes,
       pageHandler,
+      customCssHandler,
       staticHandler,
       getCsrfToken: () => TOKEN,
       logger: createLogger({ level: 'debug', sinks: [sink], redactor: createRedactor() }),
@@ -175,7 +187,11 @@ describe('createRouter', () => {
       const response = await router.handle(makeRequest({ path: '/admin/style.css' }));
 
       expect(response.status).toBe(200);
-      expect(handled).toEqual(['page:/admin/style.css', 'static:/admin/style.css']);
+      expect(handled).toEqual([
+        'page:/admin/style.css',
+        'css:/admin/style.css',
+        'static:/admin/style.css',
+      ]);
     });
   });
 
@@ -222,12 +238,49 @@ describe('createRouter', () => {
       const failing = createRouter({
         routes: [],
         pageHandler: { serve: () => Promise.reject(new Error('disque en panne')) },
+        customCssHandler,
         staticHandler,
         getCsrfToken: () => TOKEN,
         logger: createLogger({ level: 'debug', sinks: [sink], redactor: createRedactor() }),
       });
 
       expect((await failing.handle(makeRequest({ path: '/admin' }))).status).toBe(500);
+    });
+  });
+
+  describe('feuille de style personnelle', () => {
+    it('sert /custom.css sans passer par le statique', async () => {
+      // Le fichier vit dans le répertoire de données, pas dans la racine web :
+      // le gestionnaire statique ne saurait pas le trouver.
+      const response = await router.handle(makeRequest({ path: '/custom.css' }));
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBe('text/css; charset=utf-8');
+      expect(handled).not.toContain('static:/custom.css');
+    });
+
+    it('reste après les pages et avant le statique', async () => {
+      // L'ordre compte : une page ne doit pas pouvoir être masquée par ce
+      // gestionnaire, et le statique reste le dernier recours.
+      pageResponse = null;
+      await router.handle(makeRequest({ path: '/inconnu.css' }));
+
+      expect(handled).toEqual(['page:/inconnu.css', 'css:/inconnu.css', 'static:/inconnu.css']);
+    });
+
+    it('laisse le statique servir les feuilles de la racine web', async () => {
+      staticResponse = { status: 200, headers: {}, body: 'theme' };
+
+      const response = await router.handle(makeRequest({ path: '/shared/theme.css' }));
+
+      expect(response.status).toBe(200);
+      expect(handled).toContain('static:/shared/theme.css');
+    });
+
+    it('ne détourne jamais une route d’API', async () => {
+      await router.handle(makeRequest({ path: '/api/state' }));
+
+      expect(handled).toEqual([]);
     });
   });
 
@@ -238,6 +291,7 @@ describe('createRouter', () => {
     const fresh = createRouter({
       routes,
       pageHandler,
+      customCssHandler,
       staticHandler,
       getCsrfToken: getToken,
       logger: createLogger({ level: 'error', sinks: [sink] }),

@@ -389,6 +389,140 @@
 }
 
 /* -------------------------------------------------------------------------- */
+/* Groupes de champs engendrés                                                 */
+/* -------------------------------------------------------------------------- */
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-3);
+  margin-bottom: var(--cc-space-3);
+}
+
+.group {
+  padding: var(--cc-space-3);
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+}
+
+.group__title {
+  margin: 0 0 var(--cc-space-3);
+  font-size: var(--cc-text-base);
+  font-weight: var(--cc-weight-medium);
+  color: var(--cc-text);
+}
+
+.group__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--cc-space-3);
+  align-items: start;
+}
+
+/* Une case à cocher tient sur une ligne : elle n'a pas besoin d'une colonne. */
+.field--switch {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--cc-space-2);
+  margin-bottom: 0;
+}
+
+.field--switch .field__label {
+  color: var(--cc-text);
+}
+
+.field__error {
+  color: var(--cc-danger);
+  font-size: var(--cc-text-sm);
+}
+
+.field__error:empty {
+  display: none;
+}
+
+.field__input--invalid {
+  border-color: var(--cc-danger);
+}
+
+/* Un sélecteur de couleur natif reste minuscule sans hauteur explicite. */
+.field__input[type="color"] {
+  height: 2.4rem;
+  padding: var(--cc-space-1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Aperçu de l'overlay                                                         */
+/* -------------------------------------------------------------------------- */
+
+.preview {
+  padding: var(--cc-space-3);
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  margin-bottom: var(--cc-space-3);
+}
+
+.preview__frame {
+  width: 100%;
+  height: 14rem;
+  border: var(--cc-border-width) dashed var(--cc-border);
+  border-radius: var(--cc-radius);
+  /* Damier : l'overlay a un fond transparent, et sur un aplat sombre on ne
+     distinguerait pas un texte noir d'un texte absent. */
+  background-color: var(--cc-bg);
+  background-image:
+    linear-gradient(45deg, var(--cc-surface-raised) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--cc-surface-raised) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--cc-surface-raised) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--cc-surface-raised) 75%);
+  background-size: 1.5rem 1.5rem;
+  background-position: 0 0, 0 0.75rem, 0.75rem -0.75rem, -0.75rem 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Paliers de bits                                                             */
+/* -------------------------------------------------------------------------- */
+
+.tiers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-2);
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--cc-space-2);
+  align-items: end;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Listes de la vue Twitch                                                     */
+/* -------------------------------------------------------------------------- */
+
+.scopes,
+.subscriptions {
+  margin: var(--cc-space-2) 0 0;
+  padding-left: var(--cc-space-3);
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+.scopes:empty,
+.subscriptions:empty {
+  display: none;
+}
+
+.subscriptions li {
+  font-family: var(--cc-font-mono);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Bandeau, notes, copie                                                       */
 /* -------------------------------------------------------------------------- */
 

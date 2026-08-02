@@ -18,9 +18,26 @@
  */
 
 /** Vues du panneau, dans l'ordre de la navigation latérale. */
-export const ADMIN_VIEWS = ['dashboard'] as const;
+export const ADMIN_VIEWS = [
+  'dashboard',
+  'rewards',
+  'appearance',
+  'twitch',
+  'settings',
+  'transfer',
+] as const;
 
 export type AdminViewId = (typeof ADMIN_VIEWS)[number];
+
+/**
+ * Vues dont le contenu est piloté par des descripteurs de champs.
+ *
+ * Les autres se câblent à la main : le tableau de bord n'a aucun réglage, et
+ * l'import/export manipule un fichier entier, pas des champs.
+ */
+export const FIELD_VIEWS = ['rewards', 'appearance', 'twitch', 'settings'] as const;
+
+export type FieldViewId = (typeof FIELD_VIEWS)[number];
 
 /** Vue ouverte à défaut : celle qui a du sens sans avoir rien demandé. */
 export const DEFAULT_VIEW: AdminViewId = 'dashboard';
@@ -28,6 +45,11 @@ export const DEFAULT_VIEW: AdminViewId = 'dashboard';
 /** Libellés de la navigation. Séparés des identifiants, qui sont techniques. */
 export const VIEW_LABELS: Readonly<Record<AdminViewId, string>> = {
   dashboard: 'Tableau de bord',
+  rewards: 'Barème',
+  appearance: 'Apparence',
+  twitch: 'Twitch',
+  settings: 'Paramètres',
+  transfer: 'Import / export',
 };
 
 function isAdminView(value: string): value is AdminViewId {

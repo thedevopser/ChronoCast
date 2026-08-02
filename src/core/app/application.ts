@@ -64,6 +64,7 @@ import {
 } from '../server/oauth-callback-server.js';
 import { createRouter, type Router } from '../server/router.js';
 import { createApiRoutes, type TwitchApiPort } from '../server/routes/api.js';
+import { createCustomCssHandler } from '../server/routes/custom-css.js';
 import { createPageHandler } from '../server/routes/pages.js';
 import { createCsrfToken, verifyCsrfToken } from '../server/security/csrf.js';
 import { createStaticHandler } from '../server/static-handler.js';
@@ -646,6 +647,11 @@ export function createApplication(options: ApplicationOptions): Application {
       getCsrfToken: () => csrfToken,
       getWsPort: currentWsPort,
       isSetupCompleted: () => configService.get().setup.completed,
+    }),
+    customCssHandler: createCustomCssHandler({
+      dataDirectory: paths.dataDirectory,
+      isEnabled: () => configService.get().overlay.enableCustomCss,
+      logger,
     }),
     staticHandler,
     getCsrfToken: () => csrfToken,

@@ -12,7 +12,11 @@
  *   2. **Jeton CSRF** — avant même de savoir si la route existe. Répondre `404` à
  *      une mutation non authentifiée dessinerait la carte de l'API à qui la
  *      demande ; un `403` uniforme n'apprend rien.
- *   3. **Résolution** — API, puis pages, puis ressources statiques.
+ *   3. **Résolution** — API, puis pages, puis feuille personnelle, puis
+ *      ressources statiques. La feuille passe **après** les pages, pour qu'elle
+ *      ne puisse jamais en masquer une, et **avant** le statique, qui ne sait
+ *      chercher que dans la racine web alors qu'elle vit dans le répertoire de
+ *      données.
  *   4. **En-têtes de sécurité** — appliqués à la sortie, sur toutes les réponses
  *      sans exception, y compris les erreurs.
  *
@@ -48,6 +52,14 @@ export interface Router {
 export interface RouterOptions {
   readonly routes: readonly Route[];
   readonly pageHandler: PageHandler;
+  /**
+   * Feuille personnelle de l'overlay, lue dans le répertoire de données.
+   *
+   * Même contrat que `PageHandler` — un `null` signifie « ce chemin ne
+   * m'appartient pas » — parce que c'est exactement le même besoin : servir un
+   * chemin précis sans priver les suivants de leur chance.
+   */
+  readonly customCssHandler: PageHandler;
   readonly staticHandler: StaticHandler;
   /** Lu à chaque requête : le jeton est engendré au démarrage et peut changer. */
   readonly getCsrfToken: () => string;
@@ -82,7 +94,7 @@ function stripBody(response: HttpResponse): HttpResponse {
 }
 
 export function createRouter(options: RouterOptions): Router {
-  const { routes, pageHandler, staticHandler, getCsrfToken, logger } = options;
+  const { routes, pageHandler, customCssHandler, staticHandler, getCsrfToken, logger } = options;
   const scoped = logger.child('router');
 
   /** Méthodes acceptées pour un chemin donné, pour l'en-tête `Allow` d'un 405. */
@@ -118,6 +130,13 @@ export function createRouter(options: RouterOptions): Router {
     const page = await pageHandler.serve(request.path);
     if (page !== null) {
       return page;
+    }
+
+    // Après les pages, avant le statique : elle vit dans le répertoire de
+    // données, où le gestionnaire statique ne sait pas aller.
+    const customCss = await customCssHandler.serve(request.path);
+    if (customCss !== null) {
+      return customCss;
     }
 
     return await staticHandler.serve(request.path);

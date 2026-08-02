@@ -2,7 +2,9 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 1er août 2026, après fusion de la PR #8. Phases 0 à 4 terminées. **Phase 5 : PR A (#7) et PR B (#8) fusionnées — l'overlay et l'assistant de première configuration sont livrés.** Reste la **PR C**, le panneau d'administration, décrite en section 8. C'est la plus lourde des trois : un découpage est proposé plus bas.
+**Dernière mise à jour :** 2 août 2026, pendant la PR C. Phases 0 à 4 terminées. **Phase 5 : PR A (#7) et PR B (#8) fusionnées.** La **PR C** est en cours sur `feat/admin-web` : **lot 1 commité**, lots 2 et 3 à écrire. Tout est en section 8.
+
+**Une dette a été actée pendant le lot 1** et sortie de la PR C : le mode `server.websocket.mode: 'separate'` n'a aucune implémentation côté serveur. Elle fera l'objet d'un lot dédié, sur sa propre branche, et **les arbitrages restent à prendre**. Tout ce qu'il faut pour trancher sans rien ré-explorer est en section 8, sous « Dette — le mode `separate` ».
 
 ---
 
@@ -109,9 +111,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. Les huit PR sont fusionnées en squash.
+**Branche courante : `feat/admin-web`**, partie de `main` à `6b1bec1`. **Les lots 1 et 2 de la PR C y sont commités**, le lot 3 reste à écrire, et les trois iront dans **une seule PR** — décision de l'utilisateur : un commit par lot, pas de PR intermédiaire. Le document `PR-feat-admin-web.md` ne sera donc écrit **qu'après le commit 3**, quand la PR sera prête à être ouverte. Les huit PR précédentes sont fusionnées en squash.
 
 ```
+(lot 2 : vues de saisie, liaison de formulaires, custom.css)    <- feat/admin-web
+25170e7 feat(admin): socle du panneau et vue tableau de bord
 6b1bec1 feat(setup): flux OAuth complet et assistant de configuration (#8)  <- main
 67d9219 feat(web): fondations web et overlay OBS (#7)
 eb02663 Phase 4 — Serveurs locaux et point d'entrée headless (#6)
@@ -123,20 +127,19 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 025 tests, 47 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur.**
+**1 236 tests, 57 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur.** (1 025 avant le lot 1, 1 112 après, soit 211 nouveaux à ce stade.)
 
-**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #8 a été écrite après la fusion elle-même, elle ne pouvait donc pas y figurer. Comme les fois précédentes, elle **partira dans le premier commit de la PR C**, sur la branche `feat/admin-web`, plutôt que dans une PR de documentation à elle seule. `git status` ne doit signaler aucun autre fichier.
+**Seule modification en attente : ce fichier**, qui partira dans le commit du lot 3, comme les fois précédentes. `git status` ne doit signaler aucun autre fichier — `dist/` et `PR-*.md` sont ignorés.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # doit afficher main
-git pull --ff-only origin main
-./scripts/dc.sh verify       # doit être intégralement vert (1 025 tests)
-git checkout -b feat/admin-web
+git branch --show-current    # doit afficher feat/admin-web
+git status --short           # ne doit lister que docs/REPRISE.md
+./scripts/dc.sh verify       # doit être intégralement vert (1 236 tests)
 ```
 
-La PR C peut alors commencer, en TDD, en suivant la section 8.
+Le lot 3 peut alors commencer, en TDD, en suivant la section 8.
 
 ---
 
@@ -375,7 +378,7 @@ C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies
 **Découpage retenu, chaque lot étant utilisable seul, les trois sur la branche `feat/admin-web` en trois commits pour une seule PR :**
 
 1. **Socle** — **fait, 87 tests, 1 112 au total.** Open Props 1.7.23 vendoré, `theme.css` rebasé, port WebSocket découvrable, redirection de `/` vers `/setup`, routage par hash, coquille du panneau avec navigation latérale, et vue *tableau de bord* branchée sur le WebSocket. Détail plus bas.
-2. **Vues de saisie** — barème, apparence avec aperçu live, paramètres, import/export. C'est ici que vit la couche de liaison de formulaires : la partie à concevoir soigneusement, sous peine d'écrire dix fois le même code.
+2. **Vues de saisie** — **fait, 124 tests, 1 236 au total.** Couche de liaison, table de descripteurs, vues barème, apparence avec aperçu live, Twitch, paramètres, import/export, et la route `custom.css`. Détail plus bas.
 3. **Vues de consultation** — historique et journaux, avec pagination et filtres.
 
 **Travaux à ne pas oublier, tracés depuis les PR précédentes :**
@@ -386,6 +389,12 @@ C'est **la plus lourde des trois**, probablement plus que les PR A et B réunies
 - **Le port WebSocket** : traité par le lot 1, mais le sujet ne se referme pas là. Voir la dette décrite juste après.
 
 #### Dette — le mode `separate` du WebSocket n'existe pas côté serveur
+
+> **Statut : dette actée, à traiter dans un lot dédié.** Décision de l'utilisateur, prise après le lot 1 de la PR C : le sujet est sorti de la PR C et fera l'objet d'un lot à lui seul, sur une branche séparée — c'est du serveur, pas du panneau. **Les arbitrages ne sont pas pris** ; ils le seront à l'ouverture de ce lot, à partir de la section « Les trois issues » plus bas. Rien à décider avant.
+>
+> Branche suggérée le moment venu : `fix/websocket-separate` si l'on implémente, `chore/retirer-websocket-separate` si l'on retire.
+>
+> Cette section est écrite pour être suffisante à elle seule : elle contient les constats, ce qui a déjà été livré, ce qui a été délibérément écarté, ce qu'il resterait à faire et l'avis argumenté. Rien n'est à ré-explorer dans le code.
 
 Découvert pendant le lot 1 de la PR C, en câblant ce qui devait « rendre le mode `separate` utilisable ». Ce n'est pas une dette de la Phase 5 mais de la **Phase 4**, et elle est plus lourde que ce que la note laissée en PR A laissait croire.
 
@@ -399,9 +408,42 @@ Découvert pendant le lot 1 de la PR C, en câblant ce qui devait « rendre le m
 
 **Ce qui a été délibérément écarté.** `application.ts` expose `currentWsPort()`, qui renvoie **le port HTTP réel** et non `config.server.websocket.port`. Renvoyer le réglage annoncerait un port où rien n'écoute : cela transformerait un réglage aujourd'hui sans effet en panne franche de l'overlay, en plein direct, pour quelqu'un qui aurait simplement exploré la configuration. Le commentaire posé sur cette fonction indique qu'elle est **le seul endroit à changer** le jour où un second écouteur existera.
 
-**Ce qu'il resterait à faire, si l'on décide d'implémenter.** Un second serveur HTTP minimal, bindé `127.0.0.1` sur `server.websocket.port`, ne servant que l'`upgrade` ; la garde d'`Host` posée sur cette poignée de main, comme elle l'est déjà dans `ws-adapter.ts` ; le contrôle d'`Origin` du CSRF conservé ; le repli de port explicitement **refusé**, sur le modèle du port de rappel OAuth — un socket qui écoute ailleurs qu'annoncé est introuvable ; le cycle de vie branché sur `start()` et `stop()` ; `currentWsPort()` rebasculé sur le réglage ; et des tests d'intégration ouvrant un vrai client sur le second port.
+**Comment refaire le constat en trente secondes**, sans relire quoi que ce soit :
 
-**Avis sur la suite.** Trois issues cohérentes, une seule mauvaise. Implémenter proprement, en lot séparé et hors PR C — c'est du serveur, pas du panneau. Retirer les deux réglages du schéma, ce qui supprime la dette au lieu de la porter. Ou les documenter comme non implémentés. La seule option à écarter est de laisser en l'état un réglage qui promet un comportement qu'il ne produit pas. À noter que `shared` est la décision actée de la section 4, que rien dans le produit n'a besoin de `separate`, et qu'aucun utilisateur ne l'a demandé : le retrait est défendable, et il est gratuit.
+```bash
+# Aucun résultat hors de la déclaration au schéma : personne ne lit ces réglages.
+grep -rn "websocket.mode\|websocket\.port\|'separate'" src/ | grep -v "config/schema.ts"
+
+# L'adaptateur est branché sur l'upgrade du serveur HTTP, sans condition.
+grep -n "onUpgrade\|createWsAdapter" src/core/app/application.ts
+```
+
+**Emplacements exacts, au moment où cette note est écrite** (les numéros de ligne bougeront, les noms non) :
+
+| Quoi | Où |
+| --- | --- |
+| Déclaration des deux réglages inertes | `core/config/schema.ts`, objet `serverSchema.websocket` : `mode` et `port` |
+| Le seul endroit à changer pour implémenter | `core/app/application.ts`, fonction `currentWsPort()` — un commentaire l'y dit déjà |
+| Branchement inconditionnel de l'adaptateur | `core/app/application.ts`, `createHttpServer({ …, onUpgrade: wsAdapter.handleUpgrade })` |
+| Garde d'`Host` sur la poignée de main | `core/server/ws-adapter.ts`, à reproduire telle quelle sur le second écouteur |
+| Contrôle d'`Origin` | `core/server/security/csrf.ts`, `isAllowedWebSocketOrigin`, déjà appelé par `ws-hub.ts` |
+| Modèle de port qui ne se replie jamais | `core/server/oauth-callback-server.ts`, et le motif est expliqué en section 8, PR B |
+| Composition de l'URL côté page | `web/shared/ws-url.ts`, `resolveWebSocketUrl` — rien à y changer |
+| Substitution du marqueur | `core/server/routes/pages.ts`, `injectWsPort` et `WS_PORT_PLACEHOLDER` |
+
+**Ce qu'il resterait à faire, si l'on décide d'implémenter.** Un second serveur HTTP minimal, bindé `127.0.0.1` sur `server.websocket.port`, ne servant que l'`upgrade` ; la garde d'`Host` posée sur cette poignée de main, comme elle l'est déjà dans `ws-adapter.ts` ; le contrôle d'`Origin` du CSRF conservé ; le repli de port explicitement **refusé**, sur le modèle du port de rappel OAuth — un socket qui écoute ailleurs qu'annoncé est introuvable, et une erreur franche au démarrage est bien plus lisible ; le cycle de vie branché sur `start()` et `stop()`, en n'oubliant pas que `stop()` ferme déjà `wsAdapter` puis `httpServer` dans cet ordre ; `currentWsPort()` rebasculé sur le réglage ; et des tests d'intégration ouvrant un vrai client sur le second port, sur le modèle de `tests/integration/ws-adapter.test.ts`.
+
+**Ce qui est déjà couvert par des tests, et n'est pas à réécrire.** `tests/unit/web/shared/ws-url.test.ts` (18 cas : lecture du méta, ports aberrants, IPv6, `wss`, repli) ; `tests/unit/server/pages.test.ts` (substitution sur les trois pages, `content-length` recalculé, régimes de cache distincts) ; `tests/unit/server/ws-hub.test.ts` (le `hello` porte `wsPort`, y compris lorsqu'il diffère du port HTTP — le cas `separate` y est **déjà** simulé au niveau du hub). Autrement dit, seul l'écouteur manque.
+
+**Les trois issues, à arbitrer à l'ouverture du lot.** Une seule est mauvaise.
+
+1. **Implémenter** ce qui est décrit ci-dessus. Coût réel : un serveur de plus dans le cycle de vie, deux gardes à ne pas oublier, des tests d'intégration. Bénéfice : un mode que personne n'a demandé.
+2. **Retirer** `server.websocket.mode` et `server.websocket.port` du schéma. Supprime la dette au lieu de la porter, ne retire aucune fonctionnalité — puisqu'il n'y en a pas —, et allège d'autant la vue *paramètres* du panneau. Attention au seul point d'attention : `configSchema` est en mode `strip`, donc une configuration existante portant ces clés se complétera sans erreur, ce qui rend le retrait sans risque de migration.
+3. **Documenter** les deux réglages comme non implémentés, en les laissant au schéma.
+
+**Avis, pour ce qu'il vaut au moment où cette note est écrite :** le retrait. `shared` est la décision actée de la section 4, rien dans le produit n'a besoin de `separate`, aucun utilisateur ne l'a demandé, et la V1 vise un `.exe` grand public où chaque réglage inutile est une question de support en plus. Le retrait est gratuit et définitif là où l'implémentation ajoute une surface à maintenir et à sécuriser pour un usage hypothétique.
+
+**Ce qu'il faut écarter dans tous les cas :** laisser en l'état un réglage qui promet un comportement qu'il ne produit pas.
 
 **Ce qui est déjà en place et ne doit pas être réécrit :** `web/shared/api-client.ts` (jeton CSRF, erreurs `ApiError` typées), `ws-client.ts`, `countdown.ts`, `safe-dom.ts`, `time-format.ts`, `protocol.ts`, `theme.css`, et depuis le lot 1 `ws-url.ts` et `open-props.css`. Le panneau les consomme tels quels.
 
@@ -427,6 +469,31 @@ Découvert pendant le lot 1 de la PR C, en câblant ce qui devait « rendre le m
 - **Le modèle du tableau de bord renvoie l'état identique par référence** quand un message ne change rien, exactement comme les réducteurs du noyau : la vue s'en sert pour ne pas repeindre une liste inchangée à chaque battement.
 - **Rien n'est assaini dans le modèle.** Les pseudos le traversent tels quels et ne sont nettoyés qu'à l'écriture, par `safe-dom`. Deux endroits où s'en souvenir, c'est un endroit où l'oublier.
 - **Le tableau de bord retient aussi les événements non crédités.** Un don écarté par le plafond est précisément celui qui intrigue.
+
+#### Lot 2 de la PR C — livré, 124 tests
+
+| Fichier | Rôle |
+| --- | --- |
+| `web/admin/form-binding.ts` | Conversion, comparaison et reconstruction du fragment de configuration. Ne connaît pas le DOM |
+| `web/admin/fields.ts` | Table des descripteurs, leurs groupes, et les réglages délibérément écartés avec leur raison |
+| `web/admin/render-fields.ts` | Peinture et relecture des champs. Seule frontière d'écriture DOM de la couche de réglage |
+| `web/admin/bits-tiers.ts` | Éditeur des paliers de bits, seul réglage à cardinalité variable |
+| `core/server/routes/custom-css.ts` | Feuille personnelle de l'overlay, lue dans le répertoire de données |
+| `core/server/router.ts` | Aiguillage étendu : API, pages, feuille personnelle, statique |
+| `web/admin/index.html`, `admin.css`, `main.ts` | Cinq vues de plus, et leur câblage |
+
+**Décisions prises pendant ce lot :**
+
+- **Les champs sont engendrés depuis la table, pas écrits dans le gabarit.** Recopier soixante-dix champs en HTML créerait une seconde source de vérité, et une faute de frappe entre un sélecteur et son descripteur ne se verrait qu'à l'usage — un réglage « qui ne s'enregistre pas », sans message ni trace.
+- **La table est confrontée au schéma par un test.** `tests/unit/web/admin/fields.test.ts` vérifie que chaque descripteur désigne un chemin réel, que son genre correspond au type de la valeur par défaut, que ses bornes la laissent passer, et surtout que **chaque feuille de la configuration est liée ou explicitement écartée**. C'est l'exigence « aucune valeur métier codée en dur » rendue mécanique : un réglage ajouté au schéma sans champ fait échouer la suite.
+- **Sept réglages sont écartés, chacun avec sa raison** dans `UNBOUND_PATHS` : `schemaVersion` et `setup.completed` ne sont pas des réglages, `twitch.broadcasterUserId` et `broadcasterLogin` viennent d'OAuth, `rewards.bits.tiers` a son éditeur, et `server.websocket.mode` et `port` sont sans effet — les afficher promettrait un comportement inexistant, ce qui est précisément la dette décrite plus haut.
+- **Seuls les champs modifiés partent.** Renvoyer les soixante-dix à chaque enregistrement écraserait une valeur changée entre-temps par l'assistant resté ouvert dans une fenêtre voisine.
+- **Rien ne part tant qu'une saisie est fautive.** Un enregistrement partiel laisserait l'utilisateur croire au succès. Chaque faute est nommée sous son champ plutôt que renvoyée en `400` générique.
+- **La virgule décimale est acceptée.** Un clavier français en produit une, et la refuser serait une régression d'ergonomie par rapport au soin mis dans les messages du serveur.
+- **Un doublon de seuil de bits est refusé.** Le barème compare avec un `>` strict et garde le premier des ex æquo, c'est-à-dire un ordre de saisie que rien n'affiche : le résultat serait imprévisible. Le tri, lui, n'est qu'un confort de lecture — le barème tolère n'importe quel ordre.
+- **L'aperçu d'apparence n'a besoin d'aucun `postMessage`.** Un `PATCH /api/config` diffuse un message `config` sur le WebSocket, que l'overlay du cadre applique de lui-même. Le cadre n'est chargé qu'à la première ouverture de la vue : le charger d'emblée ouvrirait une seconde connexion WebSocket qui vivrait tout le direct pour un cadre que personne ne regarde.
+- **Le gestionnaire de `custom.css` passe après les pages et avant le statique.** Après, pour qu'il ne puisse jamais masquer une page ; avant, parce que le fichier vit dans le répertoire de données où le gestionnaire statique ne sait pas aller. Il reprend le contrat `serve(pathname) → HttpResponse | null` des pages, et surtout leur discipline : canonisation puis vérification que le chemin est resté sous la racine. La seule vraie surface est le lien symbolique — `tokens.json` est le voisin immédiat du fichier servi.
+- **Le bandeau est effacé avant l'action, jamais après.** L'effacer après emporterait le message que l'action vient elle-même d'afficher.
 
 ### Phase 6 — Coquille Electron
 

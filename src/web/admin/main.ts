@@ -31,6 +31,7 @@ import {
 } from '../shared/protocol.js';
 import { createWsClient, type WsClientStatus, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
+import { normalizeTiers, type TierInput } from './bits-tiers.js';
 import {
   applyMessage,
   counterControls,
@@ -40,7 +41,24 @@ import {
   twitchLabel,
   type DashboardModel,
 } from './dashboard-model.js';
-import { ADMIN_VIEWS, hashForView, viewFromHash, VIEW_LABELS, type AdminViewId } from './router.js';
+import { fieldsOf, groupsOf } from './fields.js';
+import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
+import {
+  clearFieldErrors,
+  readFieldValues,
+  renderFieldGroups,
+  showFieldErrors,
+  writeFieldValues,
+} from './render-fields.js';
+import {
+  ADMIN_VIEWS,
+  FIELD_VIEWS,
+  hashForView,
+  viewFromHash,
+  VIEW_LABELS,
+  type AdminViewId,
+  type FieldViewId,
+} from './router.js';
 
 /** Pastille de liaison, par état du client WebSocket. */
 const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {
@@ -57,6 +75,16 @@ const COUNTER_PILLS: Readonly<Record<CounterState['status'], string>> = {
   paused: 'pill pill--warning',
   finished: 'pill pill--danger',
 };
+
+/** Ce que `GET /api/twitch/status` renvoie, réduit à ce que la vue affiche. */
+interface TwitchDescription {
+  readonly broadcasterLogin: string;
+  readonly clientId: string;
+  readonly hasClientSecret: boolean;
+  readonly connected: boolean;
+  readonly scopes: readonly string[];
+  readonly missingScopes: readonly string[];
+}
 
 /**
  * Adaptateur du `WebSocket` du navigateur vers le port attendu par le client.
@@ -132,9 +160,11 @@ function start(): void {
   /** Neutralise le bouton le temps de l'appel : un double clic vaut deux actions. */
   async function guarded(target: HTMLButtonElement, action: () => Promise<void>): Promise<void> {
     target.disabled = true;
+    // Le bandeau est effacé **avant** l'action, jamais après : l'effacer après
+    // emporterait le message que l'action vient elle-même d'afficher.
+    banner.hidden = true;
     try {
       await action();
-      banner.hidden = true;
     } catch (error: unknown) {
       reportFailure(error);
     } finally {
@@ -147,11 +177,18 @@ function start(): void {
   /* ---------------------------------------------------------------------- */
 
   function showView(view: AdminViewId): void {
-    // Élargi en `readonly string[]` : tant que la liste ne compte qu'une vue,
-    // TypeScript réduit la comparaison à une constante et ESLint la signale
-    // comme morte. Elle ne l'est que le temps du lot 1.
     for (const candidate of ADMIN_VIEWS as readonly string[]) {
       requireElement(document, `#view-${candidate}`).hidden = candidate !== view;
+    }
+
+    // L'aperçu n'est chargé qu'à la première ouverture de la vue Apparence :
+    // le charger d'emblée ouvrirait une seconde connexion WebSocket qui
+    // resterait en vie tout le direct, pour un cadre que personne ne regarde.
+    if (view === 'appearance') {
+      const preview = requireElement(document, '#overlay-preview') as HTMLIFrameElement;
+      if (preview.getAttribute('src') === null) {
+        preview.src = '/overlay';
+      }
     }
 
     for (const item of nav.querySelectorAll('a')) {
@@ -374,8 +411,275 @@ function start(): void {
   }
 
   /* ---------------------------------------------------------------------- */
+  /* Vues de réglage                                                        */
+  /* ---------------------------------------------------------------------- */
+
+  /** Dernière configuration connue, référence de comparaison des saisies. */
+  let config: unknown = {};
+
+  const containerOf = (view: FieldViewId): HTMLElement =>
+    requireElement(document, `#fields-${view}`);
+
+  const tiersList = requireElement(document, '#bits-tiers');
+
+  /** Ajoute une ligne à l'éditeur de paliers. */
+  function appendTierRow(minBits: string, seconds: string): void {
+    const row = document.createElement('li');
+    row.className = 'tier';
+
+    const makeField = (label: string, value: string, role: string): HTMLElement => {
+      const wrapper = document.createElement('label');
+      wrapper.className = 'field field--compact';
+
+      const caption = document.createElement('span');
+      caption.className = 'field__label';
+      setText(caption, label);
+
+      const input = document.createElement('input');
+      input.className = 'field__input';
+      input.type = 'number';
+      input.min = '0';
+      input.step = '1';
+      input.value = value;
+      input.dataset['tier'] = role;
+
+      wrapper.append(caption, input);
+      return wrapper;
+    };
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'button button--danger';
+    setText(remove, 'Retirer');
+    remove.addEventListener('click', () => {
+      row.remove();
+    });
+
+    row.append(makeField('Seuil, en bits', minBits, 'min'), makeField('Secondes', seconds, 'seconds'), remove);
+    tiersList.append(row);
+  }
+
+  /** Lit l'éditeur de paliers, ligne par ligne. */
+  function readTierRows(): TierInput[] {
+    return [...tiersList.querySelectorAll('.tier')].map((row) => ({
+      minBits: row.querySelector<HTMLInputElement>('[data-tier="min"]')?.value ?? '',
+      seconds: row.querySelector<HTMLInputElement>('[data-tier="seconds"]')?.value ?? '',
+    }));
+  }
+
+  function renderTiers(tiers: readonly { minBits: number; seconds: number }[]): void {
+    clearChildren(tiersList);
+    for (const tier of tiers) {
+      appendTierRow(String(tier.minBits), String(tier.seconds));
+    }
+  }
+
+  requireElement(document, '#add-tier').addEventListener('click', () => {
+    appendTierRow('', '');
+  });
+
+  /** Repeint tous les champs de réglage depuis la configuration en mémoire. */
+  function paintFields(): void {
+    for (const view of FIELD_VIEWS) {
+      const fields = fieldsOf(view);
+      writeFieldValues(containerOf(view), fields, valuesFrom(fields, config));
+      clearFieldErrors(containerOf(view), fields);
+    }
+
+    const tiers = (config as { rewards?: { bits?: { tiers?: { minBits: number; seconds: number }[] } } })
+      .rewards?.bits?.tiers;
+    renderTiers(tiers ?? []);
+  }
+
+  async function refreshConfig(): Promise<void> {
+    const payload = await api.get<{ config: unknown }>('/api/config');
+    config = payload.config;
+    paintFields();
+  }
+
+  /**
+   * Enregistre une vue de réglage.
+   *
+   * Seuls les champs **modifiés** partent : renvoyer les soixante-dix
+   * écraserait une valeur changée entre-temps par l'assistant resté ouvert
+   * dans une fenêtre voisine.
+   */
+  async function saveView(view: FieldViewId, extra?: Record<string, unknown>): Promise<void> {
+    const fields = fieldsOf(view);
+    const container = containerOf(view);
+
+    clearFieldErrors(container, fields);
+    const { patch, errors } = patchFrom(fields, readFieldValues(container, fields), config);
+
+    const allErrors: FieldError[] = [...errors];
+    const tierMessages: string[] = [];
+
+    if (view === 'rewards') {
+      const rows = readTierRows();
+      const filled = rows.filter((row) => row.minBits.trim() !== '' || row.seconds.trim() !== '');
+      const modeField = container.querySelector<HTMLSelectElement>('#reward-bits-mode');
+
+      // Les paliers ne sont exigés qu'en mode « tiers ». En mode linéaire on
+      // les enregistre tout de même s'ils sont renseignés : c'est ainsi qu'on
+      // les prépare avant de basculer.
+      if (modeField?.value === 'tiers' || filled.length > 0) {
+        const { tiers, errors: tierErrors } = normalizeTiers(rows);
+        if (tierErrors.length > 0) {
+          tierMessages.push(...tierErrors);
+        } else if (JSON.stringify(tiers) !== JSON.stringify(readTiersFromConfig())) {
+          patch['rewards'] = { ...(patch['rewards'] as object | undefined), bits: {
+            ...((patch['rewards'] as { bits?: object } | undefined)?.bits ?? {}),
+            tiers,
+          } };
+        }
+      }
+    }
+
+    if (allErrors.length > 0 || tierMessages.length > 0) {
+      showFieldErrors(container, allErrors);
+      const first = allErrors[0]?.message ?? tierMessages[0] ?? '';
+      showBanner(`Rien n’a été enregistré. ${first}`, 'banner--error');
+      return;
+    }
+
+    if (Object.keys(patch).length === 0 && extra === undefined) {
+      showBanner('Aucune modification à enregistrer.', 'banner--success');
+      return;
+    }
+
+    // Le secret client est **frère** de `config` dans le corps, jamais son
+    // enfant : il va dans le magasin chiffré et ne ressort par aucune lecture.
+    await api.patch('/api/config', { ...(Object.keys(patch).length > 0 ? { config: patch } : {}), ...extra });
+    await refreshConfig();
+    showBanner('Modifications enregistrées.', 'banner--success');
+  }
+
+  function readTiersFromConfig(): unknown {
+    return (
+      (config as { rewards?: { bits?: { tiers?: unknown } } }).rewards?.bits?.tiers ?? []
+    );
+  }
+
+  for (const view of ['rewards', 'appearance', 'settings'] as const) {
+    const control = button(`#save-${view}`);
+    control.addEventListener('click', () => {
+      void guarded(control, () => saveView(view));
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Vue Twitch                                                             */
+  /* ---------------------------------------------------------------------- */
+
+  async function refreshTwitch(): Promise<void> {
+    const status = await api.get<TwitchDescription>('/api/twitch/status');
+
+    setText(requireElement(document, '#twitch-login'), status.broadcasterLogin || '—');
+
+    const connection = requireElement(document, '#twitch-connection');
+    setText(connection, status.connected ? 'Connecté' : 'Non connecté');
+    connection.className = status.connected ? 'pill pill--ok' : 'pill pill--warning';
+
+    const secret = requireElement(document, '#twitch-secret');
+    setText(secret, status.hasClientSecret ? 'Secret enregistré' : 'Aucun secret');
+    secret.className = status.hasClientSecret ? 'pill pill--ok' : 'pill pill--warning';
+
+    setText(
+      requireElement(document, '#twitch-scopes'),
+      status.missingScopes.length === 0
+        ? 'Toutes les autorisations nécessaires ont été accordées.'
+        : 'Autorisations manquantes : le compteur fonctionne, mais ces sources ne créditeront rien.',
+      200,
+    );
+
+    const missing = requireElement(document, '#twitch-missing-scopes');
+    clearChildren(missing);
+    for (const scope of status.missingScopes) {
+      const item = document.createElement('li');
+      setText(item, scope);
+      missing.append(item);
+    }
+  }
+
+  async function refreshSubscriptions(): Promise<void> {
+    const { subscriptions } = await api.get<{
+      subscriptions: readonly { id: string; type: string; status: string }[];
+    }>('/api/twitch/subscriptions');
+
+    const list = requireElement(document, '#twitch-subscriptions');
+    clearChildren(list);
+    requireElement(document, '#twitch-subscriptions-empty').hidden = subscriptions.length > 0;
+
+    for (const subscription of subscriptions) {
+      const item = document.createElement('li');
+      setText(item, `${subscription.type} — ${subscription.status}`, 120);
+      list.append(item);
+    }
+  }
+
+  const saveTwitch = button('#save-twitch');
+  saveTwitch.addEventListener('click', () => {
+    void guarded(saveTwitch, async () => {
+      const secretField = input('#twitch-client-secret');
+      const secret = secretField.value;
+
+      await saveView('twitch', secret === '' ? undefined : { clientSecret: secret });
+      secretField.value = '';
+      await refreshTwitch();
+    });
+  });
+
+  const reconnect = button('#twitch-reconnect');
+  reconnect.addEventListener('click', () => {
+    void guarded(reconnect, async () => {
+      const result = await api.post<{ authorizationUrl: string }>('/api/twitch/connect');
+      if (result !== null) {
+        window.location.assign(result.authorizationUrl);
+      }
+    });
+  });
+
+  const revoke = button('#twitch-revoke');
+  revoke.addEventListener('click', () => {
+    void guarded(revoke, async () => {
+      await api.post('/api/twitch/revoke');
+      await refreshTwitch();
+      await refreshSubscriptions();
+      showBanner('Accès révoqué.', 'banner--success');
+    });
+  });
+
+  const refreshSubs = button('#twitch-refresh');
+  refreshSubs.addEventListener('click', () => {
+    void guarded(refreshSubs, refreshSubscriptions);
+  });
+
+  /* ---------------------------------------------------------------------- */
+  /* Import et export                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  const importButton = button('#import-config');
+  importButton.addEventListener('click', () => {
+    void guarded(importButton, async () => {
+      const file = input('#import-file').files?.[0];
+      if (file === undefined) {
+        showBanner('Choisissez d’abord un fichier.', 'banner--error');
+        return;
+      }
+
+      await api.post('/api/config/import', { content: await file.text() });
+      await refreshConfig();
+      showBanner('Configuration importée.', 'banner--success');
+    });
+  });
+
+  /* ---------------------------------------------------------------------- */
   /* Démarrage                                                              */
   /* ---------------------------------------------------------------------- */
+
+  for (const view of FIELD_VIEWS) {
+    renderFieldGroups(document, containerOf(view), fieldsOf(view), groupsOf(view));
+  }
 
   buildNav();
   showView(viewFromHash(window.location.hash));
@@ -407,16 +711,29 @@ function start(): void {
     },
   });
 
-  // La valeur de départ n'est pas dans l'instantané du WebSocket : elle vit
-  // dans la configuration, qui se lit par l'API.
-  void api.get<{ config: { counter: { initialSeconds: number } } }>('/api/config').then(
-    ({ config }) => {
-      input('#initial-hours').value = String(config.counter.initialSeconds / 3_600);
+  // La configuration n'est pas dans l'instantané du WebSocket, qui ne diffuse
+  // que la section `overlay` : elle se lit par l'API.
+  void refreshConfig().then(
+    () => {
+      const initial = (config as { counter?: { initialSeconds?: number } }).counter?.initialSeconds;
+      if (initial !== undefined) {
+        input('#initial-hours').value = String(initial / 3_600);
+      }
     },
     (error: unknown) => {
       reportFailure(error);
     },
   );
+
+  // Twitch en dernier et sans bloquer : c'est justement quand Twitch ne répond
+  // pas que le streamer doit pouvoir ouvrir son panneau.
+  void refreshTwitch().catch((error: unknown) => {
+    reportFailure(error);
+  });
+  void refreshSubscriptions().catch(() => {
+    // Sans jeton, cette route répond 502 : l'annoncer sur chaque ouverture du
+    // panneau d'une installation neuve n'apprendrait rien à personne.
+  });
 
   client.start();
   window.requestAnimationFrame(render);
