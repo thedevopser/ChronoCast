@@ -117,6 +117,18 @@ describe('package.json', () => {
     expect(manifest.devDependencies).toHaveProperty('electron-builder');
   });
 
+  it('n’embarque pas les cartes de source', async () => {
+    // Elles ne servent qu'au développement : les outils de développement sont
+    // fermés dans une application packagée, personne ne les lira jamais. Elles
+    // pèsent en revanche plusieurs centaines de kilooctets dans l'installeur, et
+    // celles du code web étaient de surcroît servies en 404 — la liste blanche
+    // du serveur statique ne les connaît pas. Livrer un fichier inaccessible et
+    // inutile est le genre de détail qui fait douter du reste.
+    const config = await read('electron-builder.yml');
+
+    expect(config).toContain("'!**/*.map'");
+  });
+
   it('fige les versions d’electron et d’electron-builder', async () => {
     // Elles déterminent le Chromium embarqué et la forme de l'installeur,
     // c'est-à-dire ce que le conteneur ne peut pas vérifier. Un intervalle de
@@ -127,5 +139,31 @@ describe('package.json', () => {
 
     expect(manifest.devDependencies['electron']).toMatch(/^\d+\.\d+\.\d+$/);
     expect(manifest.devDependencies['electron-builder']).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+});
+
+describe('cohérence de la version', () => {
+  it('annonce la même version dans le manifeste et dans le code', async () => {
+    // Deux endroits portent la version : `package.json`, d'où electron-builder
+    // tire le nom de l'installeur et d'où `app.getVersion()` la lit, et une
+    // constante du noyau, parce que le point d'entrée headless n'a pas accès au
+    // premier. Rien ne garantissait leur alignement : le jour où l'un des deux
+    // est oublié, headless annonce une version fausse à ses clients WebSocket,
+    // et rien ne le signale.
+    //
+    // La duplication est conservée plutôt que résolue par une lecture de
+    // `package.json` à l'exécution : celle-ci dépendrait de la disposition des
+    // fichiers émis, qui change au packaging. Un test la tient, comme il tient
+    // déjà `productName` et `app.setName`.
+    const manifest = JSON.parse(await read('package.json')) as { readonly version: string };
+    const { APP_VERSION } = await import('../../../src/core/app/version.js');
+
+    expect(APP_VERSION).toBe(manifest.version);
+  });
+
+  it('emploie une version sémantique', async () => {
+    const manifest = JSON.parse(await read('package.json')) as { readonly version: string };
+
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });

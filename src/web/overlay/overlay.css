@@ -103,8 +103,17 @@ body {
   background: var(--cc-frame-background);
 
   /*
-   * Deux couches de masque : la boîte intérieure, et la boîte entière. Leur
-   * soustraction ne laisse que le pourtour.
+   * Deux couches de masque : la boîte de contenu, et la boîte entière. Leur
+   * soustraction ne laisse que le pourtour, c'est-à-dire le trait.
+   *
+   * **`content-box`, et surtout pas `padding-box`.** Le nom trompe : la boîte
+   * de remplissage n'est pas la boîte diminuée de la marge intérieure, mais la
+   * boîte diminuée des **bordures**. Le trait étant ici exprimé par un
+   * `padding` et non par une bordure, les deux couches auraient exactement la
+   * même taille et ne différeraient que par leurs rayons de coin — leur
+   * soustraction ne laisserait que les arcs des quatre angles. C'est
+   * précisément ce qui s'est vu à l'écran. La boîte de contenu, elle, est
+   * diminuée des bordures **et** de la marge intérieure.
    *
    * La forme préfixée est conservée pour les Chromium plus anciens — une
    * Browser Source OBS n'est pas toujours à jour, et `mask-composite` n'est
@@ -112,9 +121,9 @@ body {
    * l'emporte là où elle existe. L'ordre compte : la propriété raccourcie
    * réinitialise la composition, elle doit donc précéder.
    */
-  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
 

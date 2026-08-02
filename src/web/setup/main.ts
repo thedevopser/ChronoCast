@@ -13,7 +13,15 @@
 
 import { ApiError, createApiClient, readCsrfToken } from '../shared/api-client.js';
 import { clearChildren, requireElement, setText } from '../shared/safe-dom.js';
-import { isStepReachable, resumeStep, SETUP_STEPS, type SetupStepId } from './wizard.js';
+// `resumeHint` est renommé : la variable du même nom désigne ici l'élément du
+// DOM qui porte la phrase, et non la phrase elle-même.
+import {
+  isStepReachable,
+  resumeHint as hintFor,
+  resumeStep,
+  SETUP_STEPS,
+  type SetupStepId,
+} from './wizard.js';
 
 /** Libellés du fil d'étapes. */
 const STEP_LABELS: Readonly<Record<SetupStepId, string>> = {
@@ -313,15 +321,9 @@ function start(): void {
 
   void refresh().then(
     () => {
-      const step = resumeStep({ ...status, completed });
-      setText(
-        resumeHint,
-        completed
-          ? 'Configuration terminée. Vous pouvez la reprendre à tout moment.'
-          : 'Reprise là où vous vous étiez arrêté.',
-        200,
-      );
-      show(step);
+      const state = { ...status, completed };
+      setText(resumeHint, hintFor(state), 200);
+      show(resumeStep(state));
     },
     (error: unknown) => {
       reportFailure(error);

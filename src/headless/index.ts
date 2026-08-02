@@ -24,13 +24,12 @@ import { createFsPathProvider, defaultWebRoot } from '../core/app/fs-path-provid
 import { createNodeRuntime } from '../core/app/node-runtime.js';
 import type { BrowserOpener } from '../core/app/ports.js';
 import { createSystemClock } from '../core/app/system-clock.js';
+import { APP_VERSION } from '../core/app/version.js';
 import { createSystemTicker } from '../core/app/system-ticker.js';
 import { createLogger } from '../core/logging/logger.js';
 import { createConsoleSink } from '../core/logging/sinks/console-sink.js';
 import { createAesSecretStore } from './aes-secret-store.js';
 
-/** Version affichée aux clients WebSocket. Alignée sur `package.json` au packaging. */
-const APP_VERSION = '0.3.0';
 
 /**
  * Ouverture de navigateur dégradée.

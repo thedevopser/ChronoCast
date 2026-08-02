@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, sur la branche `docs/documentation-complete`. **Les huit phases sont terminées.** Le produit est installé, éprouvé sur poste Windows, et documenté. La version est en `0.3.0`. Il ne reste aucun chantier planifié : ce qui vient désormais vient de l'usage.
+**Dernière mise à jour :** 2 août 2026, sur la branche `fix/cadre-boite-de-contenu`. **Les huit phases sont terminées, et les derniers manquements connus sont corrigés.** Le produit est installé, éprouvé sur poste Windows, et documenté. La version est en **`0.4.0`**, destinée à être la première release officielle. Il ne reste aucun chantier planifié : ce qui vient désormais vient de l'usage.
 
 **Le produit fonctionne de bout en bout sur un vrai poste.** Le workflow `Release` produit l'installeur, l'installation aboutit, l'application démarre, se configure, se connecte à Twitch, se replie dans le tray où le compteur se lit, et sert l'overlay à OBS. **La Phase 7 n'est pas seulement écrite : tout ce que le conteneur ne pouvait pas vérifier a été éprouvé à la main.** Le détail est en section 7, sous « Validation sur poste Windows ».
 
@@ -113,10 +113,12 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `docs/documentation-complete`**, PR non fusionnée à l'heure où ces lignes sont écrites. Une seconde branche, `fix/cadre-sans-fond`, est commitée et attend elle aussi sa fusion. Les dix-huit PR précédentes sont fusionnées en squash ; `main` est sur `29ac239`.
+**Branche courante : `fix/cadre-boite-de-contenu`**, PR non fusionnée à l'heure où ces lignes sont écrites. Les vingt PR précédentes sont fusionnées en squash ; `main` est sur `310c1d2`.
 
 ```
-29ac239 fix(overlay): cadre en anneau, dégradé ciblable (#18)                 <- main
+310c1d2 docs: neuf documents, retrait du packaging local (#20)              <- main
+c021218 fix(overlay): trait du cadre peint par soustraction (#19)
+29ac239 fix(overlay): cadre en anneau, dégradé ciblable (#18)
 0937d9b feat(overlay): cadre et dégradé (#17)
 0c9fa9c fix(oauth): ramener la configuration dans la fenêtre (#16)
 ae3f7de fix(oauth): rediriger vers localhost (#15)
@@ -137,16 +139,16 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 18969d2 chore: initialiser le dépôt ChronoCast
 ```
 
-**1 515 tests, 70 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth, les **10** du retour dans la fenêtre et les **19** du cadre et du dégradé.)
+**1 527 tests, 72 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth, les **10** du retour dans la fenêtre les **19** du cadre et du dégradé, les **3** de la documentation et les **9** des derniers manquements.)
 
-**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #18 a été écrite après la fusion elle-même. Comme les fois précédentes, elle partira dans le premier commit du prochain lot. `git status` ne doit signaler aucun autre fichier — `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Rien en attente hors du travail de la branche.** `git status` ne doit signaler aucun fichier une fois celle-ci commitée — `dist/`, `release/` et `PR-*.md` sont ignorés.
 
-**La version est passée à `0.2.0`**, à deux endroits qui doivent rester alignés : `package.json` — d'où electron-builder tire le nom de l'installeur et `app.getVersion()` — et la constante `APP_VERSION` de `src/headless/index.ts`, qui n'a pas accès au premier. Rien ne vérifie automatiquement cet alignement : la seule garde est de les modifier ensemble.
+**La version est en `0.4.0`**, à deux endroits qui doivent rester alignés : `package.json` — d'où electron-builder tire le nom de l'installeur et `app.getVersion()` — et `APP_VERSION`, désormais dans `src/core/app/version.ts` et non plus enfoui dans le point d'entrée headless. **Un test de cohérence les tient ensemble** : la suite refuse de passer si l'un des deux est oublié. La duplication a été conservée plutôt que résolue par une lecture de `package.json` à l'exécution, qui ferait reposer une valeur d'affichage sur la disposition des fichiers émis.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # deux branches en attente de fusion, voir ci-dessus
+git branch --show-current    # fix/cadre-boite-de-contenu tant que la PR n'est pas fusionnée
 ./scripts/dc.sh verify       # doit être intégralement vert
 ```
 
@@ -344,11 +346,11 @@ Dette `tsconfig.web.json` payée, `web/shared/` complet, overlay complet. `npm r
 - **Vitest est scindé en deux projets** (`node` et `web`) via `test.projects`, avec `handleDisabledFileLoadingAsSuccess` côté happy-dom : sans ce réglage, chaque chargement de ressource refusé remplit la sortie de piles d'appel qui n'annoncent aucun défaut.
 - **Open Props n'est pas encore vendoré** : l'overlay n'en a aucun besoin — fond transparent, tout piloté par les variables `--cc-*`. Le vendorer maintenant reviendrait à livrer un fichier inutilisé. Il arrivera avec la PR C, qui en a l'usage.
 
-**Trois points restés ouverts, à traiter plus tard :**
+**Trois points restés ouverts à l'époque, tous clos depuis :**
 
 1. **`overlay.enableCustomCss` n'a aucune route serveur.** Le réglage existe au schéma depuis la Phase 1, mais `static-handler.ts` ne sert que `webRootDirectory` : rien ne lit `custom.css` dans le répertoire de données. Il faudra une route dédiée, avec les mêmes gardes de chemin.
 2. **Le mode `server.websocket.mode: 'separate'` n'est pas découvrable depuis la page.** ~~Le message `hello` ne porte que le port HTTP.~~ **Clos autrement que prévu :** l'analyse du lot 1 de la PR C a montré que le `hello` ne pouvait rien y faire — il arrive *sur* la connexion, donc il faut déjà avoir joint le bon port pour le lire. Le mode n'ayant par ailleurs aucune implémentation, il a été retiré. Voir « Dette soldée » en section 7.
-3. **Les fichiers `.js.map` sont émis dans `dist/public` mais absents de la liste blanche du serveur statique**, donc servis en 404. Sans conséquence fonctionnelle, mais à trancher au packaging (Phase 7) : les exclure du build de production plutôt que les livrer inaccessibles.
+3. **Les fichiers `.js.map` sont émis dans `dist/public` mais absents de la liste blanche du serveur statique**, donc servis en 404. ~~À trancher au packaging.~~ **Tranché en PR #21 par l'exclusion** : `'!**/*.map'` dans les fichiers d'electron-builder. Elles ne servent qu'au développement, les outils de développement sont fermés dans une application packagée, et un fichier à la fois inutile et inaccessible n'a rien à faire dans un installeur. Elles restent émises dans `dist/`, où elles servent au débogage local.
 
 #### PR B — `feat/setup-oauth` — **fusionnée (#8), 83 tests, 1 025 au total**
 
@@ -645,13 +647,22 @@ Deux sections de plus au schéma de l'overlay, **éteintes par défaut** : la sc
 - **`overlay.gradient`** — deux couleurs, un angle, et **deux cibles indépendantes** : `onText` et `onFrame`. Vouloir le dégradé sur les chiffres n'implique pas de le vouloir sur le cadre. Les couleurs, elles, restent communes : les dédoubler n'aurait servi qu'à donner l'occasion de les désaccorder.
 - **`overlay.frame`** — épaisseur, arrondi, marges intérieures, couleur, remplissage et son opacité. À ne pas confondre avec `overlay.outline`, qui cerne les glyphes ; le champ correspondant a d'ailleurs été renommé « Contour des chiffres », la confusion ayant eu lieu pour de vrai.
 
-**Trois contraintes de rendu expliquent la forme du code, et se paieraient cher à redécouvrir.**
+**Le cadre a demandé quatre tentatives.** Le détail vaut d'être lu avant d'y toucher, parce que chacune des trois premières était fausse pour une raison différente, et qu'aucune n'était visible autrement qu'à l'œil, sur un poste.
 
-1. **Le trait du cadre est un `padding` peint par le fond, pas une bordure.** `border-image` est la façon évidente de faire un trait en dégradé, et elle fait perdre `border-radius`. Il fallait choisir entre le dégradé et les coins ronds : cette construction garde les deux.
-2. **Un dégradé de texte passe par `background-clip: text`**, ce qui impose `color: transparent`. D'où le couple `--cc-text-fill` / `--cc-text-background`, et la règle qui va avec : la couleur doit redevenir opaque dès que le dégradé s'éteint, sans quoi **le compteur disparaît de la scène**.
-3. **D'où deux enveloppes autour du compteur** (`.frame`, `.frame__inner`) : le remplissage ne peut pas vivre sur l'élément du texte, il serait découpé à la forme des chiffres.
+| Tentative | Ce qui était fait | Pourquoi c'était faux |
+| --- | --- | --- |
+| PR #17 | Dégradé sur le fond d'une enveloppe, `padding` censé n'en laisser voir que le pourtour, seconde enveloppe pour le remplissage | **Le fond d'un élément peint toute sa boîte**, marge intérieure comprise. Le trait n'apparaissait que si l'intérieur était opaque |
+| PR #18 | Remplissage par défaut ramené à zéro | Le défaut était bon, mais il rendait le premier défaut plus visible : cadre entièrement plein |
+| PR #19 | Trait peint par un pseudo-élément, masque à deux couches, rognage `padding-box` | **`padding-box` n'est pas la boîte diminuée de la marge intérieure, mais la boîte diminuée des bordures.** Sans bordure, les deux couches avaient la même taille : seuls les arcs des angles restaient |
+| PR #21 | Même masque, rognage `content-box` | La boîte de contenu est diminuée des bordures **et** de la marge intérieure |
 
-**L'intérieur du cadre est libre par défaut** (`fillOpacity: 0`). Un cadre est un trait, pas un pavé : le premier défaut retenu, un noir à 0,4, laissait le dégradé transparaître à travers et faisait passer le cadre pour un fond plein. Corrigé en PR #18, sur retour d'usage — la construction tenait, c'est la valeur choisie qui décrivait un cadre plein.
+**La construction retenue, à ne pas défaire :** `.frame` porte le remplissage, `.frame::before` peint le trait sur toute sa surface, et un masque à deux couches — la boîte de contenu, la boîte entière — en soustrait l'intérieur. `border-image` réglerait le trait d'un coup mais fait perdre `border-radius` ; le masque doit être posé sur le pseudo-élément, jamais sur l'enveloppe, sous peine d'effacer aussi les chiffres. Les rayons intérieurs sont calculés par le moteur.
+
+**Trois de ces invariants sont désormais figés** dans `tests/unit/assets/overlay-css.test.ts`. Ils ne remplacent pas un rendu — il n'y a pas de moteur ici — mais ils tiennent les valeurs exactes dont l'erreur est silencieuse.
+
+**L'autre contrainte, indépendante :** un dégradé de texte passe par `background-clip: text`, ce qui impose `color: transparent`. D'où le couple `--cc-text-fill` / `--cc-text-background`, et la règle qui va avec : la couleur doit redevenir opaque dès que le dégradé s'éteint, sans quoi **le compteur disparaît de la scène**. C'est aussi la raison pour laquelle le remplissage ne peut pas vivre sur l'élément du texte : il serait découpé à la forme des chiffres.
+
+**L'intérieur du cadre est libre par défaut** (`fillOpacity: 0`) : un cadre est un trait, pas un pavé.
 
 **L'opacité du remplissage est un réglage distinct de sa couleur** parce que `<input type="color">` ne sait pas exprimer la transparence. Les deux sont recomposés en notation à huit chiffres par `withOpacity`, qui développe la notation courte `#RGB` et remplace une opacité déjà portée par la couleur.
 

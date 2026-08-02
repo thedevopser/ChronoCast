@@ -110,3 +110,28 @@ export function isStepReachable(step: SetupStepId, state: SetupState): boolean {
       return state.connected;
   }
 }
+
+/**
+ * Phrase affichée sous le titre de l'assistant.
+ *
+ * Elle est ici et non dans le gabarit parce qu'elle **dépend de l'état**, et
+ * qu'un texte conditionnel laissé dans la page finit par mentir : « Reprise là
+ * où vous vous étiez arrêté » s'affichait à la première étape d'une
+ * installation neuve, où rien n'avait jamais été commencé. C'est la première
+ * phrase que lit un nouvel utilisateur.
+ *
+ * L'achèvement l'emporte sur la reprise : une configuration terminée dont le
+ * jeton a été révoqué depuis Twitch reprend à `connect`, et annoncer alors
+ * qu'elle n'a jamais été menée à son terme serait faux une seconde fois.
+ */
+export function resumeHint(state: SetupState): string {
+  if (state.completed) {
+    return 'Configuration terminée. Vous pouvez la reprendre à tout moment.';
+  }
+
+  if (state.clientId === '' && !state.hasClientSecret) {
+    return 'Six étapes, et quelques minutes.';
+  }
+
+  return 'Reprise là où vous vous étiez arrêté.';
+}
