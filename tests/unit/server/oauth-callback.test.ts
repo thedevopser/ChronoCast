@@ -42,7 +42,8 @@ interface Harness {
   readonly router: ReturnType<typeof createOAuthCallbackRouter>;
   readonly exchanged: string[];
   readonly verified: string[];
-  settledCount: number;
+  /** Issues transmises à `onSettled`, dans l'ordre. */
+  readonly settled: string[];
 }
 
 function createHarness(
@@ -54,8 +55,9 @@ function createHarness(
 ): Harness {
   const exchanged: string[] = [];
   const verified: string[] = [];
+  const settled: string[] = [];
 
-  const harness: Harness = {
+  return {
     router: createOAuthCallbackRouter({
       verifyState: (state: string) => {
         verified.push(state);
@@ -66,17 +68,15 @@ function createHarness(
         await (options.complete?.(code) ?? Promise.resolve());
       },
       getAppPort: () => (options.appPort === undefined ? APP_PORT : options.appPort),
-      onSettled: () => {
-        harness.settledCount += 1;
+      onSettled: (outcome) => {
+        settled.push(outcome);
       },
       logger: createLogger({ level: 'error', sinks: [] }),
     }),
     exchanged,
     verified,
-    settledCount: 0,
+    settled,
   };
-
-  return harness;
 }
 
 function callback(query: Record<string, string>) {
@@ -93,27 +93,50 @@ describe('createOAuthCallbackRouter', () => {
       expect(harness.exchanged).toStrictEqual(['abc123']);
     });
 
-    it('renvoie le navigateur vers l’assistant', async () => {
-      // Ramener l'utilisateur dans l'assistant vaut mieux que de lui afficher
-      // une page morte : il y voit le résultat et poursuit sa configuration.
+    it('rend une page terminale, sans renvoyer le navigateur dans l’assistant', async () => {
+      // Rediriger vers `/setup` faisait poursuivre la configuration **dans le
+      // navigateur**, pendant que la fenêtre de l'application restait à
+      // l'étape précédente : deux assistants ouverts, et l'utilisateur qui
+      // termine dans le mauvais. Le navigateur a fait sa part, il s'arrête là.
       const harness = createHarness();
 
       const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
 
-      expect(response.status).toBe(302);
-      expect(response.headers['location']).toBe('http://127.0.0.1:3777/setup?oauth=ok');
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/html');
+      expect(response.headers['location']).toBeUndefined();
     });
 
-    it('signale que le flux est terminé', async () => {
-      // C'est ce qui désarme le serveur éphémère : il n'a plus rien à écouter.
+    it('renvoie l’utilisateur vers ChronoCast', async () => {
+      const harness = createHarness();
+
+      const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
+
+      expect(response.body.toString()).toContain('ChronoCast');
+    });
+
+    it('garde un lien vers l’assistant, seul retour du mode headless', async () => {
+      // Sans fenêtre applicative, cette page est le seul retour possible :
+      // supprimer ce lien enfermerait l'utilisateur du point d'entrée headless
+      // sur une page morte.
+      const harness = createHarness();
+
+      const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
+
+      expect(response.body.toString()).toContain('http://127.0.0.1:3777/setup?oauth=ok');
+    });
+
+    it('signale l’issue du flux', async () => {
+      // C'est ce qui désarme le serveur éphémère — il n'a plus rien à écouter —
+      // et ce qui, dans la coquille, ramène la fenêtre au premier plan.
       const harness = createHarness();
 
       await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
 
-      expect(harness.settledCount).toBe(1);
+      expect(harness.settled).toStrictEqual(['ok']);
     });
 
-    it('ne laisse jamais le code apparaître dans la redirection', async () => {
+    it('ne laisse jamais le code apparaître dans la page', async () => {
       const harness = createHarness();
 
       const response = await harness.router.handle(
@@ -123,21 +146,22 @@ describe('createOAuthCallbackRouter', () => {
       expect(JSON.stringify(response)).not.toContain('secret-code');
     });
 
-    it('se rabat sur une page quand le port applicatif est inconnu', async () => {
+    it('omet le lien quand le port applicatif est inconnu', async () => {
       // Le rappel peut aboutir alors que le serveur principal n'écoute pas
-      // encore : mieux vaut une page sobre qu'une redirection vers nulle part.
+      // encore : un lien vers un port qui n'existe pas vaut moins que pas de
+      // lien du tout.
       const harness = createHarness({ appPort: null });
 
       const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
 
       expect(response.status).toBe(200);
-      expect(response.headers['content-type']).toContain('text/html');
+      expect(response.body.toString()).not.toContain('<a');
       expect(harness.exchanged).toStrictEqual(['abc']);
     });
   });
 
   describe('refus de l’utilisateur', () => {
-    it('ramène à l’assistant sans tenter d’échange', async () => {
+    it('clôt le flux sans tenter d’échange', async () => {
       // Twitch renvoie `error=access_denied` quand l'utilisateur clique sur
       // « Annuler ». Ce n'est pas une anomalie, c'est une décision.
       const harness = createHarness();
@@ -146,10 +170,10 @@ describe('createOAuthCallbackRouter', () => {
         callback({ error: 'access_denied', error_description: 'refusé', state: VALID_STATE }),
       );
 
-      expect(response.status).toBe(302);
-      expect(response.headers['location']).toBe('http://127.0.0.1:3777/setup?oauth=denied');
+      expect(response.status).toBe(200);
+      expect(response.body.toString()).toContain('oauth=denied');
       expect(harness.exchanged).toStrictEqual([]);
-      expect(harness.settledCount).toBe(1);
+      expect(harness.settled).toStrictEqual(['denied']);
     });
 
     it('ne reflète pas le message d’erreur de Twitch', async () => {
@@ -183,7 +207,7 @@ describe('createOAuthCallbackRouter', () => {
 
       await harness.router.handle(callback({ code: 'abc', state: 'b'.repeat(64) }));
 
-      expect(harness.settledCount).toBe(0);
+      expect(harness.settled).toStrictEqual([]);
     });
 
     it('refuse un rappel sans state', async () => {
@@ -215,18 +239,19 @@ describe('createOAuthCallbackRouter', () => {
   });
 
   describe('échec de l’échange', () => {
-    it('ramène à l’assistant avec un code d’erreur stable', async () => {
+    it('annonce l’échec avec un code stable', async () => {
       const harness = createHarness({
         complete: () => Promise.reject(new Error('Twitch a répondu 400')),
       });
 
       const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
 
-      expect(response.status).toBe(302);
-      expect(response.headers['location']).toBe('http://127.0.0.1:3777/setup?oauth=failed');
+      expect(response.status).toBe(200);
+      expect(response.body.toString()).toContain('oauth=failed');
+      expect(harness.settled).toStrictEqual(['failed']);
     });
 
-    it('ne reflète pas le message d’erreur dans l’URL', async () => {
+    it('ne reflète pas le message d’erreur dans la page', async () => {
       // Le détail appartient aux journaux, pas à une barre d'adresse.
       const harness = createHarness({
         complete: () => Promise.reject(new Error('client_secret invalide : abcdef')),
@@ -244,7 +269,7 @@ describe('createOAuthCallbackRouter', () => {
 
       await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
 
-      expect(harness.settledCount).toBe(1);
+      expect(harness.settled).toStrictEqual(['failed']);
     });
   });
 
@@ -257,7 +282,7 @@ describe('createOAuthCallbackRouter', () => {
       );
 
       expect(response.status).toBe(404);
-      expect(harness.settledCount).toBe(0);
+      expect(harness.settled).toStrictEqual([]);
     });
 
     it('n’accepte que la lecture', async () => {

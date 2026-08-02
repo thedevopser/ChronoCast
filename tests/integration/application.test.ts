@@ -14,7 +14,9 @@ import {
 import type { SecretStore } from '../../src/core/app/ports.js';
 import { createSystemClock } from '../../src/core/app/system-clock.js';
 import type { Ticker } from '../../src/core/counter/counter-service.js';
+import type { Router } from '../../src/core/server/router.js';
 import { CSRF_HEADER } from '../../src/core/server/security/csrf.js';
+import { makeRequest } from '../helpers/http-request.js';
 import {
   channelCheer,
   channelSubscribe,
@@ -129,6 +131,8 @@ describe('application complète', () => {
   const sockets: WebSocket[] = [];
   /** Trace du serveur de rappel OAuth, remplacé par un double. */
   let oauthEvents: string[] = [];
+  /** Routeur du rappel, capturé au passage : il est piloté directement. */
+  let oauthRouter: Router | null = null;
 
   /** Construit une application sur le répertoire de données courant. */
   function build(): Application {
@@ -158,8 +162,9 @@ describe('application complète', () => {
       },
       // Le port 37771 est fixe et imposé par Twitch : l'ouvrir réellement
       // ferait échouer deux tests exécutés en parallèle sur la même machine.
-      createOAuthServer: () => {
+      createOAuthServer: (router) => {
         oauthEvents.push('créé');
+        oauthRouter = router;
         return {
           start: () => {
             oauthEvents.push('démarré');
@@ -208,6 +213,7 @@ describe('application complète', () => {
   beforeEach(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-'));
     oauthEvents = [];
+    oauthRouter = null;
     application = build();
     port = await application.start();
   });
@@ -555,6 +561,27 @@ describe('application complète', () => {
 
     it('refuse tout state quand aucun flux n’est ouvert', () => {
       expect(application.verifyOAuthState('a'.repeat(64))).toBe(false);
+    });
+
+    it('annonce l’issue du rappel sur le bus', async () => {
+      // C'est par là que la coquille Electron ramène sa fenêtre au premier
+      // plan. Sans cet événement, l'utilisateur termine sa configuration dans
+      // le navigateur pendant que la fenêtre reste à l'étape précédente — et
+      // c'est exactement ce qui se passait avant cette correction.
+      const state = await beginAuthorization();
+      const settled: string[] = [];
+      application.bus.on('oauth:settled', (payload) => {
+        settled.push(payload.outcome);
+      });
+
+      // L'échange échouera : ces tests n'ont aucun accès réseau. C'est bien la
+      // situation à couvrir — un échec doit ramener la fenêtre autant qu'une
+      // réussite, sans quoi l'utilisateur reste devant un assistant muet.
+      await oauthRouter?.handle(
+        makeRequest({ path: '/callback', query: { code: 'abc', state } }),
+      );
+
+      expect(settled).toStrictEqual(['failed']);
     });
 
     it('ouvre le port de rappel pour la durée du flux', async () => {
