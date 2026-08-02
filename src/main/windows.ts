@@ -28,6 +28,15 @@ export interface MainWindowOptions {
   readonly devToolsEnabled: boolean;
 
   /**
+   * Icône de la fenêtre et de la barre des tâches.
+   *
+   * Une fois l'application packagée, Windows la lit dans l'exécutable ; la
+   * poser ici sert au développement, où elle vaut sinon l'icône par défaut
+   * d'Electron — celle qu'on finit par livrer sans s'en apercevoir.
+   */
+  readonly iconPath: string;
+
+  /**
    * Vrai tant que l'application ne se termine pas.
    *
    * Fermer la fenêtre replie vers la zone de notification : le compteur doit
@@ -58,6 +67,7 @@ export function createMainWindow(options: MainWindowOptions): BrowserWindow {
     show: !options.startHidden,
     backgroundColor: '#14131a',
     title: 'ChronoCast',
+    icon: options.iconPath,
     autoHideMenuBar: true,
     webPreferences: {
       // Aucun preload : les pages sont servies par le serveur HTTP local et

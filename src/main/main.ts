@@ -56,11 +56,15 @@ app.setName('ChronoCast');
 /** Période de rafraîchissement du tray, en millisecondes. */
 const TRAY_REFRESH_MS = 5_000;
 
-/** Icône de la zone de notification, relative au code compilé. */
-function trayIconPath(): string {
-  // `dist/main/main.js` → racine du paquet → `assets/tray.png`. Le chemin reste
-  // valide à l'intérieur de l'archive asar.
-  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'tray.png');
+/**
+ * Chemin d'une icône livrée avec l'application.
+ *
+ * `dist/main/main.js` → racine du paquet → `assets/`. Le chemin reste valide à
+ * l'intérieur de l'archive asar, à condition qu'`assets/` figure dans les
+ * fichiers du paquet — c'est à la configuration d'electron-builder de le dire.
+ */
+function iconPath(name: string): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', name);
 }
 
 let application: Application | null = null;
@@ -162,6 +166,9 @@ function onStarted(port: number): void {
     // Jamais dans une application packagée : les outils de développement y
     // donnent accès à la page d'administration et à tout ce qu'elle peut faire.
     devToolsEnabled: !app.isPackaged,
+    // Le `.ico` porte sept tailles : Windows y prend celle qui convient à la
+    // barre des tâches comme à l'alternateur de fenêtres.
+    iconPath: iconPath('icon.ico'),
     hideOnClose: () => !shuttingDown,
     onFirstHide: () => {
       notifyStillRunning();
@@ -169,7 +176,9 @@ function onStarted(port: number): void {
   });
 
   tray = createAppTray({
-    iconPath: trayIconPath(),
+    // Le PNG carré 32 × 32, et non le `.ico` : la zone de notification affiche
+    // une image unique, à laquelle un fichier multi-tailles n'apporte rien.
+    iconPath: iconPath('tray.png'),
     getState: () => {
       const state = current.counter.getState();
       return {
