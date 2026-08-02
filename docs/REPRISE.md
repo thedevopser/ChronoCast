@@ -2,11 +2,55 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, sur la branche `chore/packaging-ci`. **Phases 0 à 6 terminées**, dette du mode WebSocket `separate` soldée, identité visuelle intégrée, et **configuration de packaging livrée**. Les trois interfaces web sont livrées, et la coquille Electron aussi : cycle de vie, fenêtre durcie, zone de notification, et les trois ports Windows — chemins, `safeStorage`, navigateur système.
+**Dernière mise à jour :** 2 août 2026, après fusion de la PR #13. **Phases 0 à 6 terminées**, dette du mode WebSocket `separate` soldée, identité visuelle intégrée, et **configuration de packaging livrée**. Le workflow de vérification continue a tourné sur cette PR et il est vert : la CI n'est plus théorique. Les trois interfaces web sont livrées, et la coquille Electron aussi : cycle de vie, fenêtre durcie, zone de notification, et les trois ports Windows — chemins, `safeStorage`, navigateur système.
 
 **Le `.exe` n'a pas encore été produit, mais tout est en place pour l'obtenir.** `electron-builder` est installé et configuré, et le workflow `Release` sait construire sur un runner Windows. Il reste à le **déclencher manuellement** — la marche à suivre est en section 8, sous Phase 7 — puis à éprouver l'installeur sur un poste Windows. C'est la seule partie du projet que rien ici ne peut vérifier.
 
 **La dette actée pendant la PR C a été tranchée par le retrait** : `server.websocket.mode` et `server.websocket.port` ne sont plus au schéma. L'arbitrage et ses conséquences sont en **section 7, sous « Dette soldée »**. Il n'y a plus rien à décider sur ce sujet.
+
+---
+
+## 0. Chantier en cours — portabilité Windows
+
+> **À lire en premier si cette section existe encore.** Elle décrit un travail commencé et non terminé, sur la branche `fix/portabilite-windows`. Elle est écrite pour qu'une session neuve reprenne sans rien ré-explorer, et elle **doit être supprimée** quand le chantier est clos.
+
+**Origine.** Le premier déclenchement du workflow `Release` a échoué à l'étape `verify`. Le job tourne sur `windows-latest` : **33 tests sur 1 476 échouent**, alors que la même suite est verte en conteneur Linux et sur le runner Ubuntu de la CI. Aucun de ces échecs n'est une régression — ce sont des défauts présents depuis l'origine, que seul Windows expose. C'est précisément ce que le build devait révéler.
+
+**Diagnostic, en trois familles.**
+
+| # | Famille | Échecs | Nature |
+| --- | --- | --- | --- |
+| 1 | Fins de ligne au checkout | 4 | **Défaut réel** : pas de `.gitattributes`, Git convertit en CRLF sous Windows, le condensat d'Open Props ne correspond plus |
+| 2 | Canonisation des chemins | 21 | **Défaut réel de production** : la racine n'est pas canonisée avant comparaison |
+| 3 | Tests non portables | 8 | Chemins POSIX en dur, URL `file://` sans lettre de lecteur, permissions POSIX |
+
+**Détail du défaut n° 2, le plus grave.** `static-handler.ts` compare `isInside(root, canonical)` où `canonical` vient de `realpath` mais où `root` est pris tel qu'il a été fourni. Sur le runner, `root` vaut `C:\Users\RUNNER~1\...` — nom court 8.3 — quand `realpath` renvoie `C:\Users\runneradmin\...`. Les deux diffèrent, donc **tout est refusé**. En production, il suffit d'un nom court, d'un lien ou d'une casse différente dans le chemin d'installation pour que l'application ne serve plus rien : ni overlay, ni panneau, ni assistant, et un 404 sans explication. `pages.ts` et `custom-css.ts` partagent la même discipline et le même défaut.
+
+**Plan retenu, dans cet ordre.**
+
+| Étape | Contenu | État |
+| --- | --- | --- |
+| 1 | `.gitattributes` — `* text=auto eol=lf` | **fait** |
+| 2 | Canonisation de la racine dans les gestionnaires, avec ses tests | **fait** |
+| 3 | Portabilité des huit tests restants | **fait** |
+
+**Étape 1 — faite.** `.gitattributes` créé : `* text=auto eol=lf`, plus une liste explicite de binaires (`*.png`, `*.ico`, `*.woff`, `*.woff2`) que Git ne doit toucher sous aucun prétexte — une conversion de fins de ligne sur une icône la corrompt en silence. Vérifié par `git ls-files --eol` : tous les fichiers texte du dépôt étaient déjà en LF, l'attribut fige donc l'état existant sans rien réécrire, et empêche la conversion au checkout Windows. Aucun fichier du projet n'exige de CRLF.
+
+**Étape 2 — faite.** Deux gestionnaires étaient touchés, et non trois : `pages.ts` délègue à `staticHandler.serve()`, ses treize échecs n'étaient qu'un symptôme. `static-handler.ts` et `custom-css.ts` reçoivent chacun un `resolveCanonicalRoot()` — `realpath` sur la racine, résolu une fois puis mémorisé, avec repli sur la racine brute si elle n'existe pas encore. Les deux côtés de la comparaison sont désormais canoniques.
+
+Le défaut a été **reproduit sous Linux avant d'être corrigé** : une racine atteinte par un lien symbolique produit exactement l'écart du nom court `RUNNER~1`. Deux tests neufs le figent, dont un qui vérifie que la garde n'a pas été relâchée au passage — élargir ce qui est accepté est le risque propre à ce genre de correction.
+
+**Étape 3 — faite.** Trois familles de tests, corrigées sans rien affaiblir de ce qu'ils vérifient :
+
+- **Chemins POSIX écrits en dur** (`/srv/chronocast/public`, `/app/dist/public`) : passés par `resolve()`, qui leur donne la forme de la plateforme. Sous Linux le résultat est identique, sous Windows la lettre de lecteur cesse de faire diverger l'attendu et l'obtenu. C'est plus proche du réel de toute façon : ces racines viennent d'un `PathProvider`, jamais d'un littéral.
+- **URL `file:///app/...`** : construites par `pathToFileURL(resolve(...))`. Une URL de fichier sans lettre de lecteur n'est pas valide sous Windows et `fileURLToPath` y lève — le code de production n'a jamais été en cause, il reçoit un vrai `import.meta.url`.
+- **Assertions de permissions POSIX** : conditionnées par `it.skip` sous Windows, où `stat` rend `0o666` quoi qu'on demande. Le commentaire de ces tests disait déjà « sans effet réel sous Windows » ; l'assertion, elle, l'exigeait quand même. La protection des secrets y vient de DPAPI, pas d'un bit de permission.
+
+**État à la fin des trois étapes.** `./scripts/dc.sh verify` vert en conteneur : **1 479 tests**, 68 fichiers, audit à zéro.
+
+**Ce qui n'est pas encore prouvé, et doit l'être avant de clore ce chantier.** Un `verify` vert en conteneur ne dit rien de Windows — c'est tout le sujet. La correction des fins de ligne, en particulier, **ne peut pas être vérifiée ici** : elle ne prendra effet qu'au prochain checkout sur un runner Windows. La seule vérification qui compte est donc un **nouveau déclenchement manuel du workflow `Release`**, dont les 33 échecs doivent avoir disparu.
+
+**Comment reprendre.** `git branch --show-current` doit afficher `fix/portabilite-windows`. Si le travail n'est pas commité, il est dans l'arbre de travail. Une fois le build Windows vert, **supprimer entièrement cette section 0** : elle n'a plus d'objet, et l'essentiel — la canonisation et les fins de ligne — est consigné dans les commentaires du code et dans le message de commit.
 
 ---
 
@@ -113,10 +157,11 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `chore/packaging-ci`**, partie d'un `main` à jour. Un commit, celui de la configuration de packaging, qui emporte aussi cette mise à jour. Les douze PR précédentes sont fusionnées en squash.
+**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. Les treize PR sont fusionnées en squash.
 
 ```
-4078cb6 chore(assets): identité visuelle définitive (#12)                    <- main
+0bc9120 chore(packaging): electron-builder et workflows GitHub (#13)          <- main
+4078cb6 chore(assets): identité visuelle définitive (#12)
 c93202f Phase 6 — Coquille Electron (#11)
 1720d70 refactor(config): retirer le mode WebSocket « separate » (#10)
 1726b53 Phase 5 : PR C - Panneau d'administration (#9)
@@ -133,16 +178,17 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 
 **1 476 tests, 68 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle et les **10** du packaging.)
 
-**Ce fichier fait partie du commit en cours**, comme les fois précédentes : la mise à jour post-fusion de la PR #12 y est intégrée. `git status` ne doit signaler aucun fichier hors de ceux du commit — `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Seule modification en attente : ce fichier.** La mise à jour post-fusion de la PR #13 a été écrite après la fusion elle-même. Comme les fois précédentes, elle partira dans le premier commit du prochain lot. `git status` ne doit signaler aucun autre fichier — `dist/`, `release/` et `PR-*.md` sont ignorés.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # chore/packaging-ci tant que sa PR n'est pas fusionnée
+git branch --show-current    # doit afficher main
+git pull --ff-only origin main
 ./scripts/dc.sh verify       # doit être intégralement vert (1 476 tests)
 ```
 
-La suite de la Phase 7 peut alors commencer, en suivant la section 8. C'est elle qui produit le premier livrable lançable : jusqu'ici, rien de ce qui a été écrit ne peut être exécuté sous Windows.
+**La suite de la Phase 7 ne commence pas par du code, mais par un clic** : déclencher manuellement le workflow `Release` pour obtenir un premier `.exe`. La marche à suivre est en section 8. Tant que ce build n'a pas tourné, rien de ce qui a été écrit n'a jamais été exécuté sous Windows.
 
 **Le changement de régime a eu lieu en Phase 6, et il vaut aussi pour la suite :** le conteneur ne vérifie plus tout. `main/main.ts`, `main/windows.ts` et `main/tray.ts` importent `electron`, qu'aucun Chromium ne peut lancer ici — ils sont nommément exclus de la couverture, et éprouver leur comportement passe par vos mains sous Windows. La parade tient en une phrase : **tout ce qui décide est extrait de la coquille en modules purs**, exactement comme `src/core/**` l'a été des ports. La Phase 7 va plus loin encore, puisqu'elle produit un artefact que seul un poste Windows peut exécuter.
 
@@ -595,7 +641,7 @@ Sans ce second mode, la seule façon de savoir si le build aboutit serait de cr�
 
 #### Ce qui reste à faire
 
-- **Éprouver le build**, par un déclenchement manuel. C'est la seule partie de la phase que rien ici ne peut vérifier. Points de vigilance connus : `npm ci --ignore-scripts` n'exécute pas le post-install d'Electron, et l'on compte sur electron-builder pour récupérer lui-même le runtime ; `assets/**` doit se retrouver dans l'archive asar ; l'installeur doit s'appeler `ChronoCast-Setup-<version>.exe`.
+- **Éprouver le build**, par un déclenchement manuel. C'est désormais la seule partie de la phase qui n'ait jamais tourné : le workflow `CI`, lui, a été exécuté sur la PR #13 et il est vert. Points de vigilance connus : `npm ci --ignore-scripts` n'exécute pas le post-install d'Electron, et l'on compte sur electron-builder pour récupérer lui-même le runtime ; `assets/**` doit se retrouver dans l'archive asar ; l'installeur doit s'appeler `ChronoCast-Setup-<version>.exe`.
 - **Valider l'installeur sur poste Windows** : installation, lancement, icône de fenêtre et de tray, `%APPDATA%\ChronoCast`, désinstallation qui conserve les données.
 - **Décider du sort de `build-win`** une fois la CI éprouvée : le garder comme confort local, ou le retirer avec son image de plusieurs gigaoctets.
 

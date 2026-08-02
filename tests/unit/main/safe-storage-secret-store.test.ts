@@ -91,6 +91,13 @@ describe('createSafeStorageSecretStore', () => {
 
   const secretsPath = (): string => join(directory, 'secrets.json');
 
+  // Windows ne connaît pas les permissions POSIX : `stat` y rend `0o666` quoi
+  // qu'on demande. L'assertion n'a donc de sens que là où le mode existe, et
+  // c'est sans conséquence : sous Windows, la protection réelle des secrets
+  // vient de DPAPI, pas d'un bit de permission.
+  const itPosix = process.platform === 'win32' ? it.skip : it;
+
+
   describe('aller-retour', () => {
     it('relit ce qu’il a écrit', async () => {
       await store.write('twitch.accessToken', 'jeton-secret');
@@ -139,7 +146,7 @@ describe('createSafeStorageSecretStore', () => {
       expect(raw).not.toContain('jeton-très-secret');
     });
 
-    it('restreint le fichier à son propriétaire', async () => {
+    itPosix('restreint le fichier à son propriétaire', async () => {
       await store.write('twitch.accessToken', 'jeton');
 
       const mode = (await stat(secretsPath())).mode & 0o777;

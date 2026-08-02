@@ -78,6 +78,24 @@ export function createCustomCssHandler(options: CustomCssHandlerOptions): Custom
     };
   }
 
+  /**
+   * Forme canonique du répertoire de données, résolue une fois puis mémorisée.
+   *
+   * Même raison que dans `static-handler.ts`, et même conséquence si on
+   * l'oublie : comparer une forme canonique — celle que rend `realpath` — à une
+   * forme qui ne l'est pas refuse tout. Sous Windows, un nom court 8.3, une
+   * jonction ou un `%APPDATA%` redirigé suffisent à produire cet écart, et la
+   * feuille personnelle de l'utilisateur ne serait jamais servie.
+   *
+   * Repli sur `root` si le répertoire n'existe pas encore : la garde reste
+   * alors exactement aussi sévère qu'auparavant.
+   */
+  let canonicalRoot: Promise<string> | null = null;
+  function resolveCanonicalRoot(): Promise<string> {
+    canonicalRoot ??= realpath(root).catch(() => root);
+    return canonicalRoot;
+  }
+
   return {
     async serve(pathname: string): Promise<HttpResponse | null> {
       if (normalize(pathname) !== ROUTE_PATH) {
@@ -92,7 +110,7 @@ export function createCustomCssHandler(options: CustomCssHandlerOptions): Custom
         // Canonisation avant tout : la composition du chemin ne voit pas les
         // liens symboliques, et c'est par là que le fichier peut sortir.
         const canonical = await realpath(filePath);
-        if (!isInside(root, canonical)) {
+        if (!isInside(await resolveCanonicalRoot(), canonical)) {
           // En `warning` : un lien sortant n'apparaît pas par hasard, et c'est
           // la seule trace dont disposera le streamer.
           scoped.warning('feuille personnelle refusée : lien sortant du répertoire de données');
