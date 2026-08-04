@@ -82,7 +82,7 @@ L'updater maison tient en quatre modules purs et un port. Toute la décision se 
 
 **Branche courante : `feat/auto-update`.** Le chantier 1 y est écrit en quatre commits. `main` est sur `67d0efb`, tag `v0.4.0`.
 
-**1 665 tests, 79 fichiers.** Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur. (1 527 à la fin de la V1, plus les **138** du chantier 1.)
+**1 667 tests, 79 fichiers.** Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur. (1 527 à la fin de la V1, plus les **140** du chantier 1.)
 
 **`npm audit` reste à zéro et aucune dépendance n'a été ajoutée** — c'est l'un des arguments de la conception, et il se vérifie mécaniquement.
 
@@ -133,6 +133,7 @@ L'application interroge GitHub au lancement puis toutes les six heures, téléch
 - **`PROTOCOL_VERSION` reste à 1.** L'ajout du message `update` et du canal du même nom est purement additif, et un overlay ancien resté ouvert dans OBS ne s'abonne pas à ce canal — il ne reçoit donc jamais un message que son union rejetterait. Le cas est traité malgré tout dans `overlay/main.ts` : un message inattendu ne doit jamais casser une page qu'OBS ne rechargera pas.
 - **`409` et non `500`** quand l'installation est demandée sans rien de prêt. Il n'y a rien de cassé, il n'y a rien à installer, et un `500` ferait chercher une panne qui n'existe pas.
 - **Le répertoire des téléchargements est vidé au démarrage.** Un `.exe` laissé là est celui d'une version déjà installée, et il pèse une centaine de mégaoctets dans le profil de l'utilisateur.
+- **Le nettoyage est attendu avant toute écriture, jamais seulement lancé.** C'est un défaut qui a réellement eu lieu : `files.clear()` était appelé en `void`, et un `rm -rf` se terminant après l'écriture effaçait l'installeur qu'on venait de vérifier — le service se déclarait prêt et le fichier n'existait plus. Il s'est manifesté par un test d'intégration rouge sur une exécution chargée, jamais en conteneur au repos. Le réglage est par ailleurs **relu juste avant d'écrire** : décocher la case pendant un téléchargement ne doit pas déposer cent mégaoctets que l'utilisateur vient de refuser. Les deux tests portent sur l'**ordre** des opérations et non sur la survie du fichier, un magasin factice ne terminant son nettoyage que sur demande — observer la survie dépendrait de l'ordonnancement des microtâches, c'est-à-dire d'un test vert quatre-vingt-dix-neuf fois sur cent.
 
 **Deux garde-fous ont fonctionné tout seuls pendant ce chantier**, et c'est ce qu'on leur demande : `fields.test.ts` est passé au rouge dès que `app.checkForUpdates` a rejoint le schéma, tant que le champ du panneau n'existait pas ; et le contrôle d'exhaustivité de TypeScript a signalé `dashboard-model.ts` et `overlay/main.ts` dès que le message `update` a rejoint l'union.
 
