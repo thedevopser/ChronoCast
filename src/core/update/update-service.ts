@@ -157,6 +157,17 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
   let timer: number | null = null;
   /** Empêche deux vérifications simultanées de se marcher dessus. */
   let running = false;
+  /**
+   * Nettoyage du répertoire en cours, s'il y en a un.
+   *
+   * Il est **retenu et attendu avant toute écriture**, jamais simplement lancé.
+   * Un `rm -rf` qui se terminait après l'écriture effaçait l'installeur qu'on
+   * venait de vérifier : le service se croyait prêt et le fichier n'existait
+   * plus. En production le premier contrôle est différé de trente secondes et
+   * la course ne se voit pas ; sous charge, et surtout si l'utilisateur coupe
+   * puis rallume le réglage pendant un téléchargement, elle se produit.
+   */
+  let cleanup: Promise<void> = Promise.resolve();
 
   function publish(next: Partial<UpdateStatus>): void {
     status = { ...status, ...next };
@@ -189,7 +200,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
   function forget(phase: UpdatePhase, message: string | null): void {
     readyPath = null;
     publish({ phase, availableVersion: null, notesUrl: null, message });
-    void files.clear().catch((error: unknown) => {
+    cleanup = files.clear().catch((error: unknown) => {
       logger.warning('nettoyage du répertoire des mises à jour impossible', { error });
     });
   }
@@ -345,6 +356,19 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       return;
     }
 
+    // Le nettoyage en cours doit être achevé avant d'écrire, sans quoi son
+    // `rm -rf` effacerait ce qu'on vient de vérifier.
+    await cleanup;
+
+    // Relu ici et pas seulement à l'entrée : l'utilisateur a pu décocher le
+    // réglage pendant le téléchargement, et déposer alors cent mégaoctets
+    // dans son profil serait lui livrer exactement ce qu'il vient de refuser.
+    if (!isEnabled()) {
+      readyPath = null;
+      publish({ phase: 'disabled', availableVersion: null, notesUrl: null, message: null });
+      return;
+    }
+
     readyPath = await files.save(candidate.installerName, bytes);
 
     logger.info('mise à jour prête à installer', { version: candidate.version });
@@ -369,8 +393,9 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       }
 
       // Un `.exe` laissé là est celui d'une version déjà installée ; il pèse
-      // une centaine de mégaoctets et ne resservira jamais.
-      void files.clear().catch((error: unknown) => {
+      // une centaine de mégaoctets et ne resservira jamais. Le nettoyage est
+      // retenu, pas seulement lancé : la première écriture l'attendra.
+      cleanup = files.clear().catch((error: unknown) => {
         logger.warning('nettoyage du répertoire des mises à jour impossible', { error });
       });
 

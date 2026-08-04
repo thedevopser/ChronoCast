@@ -149,9 +149,11 @@ interface Harness {
   enabled: boolean;
 }
 
-function createHarness(options: { routes?: Record<string, () => Response>; enabled?: boolean } = {}): Harness {
+function createHarness(
+  options: { routes?: Record<string, () => Response>; enabled?: boolean; store?: FakeStore } = {},
+): Harness {
   const timers = createManualTimers();
-  const store = createFakeStore();
+  const store = options.store ?? createFakeStore();
   const installer = createFakeInstaller();
   const statuses: UpdateStatus[] = [];
   const { fetch, calls } = createFakeFetch(options.routes ?? happyRoutes());
@@ -411,6 +413,79 @@ describe('createUpdateService', () => {
       await h.service.check();
       h.timers.fire();
 
+      expect(h.installer.launched).toEqual([]);
+    });
+  });
+
+  describe('nettoyage et téléchargement ne se marchent pas dessus', () => {
+    /**
+     * Magasin dont le nettoyage ne se termine que sur demande.
+     *
+     * C'est le seul moyen d'éprouver l'ordre de façon déterministe : le défaut
+     * d'origine ne se voyait que sous charge, et une suite verte quatre-vingt
+     * dix-neuf fois sur cent est pire qu'une suite rouge.
+     */
+    function createDeferredStore(): { store: FakeStore; finishClear: () => void } {
+      const store = createFakeStore();
+      let finish!: () => void;
+      const pending = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+
+      store.clear = () => {
+        store.cleared += 1;
+        return pending.then(() => {
+          store.saved.clear();
+        });
+      };
+
+      return { store, finishClear: finish };
+    }
+
+    it('n’écrit pas tant que le nettoyage du démarrage n’est pas terminé', async () => {
+      // Le défaut tel qu'il s'est produit : `start()` lançait `clear()` sans
+      // l'attendre, si bien qu'un `rm -rf` lent effaçait l'installeur écrit
+      // entre-temps. En production le premier contrôle est différé de trente
+      // secondes et la course ne se voyait pas ; sous charge, si.
+      //
+      // L'assertion porte sur l'**ordre** et non sur la survie du fichier :
+      // observer la survie dépendrait de l'ordonnancement des microtâches,
+      // c'est-à-dire d'un test vert quatre-vingt-dix-neuf fois sur cent — pire
+      // qu'un test rouge.
+      const { store, finishClear } = createDeferredStore();
+      const h = createHarness({ store });
+
+      h.service.start();
+      const checking = h.service.check();
+
+      // Les trois requêtes parties, le téléchargement est allé aussi loin
+      // qu'il pouvait : sans le correctif, l'écriture a déjà eu lieu ici.
+      await vi.waitFor(() => {
+        expect(h.calls).toHaveLength(3);
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(store.saved.size).toBe(0);
+
+      finishClear();
+      await checking;
+
+      expect([...store.saved.keys()]).toEqual([INSTALLER]);
+      expect(h.service.getStatus().phase).toBe('ready');
+    });
+
+    it('n’écrit rien si le réglage a été coupé pendant le téléchargement', async () => {
+      // L'autre moitié de la même course. Couper le réglage vide le
+      // répertoire ; un téléchargement déjà lancé ne doit pas y déposer un
+      // installeur juste après, sans quoi l'utilisateur se retrouverait avec
+      // cent mégaoctets qu'il vient explicitement de refuser.
+      const h = createHarness();
+
+      const checking = h.service.check();
+      h.enabled = false;
+      await checking;
+
+      expect(h.store.saved.size).toBe(0);
       expect(h.installer.launched).toEqual([]);
     });
   });
