@@ -108,8 +108,15 @@ Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre 
 | `logs/` | Journaux |
 | `history/` | Historique des événements |
 | `custom.css` | Votre feuille de style, si vous en avez une |
+| `updates/` | Installeur d'une mise à jour en attente. Vidé à chaque lancement |
 
 Désinstaller ChronoCast **ne supprime pas ce répertoire** : réinstaller vous rend votre configuration et votre compteur.
+
+**Les mises à jour.** ChronoCast vérifie au lancement, puis toutes les six heures, s'il existe une version plus récente. S'il en trouve une, il la télécharge en silence et vérifie son empreinte, puis affiche un bandeau en haut du panneau et ajoute une entrée au menu de l'icône près de l'horloge.
+
+**Rien ne s'installe tant que vous ne l'avez pas demandé.** Aucune fermeture surprise, aucun redémarrage en plein direct. Si le compteur tourne au moment où vous cliquez, ChronoCast vous demande de confirmer et vous dit exactement ce qui va se passer : l'application se ferme, l'installeur s'ouvre, puis le compteur reprend là où il en était.
+
+Le réglage **« Vérifier les mises à jour »**, dans *Paramètres*, coupe tout : plus aucune requête ne part. Il est activé par défaut. Le fichier téléchargé atterrit dans `updates\` et disparaît au lancement suivant.
 
 ## 7. Quand quelque chose ne va pas
 

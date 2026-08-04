@@ -51,6 +51,11 @@ sont embarqués dans l'application.
 Plateforme prise en charge en V1 : **Windows**. Linux et macOS sont envisagés
 pour une version ultérieure.
 
+Une fois installé, ChronoCast **vérifie lui-même** s'il existe une version plus
+récente, la télécharge et vérifie son empreinte SHA-256. **Rien ne s'installe
+sans votre clic** : aucune fermeture surprise en plein direct. La vérification
+se coupe dans les paramètres.
+
 ## Documentation
 
 | Document | Contenu |
@@ -64,6 +69,8 @@ pour une version ultérieure.
 | [docs/TESTING-TWITCH-CLI.md](docs/TESTING-TWITCH-CLI.md) | Tests avec la Twitch CLI |
 | [docs/CRASH-RECOVERY.md](docs/CRASH-RECOVERY.md) | Récupération après crash |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modèle de menace et contrôles de sécurité |
+| [docs/REPRISE-V2.md](docs/REPRISE-V2.md) | Document de reprise : état d'avancement et décisions en vigueur |
+| [docs/REPRISE.md](docs/REPRISE.md) | Archive de la V1 : les huit phases et leurs décisions |
 
 ## Développement
 

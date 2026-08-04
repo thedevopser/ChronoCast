@@ -1,8 +1,16 @@
-# ChronoCast — Document de reprise
+# ChronoCast — Document de reprise de la V1
+
+> **Ce document est clos. Il ne bouge plus.**
+>
+> Il décrit la V1, du socle d'outillage à la release `v0.4.0`, et il en est l'archive complète et exacte. Le document de reprise **vivant** est désormais **[REPRISE-V2.md](REPRISE-V2.md)** : c'est lui qu'il faut lire en premier, et lui seul qui est tenu à jour.
+>
+> Ce qui est écrit ici reste vrai **de la V1**, y compris ce que la V2 a depuis rouvert. La ligne « Aucune mise à jour automatique » du hors-périmètre de la section 4 en est l'exemple : elle décrit fidèlement ce que la V1 n'a pas fait, et la réécrire pour coller à la suite reviendrait à effacer la décision au lieu de la conserver. Les réouvertures sont consignées dans le document de la V2, avec leur date et leur raison.
+>
+> On vient ici pour comprendre **pourquoi** une chose est construite comme elle l'est. Le détail des huit phases, les quatre tentatives du cadre de l'overlay, les trois pièges du protocole EventSub, la leçon de la Phase 7 : rien de tout cela n'est répété ailleurs.
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il décrit l'objectif, ce qui est fait, ce qui reste, et toutes les règles et décisions en vigueur.
 
-**Dernière mise à jour :** 2 août 2026, sur la branche `fix/cadre-boite-de-contenu`. **Les huit phases sont terminées, et les derniers manquements connus sont corrigés.** Le produit est installé, éprouvé sur poste Windows, et documenté. La version est en **`0.4.0`**, destinée à être la première release officielle. Il ne reste aucun chantier planifié : ce qui vient désormais vient de l'usage.
+**Dernière mise à jour :** 2 août 2026, après la publication de la **release `v0.4.0`** — la première officielle. **Les huit phases sont terminées, tous les manquements connus sont corrigés, et l'installeur est publié** avec son empreinte SHA-256. Il ne reste aucun chantier planifié : ce qui vient désormais vient de l'usage.
 
 **Le produit fonctionne de bout en bout sur un vrai poste.** Le workflow `Release` produit l'installeur, l'installation aboutit, l'application démarre, se configure, se connecte à Twitch, se replie dans le tray où le compteur se lit, et sert l'overlay à OBS. **La Phase 7 n'est pas seulement écrite : tout ce que le conteneur ne pouvait pas vérifier a été éprouvé à la main.** Le détail est en section 7, sous « Validation sur poste Windows ».
 
@@ -113,10 +121,12 @@ De la même façon, `Clock` expose **deux** horloges : `now()` pour les horodata
 
 ## 6. État actuel du dépôt
 
-**Branche courante : `fix/cadre-boite-de-contenu`**, PR non fusionnée à l'heure où ces lignes sont écrites. Les vingt PR précédentes sont fusionnées en squash ; `main` est sur `310c1d2`.
+**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. Les vingt-deux PR sont fusionnées en squash, et le tag `v0.4.0` est publié.
 
 ```
-310c1d2 docs: neuf documents, retrait du packaging local (#20)              <- main
+67d0efb docs: illustrer le README de trois captures (#22)                    <- main, v0.4.0
+170096d fix(overlay): rogner le masque du cadre sur la boîte de contenu (#21)
+310c1d2 docs: neuf documents, retrait du packaging local (#20)
 c021218 fix(overlay): trait du cadre peint par soustraction (#19)
 29ac239 fix(overlay): cadre en anneau, dégradé ciblable (#18)
 0937d9b feat(overlay): cadre et dégradé (#17)
@@ -141,14 +151,17 @@ ce9b342 chore(build): mettre en place le socle d'outillage conteneurisé (#1)
 
 **1 527 tests, 72 fichiers. Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur** — y compris avec `electron` dans l'arbre. (1 339 après le retrait de la dette, plus les **118 tests** de la Phase 6, les **9** de l'identité visuelle les **10** du packaging les **3** de la portabilité Windows, les **7** du rappel OAuth, les **10** du retour dans la fenêtre les **19** du cadre et du dégradé, les **3** de la documentation et les **9** des derniers manquements.)
 
-**Rien en attente hors du travail de la branche.** `git status` ne doit signaler aucun fichier une fois celle-ci commitée — `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Seule modification en attente : ce fichier.** La mise à jour post-release a été écrite après la publication. Comme les fois précédentes, elle partira dans le premier commit du prochain lot. `git status` ne doit signaler aucun autre fichier — `dist/`, `release/` et `PR-*.md` sont ignorés.
+
+**La release `v0.4.0` est publiée** : `ChronoCast-Setup-0.4.0.exe` (96 Mio) et son `.sha256`, engendrés par le workflow `Release` sur un runner `windows-latest`. C'est la première version officielle du produit.
 
 **La version est en `0.4.0`**, à deux endroits qui doivent rester alignés : `package.json` — d'où electron-builder tire le nom de l'installeur et `app.getVersion()` — et `APP_VERSION`, désormais dans `src/core/app/version.ts` et non plus enfoui dans le point d'entrée headless. **Un test de cohérence les tient ensemble** : la suite refuse de passer si l'un des deux est oublié. La duplication a été conservée plutôt que résolue par une lecture de `package.json` à l'exécution, qui ferait reposer une valeur d'affichage sur la disposition des fichiers émis.
 
 ### Première action à la reprise
 
 ```bash
-git branch --show-current    # fix/cadre-boite-de-contenu tant que la PR n'est pas fusionnée
+git branch --show-current    # doit afficher main
+git pull --ff-only origin main
 ./scripts/dc.sh verify       # doit être intégralement vert
 ```
 

@@ -15,4 +15,4 @@
  * `productName` et d'`app.setName` : les deux valeurs doivent être modifiées
  * ensemble, et la suite refuse de passer sinon.
  */
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.5.0';

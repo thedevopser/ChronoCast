@@ -48,15 +48,18 @@ describe('parseSha256File', () => {
   const NAME = 'ChronoCast-Setup-0.5.1.exe';
   const DIGEST = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 
-  it('lit la sortie de `sha256sum` en mode texte', () => {
-    // Deux espaces : c'est ce que produit le workflow `Release`.
-    expect(parseSha256File(`${DIGEST}  ${NAME}\n`, NAME)).toBe(DIGEST);
+  it('lit la sortie de `sha256sum` en mode binaire', () => {
+    // Espace puis astérisque : c'est ce que le workflow `Release` produit
+    // réellement, `sha256sum` s'y exécutant sous Git Bash sur un runner
+    // Windows, où le mode binaire est le défaut. Vérifié sur le `.sha256`
+    // publié avec la `v0.4.0`.
+    expect(parseSha256File(`${DIGEST} *${NAME}\n`, NAME)).toBe(DIGEST);
   });
 
-  it('lit la sortie de `sha256sum` en mode binaire', () => {
-    // Espace puis astérisque. Le workflow n'en produit pas, mais un condensat
-    // recalculé à la main sous Windows, si.
-    expect(parseSha256File(`${DIGEST} *${NAME}\n`, NAME)).toBe(DIGEST);
+  it('lit la sortie de `sha256sum` en mode texte', () => {
+    // Deux espaces : ce que produit un `sha256sum` sous Linux. Le workflow
+    // n'en produit pas, mais un condensat recalculé à la main, si.
+    expect(parseSha256File(`${DIGEST}  ${NAME}\n`, NAME)).toBe(DIGEST);
   });
 
   it('accepte un condensat écrit en majuscules et le rend en minuscules', () => {

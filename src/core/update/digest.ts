@@ -26,9 +26,12 @@ export function sha256Hex(bytes: Uint8Array): string {
  * Une ligne de `sha256sum` : le condensat, un séparateur, le nom du fichier.
  *
  * Le séparateur est de deux espaces en mode texte et d'un espace suivi d'une
- * astérisque en mode binaire. Le workflow `Release` produit le premier ; le
- * second arrive dès que quelqu'un recalcule le condensat sous Windows, et le
- * refuser ne protégerait de rien.
+ * astérisque en mode binaire. **Le workflow `Release` produit le second** :
+ * `sha256sum` s'y exécute sous Git Bash, sur un runner Windows, où le mode
+ * binaire est le défaut — vérifié sur le `.sha256` réellement publié avec la
+ * `v0.4.0`. Les deux formes sont acceptées quand même : un condensat
+ * recalculé à la main sous Linux produit la première, et la refuser ne
+ * protégerait de rien.
  */
 const DIGEST_LINE = /^([0-9a-fA-F]{64})[ \t]+\*?(.+)$/;
 
