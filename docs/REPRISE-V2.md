@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il est **vivant** : il est mis à jour à chaque lot, et il fait foi.
 
-**Dernière mise à jour :** 4 août 2026, sur la branche `feat/auto-update`. Le chantier 1 — la mise à jour automatique — est écrit et vert en conteneur. La version est en **`0.5.0`**, non encore publiée.
+**Dernière mise à jour :** 4 août 2026, sur la branche `feat/auto-update`. Le chantier 1 — la mise à jour automatique — est **livré et éprouvé sur un vrai poste Windows**. La version est en **`0.5.0`**, prête à être publiée.
 
 **La V1 est terminée et publiée.** Son document de reprise, [REPRISE.md](REPRISE.md), est **clos** : il reste l'archive complète des huit phases, de la release `v0.4.0` et de tout ce qui a été décidé en chemin. On y va pour comprendre pourquoi une chose est construite comme elle l'est — les trois pièges du protocole EventSub, les quatre tentatives du cadre de l'overlay, la leçon de la Phase 7. Rien de tout cela n'est répété ici.
 
@@ -99,7 +99,7 @@ git branch --show-current
 
 ## 6. Chantiers
 
-### Chantier 1 — Mise à jour automatique — **écrit, non encore éprouvé sous Windows**
+### Chantier 1 — Mise à jour automatique — **livrée et éprouvée**
 
 L'application interroge GitHub au lancement puis toutes les six heures, télécharge la nouvelle version en tâche de fond, vérifie son empreinte, et propose son installation par un bandeau dans le panneau et une entrée dans le menu du tray. **Rien ne s'installe sans un clic délibéré.**
 
@@ -136,6 +136,14 @@ L'application interroge GitHub au lancement puis toutes les six heures, téléch
 
 **Deux garde-fous ont fonctionné tout seuls pendant ce chantier**, et c'est ce qu'on leur demande : `fields.test.ts` est passé au rouge dès que `app.checkForUpdates` a rejoint le schéma, tant que le champ du panneau n'existait pas ; et le contrôle d'exhaustivité de TypeScript a signalé `dashboard-model.ts` et `overlay/main.ts` dès que le message `update` a rejoint l'union.
 
+**Un détail vérifié sur le fichier réellement publié, et qui aurait pu coûter cher :** le `.sha256` attaché aux releases est en **mode binaire** — un espace puis une astérisque avant le nom — et non en mode texte. `sha256sum` s'exécute sous Git Bash sur un runner Windows, où c'est le défaut. Les deux formes étaient acceptées par chance autant que par prudence ; le commentaire du code, lui, affirmait l'inverse et a été corrigé.
+
+#### Validation sur poste Windows — faite
+
+**Le parcours complet a été éprouvé par l'utilisateur le 4 août 2026**, selon la méthode décrite en section 7 : un installeur bâti en `0.3.9` depuis une branche jetable, installé sur le poste, y a vu la `0.4.0` publiée, l'a téléchargée, en a vérifié l'empreinte, a affiché le bandeau, et l'a installée sur clic.
+
+**Ce que cela règle :** tout ce que le conteneur ne pouvait pas montrer a tourné pour de vrai — le `spawn` détaché, l'écriture d'une centaine de mégaoctets dans `%APPDATA%`, l'extinction propre, l'assistant NSIS écrasant une installation existante, et la relance. Le pari du chantier se vérifie une fois de plus : la seule pièce non couverte par les tests tenait en cinq lignes, et rien n'a dû y être corrigé après coup.
+
 ### Chantiers suivants
 
 Aucun n'est décidé. Voir la section 9 pour ce qui a été évoqué sans être tranché.
@@ -144,7 +152,7 @@ Aucun n'est décidé. Voir la section 9 pour ce qui a été évoqué sans être 
 
 ## 7. Ce que le conteneur ne vérifie pas
 
-**Un `verify` vert en conteneur ne dit rien de Windows.** C'est la leçon de la Phase 7 — 33 tests tombés sur le runner Windows alors que la suite était verte en conteneur Linux depuis des mois — et le chantier 1 l'élargit :
+**Un `verify` vert en conteneur ne dit rien de Windows.** C'est la leçon de la Phase 7 — 33 tests tombés sur le runner Windows alors que la suite était verte en conteneur Linux depuis des mois — et le chantier 1 l'élargit. **Il a été éprouvé sur poste et rien n'a dû être corrigé**, mais la méthode reste ici parce qu'elle resservira au chantier suivant :
 
 - il **lance un processus** : `spawn` détaché, `unref`, puis extinction. Rien de tout cela ne s'observe ici ;
 - il **écrit dans `%APPDATA%`** un fichier d'une centaine de mégaoctets, puis le rend exécutable par Windows ;
