@@ -659,6 +659,48 @@
   color: var(--cc-success);
 }
 
+/* Bandeau de mise à jour.
+   Distinct de `.banner`, qui porte les messages transitoires d'enregistrement :
+   celui-ci persiste tant qu'une version attend, et vit dans la coquille plutôt
+   que dans une vue — une mise à jour n'appartient à aucune. */
+.update {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cc-space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 var(--cc-space-3);
+  padding: var(--cc-space-3);
+  border: var(--cc-border-width) solid var(--cc-accent);
+  border-radius: var(--cc-radius);
+  background: var(--cc-accent-soft);
+}
+
+.update[hidden] {
+  display: none;
+}
+
+.update--error {
+  border-color: var(--cc-danger);
+  background: var(--cc-danger-soft);
+}
+
+.update__text {
+  margin: 0;
+  flex: 1 1 20rem;
+  font-size: var(--cc-text-sm);
+}
+
+.update__actions {
+  display: flex;
+  gap: var(--cc-space-3);
+  align-items: center;
+}
+
+.update__notes[hidden] {
+  display: none;
+}
+
 .note {
   margin: var(--cc-space-2) 0 0;
   color: var(--cc-text-faint);

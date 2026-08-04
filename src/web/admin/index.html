@@ -59,6 +59,24 @@
       </aside>
 
       <main class="content">
+        <!--
+          Mise à jour disponible. Distinct de `#banner`, qui porte les messages
+          transitoires d'enregistrement : les faire cohabiter dans le même
+          élément ferait effacer l'annonce de mise à jour au premier réglage
+          modifié. Il vit dans la coquille et non dans une vue, parce qu'une
+          mise à jour n'appartient à aucune et doit se voir depuis toutes.
+          Peuplé par `main.ts` via `safe-dom`, jamais écrit ici.
+        -->
+        <aside class="update" id="update" hidden>
+          <p class="update__text" id="update-text"></p>
+          <div class="update__actions">
+            <a class="update__notes" id="update-notes" target="_blank" rel="noreferrer noopener" hidden
+              >Notes de version</a
+            >
+            <button class="button" id="update-action" type="button"></button>
+          </div>
+        </aside>
+
         <p class="banner" id="banner" hidden></p>
 
         <!-- Tableau de bord -->

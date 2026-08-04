@@ -92,7 +92,10 @@ import { requiredScopes } from '../twitch/subscription-plan.js';
 import { createTokenStore, type TokenStore } from '../twitch/token-store.js';
 import type { AppEvents, TwitchStatusPayload } from './app-events.js';
 import { createEventBus, type EventBus } from './event-bus.js';
-import type { BrowserOpener, Clock, PathProvider, SecretStore } from './ports.js';
+import type { BrowserOpener, Clock, PathProvider, SecretStore, UpdateInstaller } from './ports.js';
+import { UPDATE_REPOSITORY } from '../update/repository.js';
+import { createUpdateService, type UpdateService } from '../update/update-service.js';
+import { createFsUpdateStore } from '../update/update-store.js';
 
 /**
  * Port fixe du serveur de rappel OAuth.
@@ -156,6 +159,17 @@ export interface Application {
   readonly counter: CounterService;
   readonly history: EventHistoryService;
 
+  /**
+   * Mise à jour automatique.
+   *
+   * Toujours présente, même quand le point d'entrée n'a pas de port
+   * d'installation : elle rend alors l'état `unsupported`, ce que les routes
+   * d'API et le panneau savent afficher. Une propriété qui apparaît et
+   * disparaît selon le point d'entrée obligerait chaque appelant à s'en
+   * souvenir.
+   */
+  readonly update: UpdateService;
+
   /** Jeton anti-CSRF de la session en cours. */
   getCsrfToken(): string;
 
@@ -215,6 +229,16 @@ export interface ApplicationOptions {
    * parallèle sur la même machine.
    */
   readonly createOAuthServer?: (router: Router) => ArmableServer;
+
+  /**
+   * Port de lancement de l'installeur d'une mise à jour.
+   *
+   * Absent — c'est le cas du point d'entrée headless, qui n'est ni packagé ni
+   * installé — le service de mise à jour reste inerte : il n'interroge rien et
+   * n'arme aucun minuteur. Proposer une mise à jour qu'on ne saurait pas
+   * appliquer serait une promesse en l'air.
+   */
+  readonly updateInstaller?: UpdateInstaller;
 }
 
 export function createApplication(options: ApplicationOptions): Application {
@@ -229,6 +253,7 @@ export function createApplication(options: ApplicationOptions): Application {
     createSocket,
     fetch: fetchImpl,
     sleep,
+    updateInstaller = null,
   } = options;
 
   const redactor: Redactor = createRedactor();
@@ -299,6 +324,32 @@ export function createApplication(options: ApplicationOptions): Application {
       logger: logger.child('config-store'),
     }),
     logger: logger.child('config'),
+  });
+
+  /* ---------------------------------------------------------------------- */
+  /* Mise à jour automatique                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  const updateService: UpdateService = createUpdateService({
+    currentVersion: appVersion,
+    owner: UPDATE_REPOSITORY.owner,
+    repo: UPDATE_REPOSITORY.repo,
+    fetch: fetchImpl,
+    // Les mêmes minuteurs que le client EventSub : ce sont ceux du runtime
+    // Node, tous `unref`és, et le service ne doit pas retenir la boucle
+    // d'événements six heures durant.
+    timers: eventSubTimers,
+    clock,
+    files: createFsUpdateStore(paths),
+    installer: updateInstaller,
+    logger,
+    // Relu à chaque décision plutôt que capturé : le réglage change à chaud
+    // depuis le panneau, et une valeur figée au démarrage ferait mentir la
+    // case à cocher.
+    isEnabled: () => configService.get().app.checkForUpdates,
+    onStatus: (status) => {
+      bus.emit('update:status', status);
+    },
   });
 
   const counterService: CounterService = createCounterService({
@@ -669,6 +720,7 @@ export function createApplication(options: ApplicationOptions): Application {
       history,
       logs: ringBuffer,
       twitch: twitchApi,
+      update: updateService,
       getPort: currentPort,
       appVersion,
       applyManualEvent: (event) => applyDomainEvent(event),
@@ -747,6 +799,7 @@ export function createApplication(options: ApplicationOptions): Application {
     config: configService,
     counter: counterService,
     history,
+    update: updateService,
 
     getCsrfToken: () => csrfToken,
     getPort: currentPort,
@@ -801,6 +854,10 @@ export function createApplication(options: ApplicationOptions): Application {
       configService.onChange(() => {
         logger.setLevel(configService.get().logging.level);
         hub.publishConfig();
+        // Le réglage de mise à jour se coupe et se rallume à chaud : sans ce
+        // rappel, décocher la case laisserait le minuteur armé et cocher ne
+        // relancerait rien avant le prochain démarrage.
+        updateService.refresh();
       });
 
       await counterService.start();
@@ -824,6 +881,11 @@ export function createApplication(options: ApplicationOptions): Application {
         scoped.error('chaîne Twitch non démarrée', { cause: error });
       });
 
+      // En dernier, et sans rien attendre : la première vérification est de
+      // toute façon différée, et le service ne doit disputer le démarrage ni à
+      // l'overlay ni au panneau.
+      updateService.start();
+
       scoped.info('ChronoCast démarré', {
         port,
         overlay: `http://${config.server.host}:${String(port)}/overlay`,
@@ -836,6 +898,7 @@ export function createApplication(options: ApplicationOptions): Application {
       // Un port de rappel laissé ouvert après extinction est une surface
       // offerte pour rien : plus personne n'attend de rappel.
       await oauthCallbackServer.disarm();
+      updateService.stop();
       await stopTwitch();
       await wsAdapter.close();
       hub.stop();
