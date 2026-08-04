@@ -233,10 +233,31 @@ describe('app', () => {
     expect(configSchema.parse({}).app.startMinimized).toBe(false);
   });
 
-  it('retient les deux réglages', () => {
-    const parsed = configSchema.parse({ app: { launchAtStartup: true, startMinimized: true } });
+  it('retient les trois réglages', () => {
+    const parsed = configSchema.parse({
+      app: { launchAtStartup: true, startMinimized: true, checkForUpdates: false },
+    });
 
-    expect(parsed.app).toStrictEqual({ launchAtStartup: true, startMinimized: true });
+    expect(parsed.app).toStrictEqual({
+      launchAtStartup: true,
+      startMinimized: true,
+      checkForUpdates: false,
+    });
+  });
+
+  it('vérifie les mises à jour par défaut', () => {
+    // Un compteur de subathon tourne pendant des jours chez quelqu'un qui
+    // n'ouvre pas GitHub : laisser la vérification éteinte par défaut
+    // reviendrait à ne jamais corriger personne. Rien ne s'installe pour
+    // autant sans un clic — c'est l'installation qui protège le direct, pas la
+    // vérification.
+    expect(configSchema.parse({}).app.checkForUpdates).toBe(true);
+  });
+
+  it('laisse couper toute communication sortante vers GitHub', () => {
+    // Le seul trafic sortant du produit en dehors de Twitch. Il doit être
+    // refusable, et le rester : c'est ce que promet le modèle de menace.
+    expect(configSchema.parse({ app: { checkForUpdates: false } }).app.checkForUpdates).toBe(false);
   });
 
   it('n’expose aucun réglage de fermeture vers le tray', () => {
