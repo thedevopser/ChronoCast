@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { INSTALLER_PREFIX } from '../../../src/core/update/release-feed.js';
+
 /**
  * Cohérence de la configuration de packaging.
  *
@@ -83,6 +85,19 @@ describe('electron-builder.yml', () => {
     const config = await read('electron-builder.yml');
 
     expect(config).toContain('perMachine: false');
+  });
+
+  it('nomme l’installeur exactement comme l’updater le cherche', async () => {
+    // `release-feed.ts` compose le nom de l'asset qu'il attend sur une release
+    // — `ChronoCast-Setup-<version>.exe` — et ne retient que celui-là, pour
+    // qu'un artefact étranger déposé sur la release ne puisse pas s'y
+    // substituer. Renommer l'artefact ici rendrait donc **toutes les releases
+    // suivantes invisibles** à la mise à jour automatique, sans la moindre
+    // erreur : les postes installés chercheraient un fichier qui n'existe plus
+    // et concluraient tranquillement qu'ils sont à jour.
+    const config = await read('electron-builder.yml');
+
+    expect(config).toContain(`artifactName: ${INSTALLER_PREFIX}\${version}.\${ext}`);
   });
 
   it('ne publie rien depuis le build', async () => {
