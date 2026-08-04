@@ -98,14 +98,42 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Les scripts d'outillage sont sans dépendance.** La préparation des icônes décode et réencode le PNG en une centaine de lignes de bibliothèque standard plutôt que de tirer une bibliothèque d'images, son arbre transitif et ses binaires natifs — pour un travail qu'on fait trois fois dans la vie du projet.
 
-## 8. Ce que ChronoCast ne fait pas
+## 8. La mise à jour automatique
+
+Depuis la `0.5.0`, ChronoCast interroge GitHub pour savoir s'il existe une version plus récente, télécharge l'installeur en tâche de fond et **propose** son installation. Il ne l'installe jamais de lui-même.
+
+### Ce que cela change dans le trafic sortant
+
+Deux hôtes s'ajoutent à ceux de Twitch : **`api.github.com`** et **`objects.githubusercontent.com`**, en HTTPS. Les requêtes ne portent **ni jeton ni identifiant** — l'API publique des releases n'en demande pas — et il en part quatre par jour. Ce que GitHub peut en déduire se limite à une adresse IP et à la version installée, que le `User-Agent` annonce.
+
+Le réglage **« Vérifier les mises à jour »**, dans *Paramètres*, coupe entièrement ce trafic. Il est activé par défaut : un correctif qui ne parvient à personne ne corrige rien.
+
+### SmartScreen ne protège pas ce chemin, et c'est le point important
+
+Le binaire n'est pas signé — un certificat coûte plusieurs centaines d'euros par an. Mais surtout : **le fichier téléchargé par ChronoCast ne porte aucune *Mark of the Web***. Windows n'écrit ce flux alternatif `Zone.Identifier` que lorsqu'un navigateur ou un client de messagerie dépose le fichier ; un téléchargement fait par l'application ne le reçoit pas. **SmartScreen ne se déclenchera donc jamais sur cet installeur, altéré ou non.**
+
+Deux contrôles compensent, et ils sont indépendants.
+
+**Le condensat SHA-256.** Le workflow `Release` publie un `.sha256` à côté de chaque installeur. ChronoCast le télécharge **avant** l'installeur, vérifie qu'il désigne bien le fichier attendu — un condensat valide portant sur un autre artefact validerait n'importe quoi — puis compare l'empreinte des octets reçus. **Rien n'est écrit sur le disque avant cette vérification** : les octets restent en mémoire, et un installeur non vérifié n'existe jamais sous forme de fichier. Discordance : tout est jeté, l'incident est journalisé, rien n'est lancé.
+
+**Le contrôle d'URL.** Les adresses de téléchargement sont **analysées**, jamais comparées par préfixe, et doivent mener exactement à l'artefact attendu du dépôt `thedevopser/ChronoCast`. C'est ce qui empêche une réponse d'API contrefaite d'envoyer le téléchargement ailleurs. `https://github.com@evil.test/…` commence par la bonne chaîne et ne va pas du tout au bon endroit : `hostname` ignore l'identifiant qui précède l'arobase.
+
+Le dépôt source est une **constante du code, jamais un réglage**. Le rendre configurable donnerait à qui saurait écrire dans le fichier de configuration la capacité de faire télécharger et lancer un exécutable arbitraire — c'est-à-dire transformerait un réglage en exécution de code.
+
+**L'asset est cherché par son nom exact**, déduit de la version, et non pris parmi les `.exe` de la release : un artefact étranger déposé sur une release ne peut pas se substituer à l'installeur.
+
+### Ce qui protège le direct
+
+**Rien ne s'installe sans un clic.** Installer ferme l'application ; le faire d'autorité pendant un subathon coûterait le stream. Quand le compteur tourne, le panneau demande en plus une confirmation qui dit ce qui va se passer. L'arrêt passe par le chemin propre, celui qui écrit le dernier état du compteur avant de sortir.
+
+## 9. Ce que ChronoCast ne fait pas
 
 - **Aucune télémétrie**, aucune statistique d'usage, aucun rapport de crash envoyé.
-- **Aucune connexion sortante autre que Twitch** : `id.twitch.tv`, `api.twitch.tv`, `eventsub.wss.twitch.tv`.
+- **Aucune connexion sortante** en dehors de Twitch — `id.twitch.tv`, `api.twitch.tv`, `eventsub.wss.twitch.tv` — et de GitHub pour les mises à jour, désactivable.
 - **Aucun webhook**, donc aucun nom de domaine ni port ouvert sur Internet.
-- **Aucune mise à jour automatique** : c'est vous qui téléchargez un installeur.
+- **Aucune installation automatique** : une mise à jour est proposée, jamais appliquée sans votre accord.
 
-## 9. La suite de tests de sécurité
+## 10. La suite de tests de sécurité
 
 | Fichier | Ce qu'il défend |
 | --- | --- |
@@ -120,6 +148,6 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 Ces tests emploient de vraies charges hostiles, et ils tournent dans un vrai parseur HTML : un faux `document` prouverait qu'on a appelé `textContent`, pas qu'aucun script n'a été exécuté.
 
-## 10. Signaler une faille
+## 11. Signaler une faille
 
 Ouvrez une issue sur [le dépôt](https://github.com/TheDevOpser/ChronoCast/issues). ChronoCast est une application locale sans service en ligne : il n'y a pas d'infrastructure à compromettre, et donc pas de divulgation coordonnée à organiser. Décrivez ce que vous avez trouvé, c'est le plus utile.

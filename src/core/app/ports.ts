@@ -94,3 +94,23 @@ export interface Clock {
 export interface BrowserOpener {
   open(url: string): Promise<void>;
 }
+
+/**
+ * Lancement de l'installeur d'une mise à jour déjà téléchargée et vérifiée.
+ *
+ * Le seul geste de la mise à jour que le noyau ne peut pas faire lui-même, et
+ * il est irréductible : NSIS ne peut pas écraser un exécutable en cours
+ * d'exécution. L'implémentation doit donc lancer un processus **détaché** — un
+ * enfant ordinaire mourrait avec son parent — puis terminer l'application, et
+ * la terminer **proprement**, faute de quoi le dernier état du compteur ne
+ * serait pas sur le disque au moment où la nouvelle version le relira.
+ *
+ * Ce port est **facultatif**. Le point d'entrée headless n'en fournit aucun : il
+ * n'est ni packagé ni installé, et proposer une mise à jour qu'il ne saurait
+ * pas appliquer serait une promesse en l'air. Son absence désarme le service
+ * entier plutôt que de lui faire afficher un bouton sans effet.
+ */
+export interface UpdateInstaller {
+  /** Lance l'installeur désigné, puis termine l'application. */
+  run(installerPath: string): Promise<void>;
+}

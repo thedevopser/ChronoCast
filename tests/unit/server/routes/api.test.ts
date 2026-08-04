@@ -360,4 +360,57 @@ describe('createApiRoutes', () => {
       expect(event.userName.length).toBeLessThanOrEqual(64);
     });
   });
+
+  describe('mise à jour', () => {
+    /** Place le service dans l'état où une version vérifiée attend un clic. */
+    function makeReady(): void {
+      doubles.updateStatus = {
+        phase: 'ready',
+        currentVersion: '0.1.0',
+        availableVersion: '0.5.1',
+        notesUrl: 'https://github.com/thedevopser/ChronoCast/releases/tag/v0.5.1',
+        message: null,
+        checkedAt: 1_700_000_000_000,
+      };
+    }
+
+    it('renvoie l’état courant', async () => {
+      const response = await call('GET', '/api/update');
+
+      expect(response.status).toBe(200);
+      expect(body(response)).toMatchObject({ phase: 'idle', currentVersion: '0.1.0' });
+    });
+
+    it('déclenche une vérification à la demande', async () => {
+      const response = await call('POST', '/api/update/check');
+
+      expect(response.status).toBe(200);
+      expect(doubles.calls).toContain('update.check');
+    });
+
+    it('lance l’installation quand une version est prête', async () => {
+      makeReady();
+
+      const response = await call('POST', '/api/update/install');
+
+      expect(response.status).toBe(204);
+      expect(doubles.calls).toContain('update.install');
+    });
+
+    it('refuse l’installation quand rien n’est prêt, en 409', async () => {
+      // Un `500` dirait « le serveur est cassé » là où la vérité est « il n'y
+      // a rien à installer ». La distinction se lit dans le panneau.
+      const response = await call('POST', '/api/update/install');
+
+      expect(response.status).toBe(409);
+    });
+
+    it('n’installe rien tant que le service n’est pas prêt', async () => {
+      await call('POST', '/api/update/install');
+
+      // L'appel est bien transmis — c'est le service qui décide, pas la route —
+      // mais rien ne s'installe, et l'utilisateur reçoit un refus explicite.
+      expect(body(await call('GET', '/api/update'))['phase']).toBe('idle');
+    });
+  });
 });

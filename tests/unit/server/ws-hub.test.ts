@@ -355,6 +355,48 @@ describe('createWsHub', () => {
 
       expect(messagesOfType(client, 'pong')).toHaveLength(1);
     });
+
+    it('ne pousse pas l’état des mises à jour à l’overlay', () => {
+      // L'overlay ne demande que le compteur. Une mise à jour disponible n'a
+      // rien à faire sur la scène OBS : elle s'affiche dans le panneau, pas
+      // devant les spectateurs.
+      client.receive(JSON.stringify({ type: 'subscribe', channels: ['counter'] }));
+
+      bus.emit('update:status', {
+        phase: 'ready',
+        currentVersion: '0.5.0',
+        availableVersion: '0.5.1',
+        notesUrl: null,
+        message: null,
+        checkedAt: null,
+      });
+
+      expect(messagesOfType(client, 'update')).toHaveLength(0);
+    });
+  });
+
+  describe('mises à jour', () => {
+    beforeEach(() => {
+      hub.accept(client.socket, {});
+    });
+
+    it('diffuse chaque changement d’état de la mise à jour', () => {
+      bus.emit('update:status', {
+        phase: 'ready',
+        currentVersion: '0.5.0',
+        availableVersion: '0.5.1',
+        notesUrl: 'https://github.com/thedevopser/ChronoCast/releases/tag/v0.5.1',
+        message: null,
+        checkedAt: 1_700_000_000_000,
+      });
+
+      const [message] = messagesOfType(client, 'update');
+
+      expect(message).toMatchObject({
+        type: 'update',
+        status: { phase: 'ready', availableVersion: '0.5.1' },
+      });
+    });
   });
 
   describe('messages entrants hostiles', () => {

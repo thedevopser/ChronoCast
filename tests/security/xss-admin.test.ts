@@ -161,4 +161,18 @@ describe('ressources', () => {
       expect(link.getAttribute('href')?.startsWith('https://')).toBe(true);
     }
   });
+
+  it('neutralise d’avance le lien des notes de version', () => {
+    // Ce lien est le seul du panneau dont le `href` vient du **réseau** : il
+    // est posé à l'exécution depuis la charge utile de GitHub. Le gabarit ne
+    // porte donc aucune adresse, mais il porte déjà les attributs qui
+    // protègent — les poser dans le code aurait mis à un endroit de plus une
+    // garantie qu'on veut voir d'un coup d'œil.
+    const notes = parsed.querySelector('#update-notes');
+
+    expect(notes).not.toBeNull();
+    expect(notes?.hasAttribute('href')).toBe(false);
+    expect(notes?.getAttribute('rel')).toContain('noreferrer');
+    expect(notes?.getAttribute('rel')).toContain('noopener');
+  });
 });

@@ -21,6 +21,7 @@ import type { OverlayConfig } from '../config/schema.js';
 import type { CounterState } from '../counter/counter-state.js';
 import type { DomainEvent } from '../events/domain-event.js';
 import type { LogRecord } from '../logging/logger.js';
+import type { UpdateStatus } from '../update/update-service.js';
 
 /**
  * Version du protocole.
@@ -39,7 +40,7 @@ export const PROTOCOL_VERSION = 1;
  * d'administration prend tout. Sans ce filtre, chaque ligne de journal serait
  * poussée vers OBS, qui n'en fait rien.
  */
-export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch'] as const;
+export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'update'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 /** Abonnement par défaut : tout, tant que le client n'a rien demandé de précis. */
@@ -121,6 +122,18 @@ export interface ErrorMessage {
   readonly message: string;
 }
 
+/**
+ * État de la mise à jour automatique.
+ *
+ * Diffusé à chaque transition. Le panneau en fait un bandeau ; l'overlay ne le
+ * reçoit jamais, puisqu'il ne s'abonne qu'à `counter`, `event` et `config` —
+ * une mise à jour disponible n'a rien à faire devant les spectateurs.
+ */
+export interface UpdateMessage {
+  readonly type: 'update';
+  readonly status: UpdateStatus;
+}
+
 export type ServerMessage =
   | HelloMessage
   | StateMessage
@@ -129,6 +142,7 @@ export type ServerMessage =
   | EventMessage
   | LogMessage
   | ConfigMessage
+  | UpdateMessage
   | PongMessage
   | ErrorMessage;
 
@@ -145,6 +159,8 @@ export function channelOf(message: ServerMessage): Channel | null {
       return 'config';
     case 'twitch:status':
       return 'twitch';
+    case 'update':
+      return 'update';
     // `hello`, `state`, `pong` et `error` sont adressés, jamais filtrés : les
     // retenir laisserait un client sans réponse à sa propre demande.
     case 'hello':

@@ -44,6 +44,42 @@ describe('buildTrayMenu', () => {
     expect(items[quitIndex - 1]?.kind).toBe('separator');
   });
 
+  describe('mise à jour disponible', () => {
+    it('n’apparaît pas tant qu’aucune version n’est prête', () => {
+      // Une entrée permanente et grisée ferait croire à une fonction en panne.
+      // Elle n'existe que lorsqu'il y a quelque chose à installer.
+      const commands = buildTrayMenu(base)
+        .filter((item) => item.kind === 'command')
+        .map((item) => item.id);
+
+      expect(commands).not.toContain('install-update');
+    });
+
+    it('apparaît, en nommant la version, quand une mise à jour est prête', () => {
+      const item = buildTrayMenu({ ...base, updateVersion: '0.5.1' }).find(
+        (entry) => entry.kind === 'command' && entry.id === 'install-update',
+      );
+
+      expect(item).toMatchObject({ enabled: true });
+      expect(item && 'label' in item ? item.label : '').toContain('0.5.1');
+    });
+
+    it('se place avant le séparateur qui isole la sortie', () => {
+      // Installer ferme l'application, comme quitter. Les deux doivent rester
+      // distincts : « installer » est une action qu'on veut, « quitter » une
+      // action qu'on regrette si on la clique par erreur.
+      const items = buildTrayMenu({ ...base, updateVersion: '0.5.1' });
+      const updateIndex = items.findIndex(
+        (item) => item.kind === 'command' && item.id === 'install-update',
+      );
+      const quitIndex = items.findIndex((item) => item.kind === 'command' && item.id === 'quit');
+
+      expect(updateIndex).toBeGreaterThan(-1);
+      expect(updateIndex).toBeLessThan(quitIndex);
+      expect(items[quitIndex - 1]?.kind).toBe('separator');
+    });
+  });
+
   describe('copie de l’URL de l’overlay', () => {
     it('est active lorsque le serveur écoute', () => {
       const copy = buildTrayMenu(base).find(

@@ -177,9 +177,15 @@ function start(): void {
 
       case 'twitch:status':
       case 'log':
+      case 'update':
       case 'pong':
       case 'error':
         // Rien à afficher : l'overlay ne montre que le compteur et ses bulles.
+        // Le cas `update` ne devrait même pas arriver — l'overlay ne s'abonne
+        // pas à ce canal, et une mise à jour disponible n'a rien à faire
+        // devant les spectateurs. Il est traité malgré tout, parce qu'un
+        // message inattendu ne doit jamais casser une page qu'OBS ne
+        // rechargera pas.
         break;
     }
   }

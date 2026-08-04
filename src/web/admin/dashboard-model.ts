@@ -142,10 +142,13 @@ export function applyMessage(model: DashboardModel, message: ServerMessage): Das
 
     case 'config':
     case 'log':
+    case 'update':
     case 'pong':
     case 'error':
       // Rien à retenir ici : l'apparence appartient à la vue *apparence*, les
-      // journaux à la vue *journaux*, et un `pong` ne dit rien de l'état.
+      // journaux à la vue *journaux*, la mise à jour au bandeau de la coquille
+      // — elle ne dépend d'aucune vue et doit se voir depuis toutes —, et un
+      // `pong` ne dit rien de l'état.
       return model;
   }
 }

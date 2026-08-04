@@ -393,6 +393,14 @@ const SETTINGS_FIELDS: readonly AdminField[] = [
     kind: 'boolean',
   },
   {
+    selector: '#app-check-for-updates',
+    path: 'app.checkForUpdates',
+    label: 'Vérifier les mises à jour',
+    hint: 'Interroge GitHub au lancement puis toutes les six heures. Rien ne s’installe sans votre clic. Décocher coupe la seule communication sortante autre que Twitch.',
+    view: 'settings',
+    kind: 'boolean',
+  },
+  {
     selector: '#counter-initial',
     path: 'counter.initialSeconds',
     label: 'Valeur de départ, en secondes',

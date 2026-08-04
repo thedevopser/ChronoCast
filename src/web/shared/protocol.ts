@@ -187,7 +187,7 @@ export interface OverlayConfig {
  */
 export const PROTOCOL_VERSION = 1;
 
-export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch'] as const;
+export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'update'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 /** Ce que le hub attribue tant que le client n'a rien demandé de précis. */
@@ -244,6 +244,41 @@ export interface ConfigMessage {
   readonly overlay: OverlayConfig;
 }
 
+/**
+ * Phases de la mise à jour automatique.
+ *
+ * Redéclarées ici comme tout le reste du contrat : `tsconfig.web.json` fixe
+ * `rootDir` à `src/web`, et TypeScript refuse tout fichier du programme situé
+ * hors de cette racine — y compris atteint par un `import type` pourtant effacé
+ * à la compilation. Le test d'assignabilité mutuelle tient les deux côtés
+ * ensemble.
+ *
+ * `disabled` est un choix de l'utilisateur, `unsupported` une propriété du
+ * point d'entrée : le panneau ne dit pas la même chose dans les deux cas.
+ */
+export type UpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'downloading'
+  | 'ready'
+  | 'error'
+  | 'disabled'
+  | 'unsupported';
+
+export interface UpdateStatus {
+  readonly phase: UpdatePhase;
+  readonly currentVersion: string;
+  readonly availableVersion: string | null;
+  readonly notesUrl: string | null;
+  readonly message: string | null;
+  readonly checkedAt: number | null;
+}
+
+export interface UpdateMessage {
+  readonly type: 'update';
+  readonly status: UpdateStatus;
+}
+
 export interface PongMessage {
   readonly type: 'pong';
 }
@@ -262,6 +297,7 @@ export type ServerMessage =
   | EventMessage
   | LogMessage
   | ConfigMessage
+  | UpdateMessage
   | PongMessage
   | ErrorMessage;
 
@@ -291,6 +327,7 @@ const SERVER_MESSAGE_TYPES = new Set<string>([
   'event',
   'log',
   'config',
+  'update',
   'pong',
   'error',
 ]);

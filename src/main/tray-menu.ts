@@ -13,7 +13,7 @@
 import type { CounterStatus } from '../core/counter/counter-state.js';
 
 /** Actions offertes par le menu. Liste close : `tray.ts` les branche une à une. */
-export type TrayCommandId = 'show' | 'copy-overlay-url' | 'quit';
+export type TrayCommandId = 'show' | 'copy-overlay-url' | 'install-update' | 'quit';
 
 export type TrayMenuItem =
   | { readonly kind: 'status'; readonly label: string }
@@ -25,6 +25,15 @@ export interface TrayMenuState {
   readonly remainingMs: number;
   /** URL de l'overlay, ou `null` tant que le serveur n'a pas annoncé son port. */
   readonly overlayUrl: string | null;
+
+  /**
+   * Version téléchargée et vérifiée qui attend son installation, ou `null`.
+   *
+   * `null` fait disparaître l'entrée plutôt que de la griser : une entrée
+   * permanente et inactive ferait croire à une fonction en panne, alors qu'il
+   * n'y a simplement rien à installer.
+   */
+  readonly updateVersion?: string | null;
 }
 
 const SECOND = 1_000;
@@ -95,6 +104,21 @@ export function buildTrayMenu(state: TrayMenuState): readonly TrayMenuItem[] {
       // entrée grisée.
       enabled: state.overlayUrl !== null,
     },
+    // L'entrée n'existe que lorsqu'une version vérifiée attend. Elle reste au
+    // même bord que « quitter » — installer ferme aussi l'application — mais du
+    // bon côté du séparateur : c'est une action qu'on veut, là où quitter est
+    // une action qu'on regrette si on la clique par erreur.
+    ...(state.updateVersion != null
+      ? ([
+          {
+            kind: 'command',
+            id: 'install-update',
+            label: `Installer la mise à jour ${state.updateVersion}`,
+            enabled: true,
+          },
+        ] as const)
+      : []),
+
     // Quitter arrête le subathon. Le séparateur l'éloigne d'un geste anodin,
     // pour qu'il ne devienne pas un clic malheureux.
     { kind: 'separator' },

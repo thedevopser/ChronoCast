@@ -28,6 +28,7 @@
  *      l'interroge donc jamais à la construction.
  */
 
+import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,6 +45,7 @@ import type { OAuthOutcome } from '../core/server/oauth-callback.js';
 import { createExternalBrowserOpener } from './browser-opener.js';
 import { oauthReturnUrl } from './oauth-return.js';
 import { createSafeStorageSecretStore } from './safe-storage-secret-store.js';
+import { createUpdateInstaller } from './update-installer.js';
 import { createAppTray, type AppTray } from './tray.js';
 import { createMainWindow } from './windows.js';
 
@@ -147,6 +149,18 @@ function start(): void {
     browser: createExternalBrowserOpener({ openExternal: (url) => shell.openExternal(url) }),
     ticker: createSystemTicker(),
     appVersion: app.getVersion(),
+    // `app.quit` et non `app.exit` : il traverse `before-quit`, donc l'arrêt
+    // propre, donc l'écriture du dernier état du compteur. Sortir en force
+    // ferait redémarrer la nouvelle version sur un compteur en retard de
+    // quelques secondes — au détriment du streamer, ce que le projet refuse
+    // partout ailleurs.
+    updateInstaller: createUpdateInstaller({
+      spawn,
+      quit: () => {
+        app.quit();
+      },
+      logger,
+    }),
     ...createNodeRuntime(),
   });
 
@@ -183,10 +197,15 @@ function onStarted(port: number): void {
     iconPath: iconPath('tray.png'),
     getState: () => {
       const state = current.counter.getState();
+      const update = current.update.getStatus();
       return {
         status: state.status,
         remainingMs: state.remainingMs,
         overlayUrl: `${appOrigin}/overlay`,
+        // `null` hors de l'état « prêt » : le modèle du menu fait alors
+        // disparaître l'entrée, plutôt que de proposer d'installer ce qui n'a
+        // pas encore été vérifié.
+        updateVersion: update.phase === 'ready' ? update.availableVersion : null,
       };
     },
     onCommand: (id) => {
@@ -196,6 +215,13 @@ function onStarted(port: number): void {
           break;
         case 'copy-overlay-url':
           clipboard.writeText(`${appOrigin}/overlay`);
+          break;
+        case 'install-update':
+          // Le service refuse lui-même si rien n'est prêt : la garde vit là, et
+          // non ici. L'échec est journalisé, jamais silencieux.
+          void current.update.install().catch((error: unknown) => {
+            console.error('installation de la mise à jour impossible :', error);
+          });
           break;
         case 'quit':
           app.quit();

@@ -22,7 +22,8 @@ import {
   type RingBufferSink,
 } from '../../src/core/logging/sinks/ring-buffer-sink.js';
 import { createLogger, type LogSink } from '../../src/core/logging/logger.js';
-import type { ApiContext, TwitchApiPort } from '../../src/core/server/routes/api.js';
+import type { ApiContext, TwitchApiPort, UpdateApiPort } from '../../src/core/server/routes/api.js';
+import type { UpdateStatus } from '../../src/core/update/update-service.js';
 
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
 
@@ -35,6 +36,8 @@ export interface ApiDoubles {
   historyEntries: HistoryEntry[];
   twitchStatus: TwitchStatusPayload;
   clientSecret: string | null;
+  /** État de la mise à jour, que chaque test pose comme il l'entend. */
+  updateStatus: UpdateStatus;
   /** Fait échouer la prochaine opération Twitch, pour éprouver la remontée d'erreur. */
   failTwitch: boolean;
 }
@@ -51,6 +54,14 @@ export function createApiDoubles(): ApiDoubles {
     twitchStatus: { status: 'ready' } as TwitchStatusPayload,
     clientSecret: null as string | null,
     failTwitch: false,
+    updateStatus: {
+      phase: 'idle',
+      currentVersion: '0.1.0',
+      availableVersion: null,
+      notesUrl: null,
+      message: null,
+      checkedAt: null,
+    } as UpdateStatus,
   };
 
   const configService: ConfigService = {
@@ -155,12 +166,28 @@ export function createApiDoubles(): ApiDoubles {
     },
   };
 
+  const update: UpdateApiPort = {
+    getStatus: () => doubles.updateStatus,
+    check: () => {
+      calls.push('update.check');
+      return Promise.resolve(doubles.updateStatus);
+    },
+    install: () => {
+      calls.push('update.install');
+      if (doubles.updateStatus.phase !== 'ready') {
+        return Promise.reject(new Error('Aucune mise à jour vérifiée n’est prête à être installée.'));
+      }
+      return Promise.resolve();
+    },
+  };
+
   const context: ApiContext = {
     config: configService,
     counter: counterService,
     history,
     logs: ringBuffer,
     twitch,
+    update,
     getPort: () => 3_777,
     appVersion: '0.1.0',
     applyManualEvent: (event: DomainEvent) => {
