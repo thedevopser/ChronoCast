@@ -1,28 +1,3 @@
-/**
- * Contrat du WebSocket local, vu du navigateur.
- *
- * **Ce fichier redéclare le contrat au lieu de le ré-exporter, et ce n'est pas
- * un choix.** `tsconfig.web.json` fixe `rootDir` à `src/web` ; TypeScript
- * refuse alors tout fichier du programme situé hors de cette racine (TS6059),
- * y compris atteint par un `import type` pourtant effacé à la compilation.
- * Retirer `rootDir` ferait émettre le noyau compilé dans `dist/public`, servi
- * au navigateur : hors de question. La règle ESLint qui n'autorise que les
- * `import type` en provenance du noyau va d'ailleurs dans le même sens.
- *
- * La duplication est donc subie. Elle est tenue par
- * `tests/unit/web/shared/protocol.test.ts`, qui voit les deux côtés à la fois
- * et fait échouer la compilation dès qu'un champ diverge. **Toute modification
- * de `src/core/server/protocol.ts` doit être répercutée ici**, faute de quoi le
- * `typecheck` casse — ce qui est exactement l'effet recherché.
- *
- * Le canal est en lecture seule : le serveur diffuse, il n'obéit pas. Les deux
- * seuls messages sortants admis sont `ping` et `subscribe`.
- */
-
-/* -------------------------------------------------------------------------- */
-/* Vocabulaire du noyau                                                        */
-/* -------------------------------------------------------------------------- */
-
 export type CounterStatus = 'idle' | 'running' | 'paused' | 'finished';
 
 export interface CounterState {
@@ -55,13 +30,6 @@ interface BaseDomainEvent {
   readonly id: string;
   readonly occurredAt: number;
   readonly userId: string;
-  /**
-   * Nom affiché, **choisi par un tiers non fiable**.
-   *
-   * N'importe quel spectateur peut y placer du HTML, et l'overlay tourne dans
-   * une Browser Source OBS. Cette valeur ne franchit jamais autrement que par
-   * `textContent`, via `safe-dom.ts`.
-   */
   readonly userName: string;
   readonly source: DomainEventSource;
 }
@@ -98,15 +66,6 @@ export interface FollowEvent extends BaseDomainEvent {
   readonly type: 'follow';
 }
 
-/**
- * Commande de chat créditant du temps.
- *
- * Contrairement à `userName`, `command` et `seconds` ne sont **pas** choisis
- * librement par un tiers : le nom est contraint par le schéma et les secondes
- * ont traversé le plafond du barème. Cela ne change rien à la règle — tout
- * passe par `safe-dom` — mais explique pourquoi seul `userName` porte
- * l'avertissement.
- */
 export interface CommandEvent extends BaseDomainEvent {
   readonly command: string;
   readonly type: 'command';
@@ -132,13 +91,6 @@ export interface LogRecord {
   readonly context?: Record<string, unknown>;
 }
 
-/**
- * Sous-arbre `overlay` de la configuration.
- *
- * Non `readonly`, contrairement au reste : côté noyau ce type est inféré par
- * Zod, qui produit des propriétés mutables. L'assertion d'alignement tolère
- * l'écart de modificateur, mais s'aligner évite d'avoir à se le demander.
- */
 export interface OverlayConfig {
   fontFamily: string;
   fontSize: number;
@@ -195,36 +147,18 @@ export interface OverlayConfig {
   enableCustomCss: boolean;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Constantes du protocole                                                     */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Version du protocole attendue par cette page.
- *
- * Une Browser Source OBS n'est jamais rechargée automatiquement : après une
- * mise à jour de ChronoCast, une page ancienne peut parfaitement dialoguer avec
- * un serveur neuf. Comparer cette valeur à celle du `hello` est le seul moyen
- * de s'en apercevoir.
- */
 export const PROTOCOL_VERSION = 2;
 
 export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
-/** Ce que le hub attribue tant que le client n'a rien demandé de précis. */
 export const DEFAULT_CHANNELS: readonly Channel[] = CHANNELS;
-
-/* -------------------------------------------------------------------------- */
-/* Messages du serveur vers le client                                          */
-/* -------------------------------------------------------------------------- */
 
 export interface HelloMessage {
   readonly type: 'hello';
   readonly protocolVersion: number;
   readonly appVersion: string;
   readonly port: number;
-  /** Port du WebSocket, égal au précédent en mode `shared`. Voir `ws-url.ts`. */
   readonly wsPort: number;
   readonly overlay: OverlayConfig;
 }
@@ -255,13 +189,6 @@ export interface EventMessage {
   readonly rewardSeconds: number;
   readonly applied: boolean;
 
-  /**
-   * Libellé à afficher au-dessus de la bulle, ou absent.
-   *
-   * Il voyage dans le message parce que l'overlay ne reçoit que le sous-arbre
-   * `overlay` de la configuration, alors que ce texte vit dans le barème.
-   * Absent vaut « pas de libellé ».
-   */
   readonly label?: string;
 }
 
@@ -296,24 +223,10 @@ export type ServerMessage =
   | PongMessage
   | ErrorMessage;
 
-/* -------------------------------------------------------------------------- */
-/* Messages du client vers le serveur                                          */
-/* -------------------------------------------------------------------------- */
-
 export type ClientMessage =
   | { readonly type: 'ping' }
   | { readonly type: 'subscribe'; readonly channels: Channel[] };
 
-/* -------------------------------------------------------------------------- */
-/* Lecture d'un message entrant                                                */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Discriminants admis.
- *
- * `Set` plutôt qu'une suite de comparaisons : la liste doit rester alignée sur
- * l'union `ServerMessage`, et une seule énumération est plus facile à tenir.
- */
 const SERVER_MESSAGE_TYPES = new Set<string>([
   'hello',
   'state',
@@ -326,20 +239,6 @@ const SERVER_MESSAGE_TYPES = new Set<string>([
   'error',
 ]);
 
-/**
- * Texte reçu sur le socket vers message typé, ou `null`.
- *
- * Zod n'est pas disponible ici : le front est servi en modules ES natifs, sans
- * bundler, et le noyau lui est inaccessible. Le contrôle est donc écrit à la
- * main, et volontairement limité au discriminant — le reste des champs est lu
- * défensivement par ceux qui les consomment.
- *
- * Ce que ce filtre protège n'est pas la confidentialité : le serveur est local
- * et apparié. C'est la **survie de la page**. Une exception levée dans le
- * gestionnaire de message casse la boucle de réception, et une Browser Source
- * OBS n'est jamais rechargée : l'overlay resterait figé jusqu'à ce que le
- * streamer s'en aperçoive, c'est-à-dire en direct.
- */
 export function parseServerMessage(raw: unknown): ServerMessage | null {
   if (typeof raw !== 'string') {
     return null;

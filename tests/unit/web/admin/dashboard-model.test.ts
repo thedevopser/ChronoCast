@@ -1,15 +1,3 @@
-/**
- * Modèle du tableau de bord.
- *
- * Toute la logique de la vue vit ici : ce qui est activé, ce qui est affiché,
- * ce qui est retenu. `main.ts` ne fait que peindre ce que ce module décide,
- * exactement comme l'overlay de la PR A délègue à `countdown` et `toast-queue`.
- *
- * Convention reprise des réducteurs du noyau : **l'état est renvoyé identique
- * par référence** quand un message ne change rien. La vue s'en sert pour ne
- * pas repeindre soixante fois par seconde une liste qui n'a pas bougé.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -110,8 +98,6 @@ describe('applyMessage', () => {
   });
 
   it('remplace un détail absent par une chaîne vide', () => {
-    // `detail` est optionnel dans le contrat : laisser filtrer `undefined`
-    // jusqu'à `setText` afficherait « undefined » à l'écran.
     const model = applyMessage(createDashboardModel(), { type: 'twitch:status', status: 'ready' });
 
     expect(model.twitch.detail).toBe('');
@@ -135,8 +121,6 @@ describe('applyMessage', () => {
   });
 
   it('ignore un événement déjà connu', () => {
-    // Le hub rediffuse à la reconnexion, et les événements de test partagent
-    // leur identifiant quand deux clics tombent dans la même milliseconde.
     let model = applyMessage(createDashboardModel(), eventMessage(subEvent('a')));
     const before = model.events;
     model = applyMessage(model, eventMessage(subEvent('a')));
@@ -145,8 +129,6 @@ describe('applyMessage', () => {
   });
 
   it('retient aussi les événements non crédités', () => {
-    // Un gift écarté par le plafond est précisément celui qui intrigue :
-    // l'omettre effacerait la seule explication disponible.
     const model = applyMessage(createDashboardModel(), eventMessage(subEvent('a'), 0, false));
 
     expect(model.events[0]?.applied).toBe(false);
@@ -154,8 +136,6 @@ describe('applyMessage', () => {
   });
 
   it('conserve le pseudo tel quel, sans le nettoyer', () => {
-    // L'assainissement appartient à `safe-dom`, au moment de l'écriture. Le
-    // faire ici donnerait deux endroits où s'en souvenir, donc un à oublier.
     const hostile = '<img src=x onerror=alert(1)>';
     const model = applyMessage(createDashboardModel(), eventMessage(subEvent('a', hostile)));
 
@@ -198,8 +178,6 @@ describe('counterControls', () => {
   });
 
   it('tout est inerte tant que l’état n’est pas connu', () => {
-    // Avant le premier instantané, commander le compteur reviendrait à agir à
-    // l'aveugle sur un état qu'on ne connaît pas encore.
     const controls = counterControls(null);
 
     expect(controls).toEqual({ canPause: false, canResume: false, canReset: false });

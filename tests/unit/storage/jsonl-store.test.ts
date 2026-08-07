@@ -7,17 +7,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createLogger, type LogRecord, type LogSink } from '../../../src/core/logging/logger.js';
 import { createJsonlStore } from '../../../src/core/storage/jsonl-store.js';
 
-/**
- * L'historique des événements et les logs sont des flux : on y ajoute sans cesse,
- * on ne modifie jamais. Le format JSONL — une entrée JSON par ligne — est le seul
- * qui rende l'ajout naturellement résistant à une coupure : une ligne tronquée en
- * fin de fichier est simplement ignorée à la relecture, sans compromettre les
- * précédentes.
- *
- * La rotation est quotidienne, ce qui rend la purge triviale : un fichier par
- * jour se supprime sans avoir à réécrire quoi que ce soit.
- */
-
 interface Evenement {
   readonly type: string;
   readonly secondes: number;

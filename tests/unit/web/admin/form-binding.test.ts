@@ -1,25 +1,3 @@
-/**
- * Couche de liaison entre les champs du panneau et la configuration.
- *
- * Le schéma compte environ soixante-dix réglages. Les câbler un à un
- * produirait soixante-dix fois le même code — lire un champ, convertir,
- * comparer, reconstruire un objet imbriqué — et donc soixante-dix occasions de
- * se tromper d'un caractère sans que rien ne le signale avant l'exécution.
- *
- * Ce module est la réponse : une description déclarative des champs, et deux
- * fonctions pures. Il ne connaît pas le DOM ; la vue lui passe des valeurs
- * brutes et il rend un fragment de configuration.
- *
- * Deux propriétés comptent plus que les autres, et sont testées comme telles :
- *
- * - **seuls les champs modifiés sortent.** Envoyer les soixante-dix à chaque
- *   enregistrement écraserait une valeur changée entre-temps depuis un autre
- *   onglet, ou par l'assistant resté ouvert ;
- * - **une saisie fautive est nommée**, pas renvoyée au serveur. Zod refuserait
- *   de toute façon, mais un `400` générique pour une virgule décimale gâcherait
- *   tout le soin mis dans les messages d'erreur du serveur.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -51,7 +29,6 @@ const FIELDS: readonly FieldDescriptor[] = [
   { selector: '#label', path: 'rewards.chatCommand.overlayText', kind: 'text', allowEmpty: true },
 ];
 
-/** Valeurs de départ, telles que `valuesFrom` les produirait. */
 function pristine(): Record<string, string | boolean> {
   return valuesFrom(FIELDS, CONFIG);
 }
@@ -76,9 +53,6 @@ describe('readAtPath', () => {
   });
 
   it('ne remonte jamais la chaîne de prototypes', () => {
-    // `readAtPath({}, 'constructor')` renverrait la fonction `Object` avec un
-    // accès naïf, et `toString` une fonction : de quoi faire fuiter du code
-    // dans un champ de formulaire.
     expect(readAtPath({}, 'constructor')).toBeUndefined();
     expect(readAtPath({}, 'toString')).toBeUndefined();
     expect(readAtPath({}, '__proto__')).toBeUndefined();
@@ -103,9 +77,6 @@ describe('writeAtPath', () => {
   it.each(['__proto__', 'constructor', 'prototype'])(
     'refuse le segment %s',
     (segment) => {
-      // Les descripteurs sont statiques et aucun ne porte ces noms : c'est
-      // donc une erreur de programmation, pas une saisie. Elle doit lever,
-      // bruyamment, plutôt que produire un objet silencieusement pollué.
       expect(() => { writeAtPath({}, `rewards.${segment}.x`, 1); }).toThrow();
       expect(() => { writeAtPath({}, `${segment}.x`, 1); }).toThrow();
     },
@@ -143,9 +114,6 @@ describe('valuesFrom', () => {
   });
 
   it('omet un champ dont le chemin est absent de la configuration', () => {
-    // Une configuration d'une version antérieure peut ne pas porter un réglage
-    // ajouté depuis : écrire « undefined » dans le champ serait pire que de le
-    // laisser tel quel.
     const values = valuesFrom(FIELDS, { rewards: { sub: { tier1: 5 } } });
 
     expect(values['#tier1']).toBe('5');
@@ -162,8 +130,6 @@ describe('patchFrom', () => {
   });
 
   it('ne renvoie que les champs modifiés', () => {
-    // Envoyer les soixante-dix réglages à chaque enregistrement écraserait une
-    // valeur changée entre-temps depuis un autre onglet.
     const { patch } = patchFrom(FIELDS, { ...pristine(), '#tier1': '240' }, CONFIG);
 
     expect(patch).toEqual({ rewards: { sub: { tier1: 240 } } });
@@ -183,8 +149,6 @@ describe('patchFrom', () => {
   });
 
   it('accepte la virgule comme séparateur décimal', () => {
-    // Un clavier français produit une virgule, et refuser la saisie avec un
-    // « 400 » générique serait une régression d'ergonomie.
     const { patch, errors } = patchFrom(FIELDS, { ...pristine(), '#spacing': '1,5' }, CONFIG);
 
     expect(errors).toEqual([]);
@@ -215,8 +179,6 @@ describe('patchFrom', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0]?.selector).toBe(selector);
       expect(errors[0]?.message).not.toBe('');
-      // Rien ne part au serveur tant qu'une saisie est fautive : un
-      // enregistrement partiel laisserait l'utilisateur croire au succès.
       expect(patch).toEqual({});
     });
 
@@ -231,8 +193,6 @@ describe('patchFrom', () => {
     });
 
     it('refuse un booléen reçu sous forme de chaîne', () => {
-      // Signalerait une case à cocher lue par `.value` au lieu de `.checked` :
-      // « on » est alors toujours vrai, et le réglage ne se décocherait jamais.
       const { errors } = patchFrom(FIELDS, { ...pristine(), '#resume': 'on' }, CONFIG);
 
       expect(errors).toHaveLength(1);
@@ -250,8 +210,6 @@ describe('patchFrom', () => {
   });
 
   it('ignore un champ absent des valeurs brutes', () => {
-    // Une vue ne montre qu'une partie des descripteurs : les autres ne doivent
-    // pas être vus comme vidés, ce qui les ferait tous échouer.
     const { patch, errors } = patchFrom(FIELDS, { '#tier1': '240' }, CONFIG);
 
     expect(errors).toEqual([]);
@@ -259,8 +217,6 @@ describe('patchFrom', () => {
   });
 
   it('refuse un champ texte vidé', () => {
-    // Une police vide n'a pas de sens : le refuser ici l'explique sous le
-    // champ, là où l'utilisateur peut encore le corriger.
     const { errors, patch } = patchFrom(FIELDS, { ...pristine(), '#font': '' }, CONFIG);
 
     expect(errors).toHaveLength(1);
@@ -268,9 +224,6 @@ describe('patchFrom', () => {
   });
 
   it('accepte un champ texte vidé lorsqu’il l’autorise', () => {
-    // Le libellé de la bulle est le cas : vide vaut « pas de libellé », et
-    // c'est un réglage légitime. Sans cette échappatoire, il n'y aurait aucun
-    // moyen d'éteindre l'annonce depuis le panneau.
     const { errors, patch } = patchFrom(FIELDS, { ...pristine(), '#label': '' }, CONFIG);
 
     expect(errors).toEqual([]);
@@ -278,8 +231,6 @@ describe('patchFrom', () => {
   });
 
   it('conserve un texte contenant du HTML sans le transformer', () => {
-    // L'assainissement appartient à `safe-dom`, à l'écriture. Ici on transporte
-    // ce que l'utilisateur a tapé ; c'est Zod qui jugera de sa validité.
     const hostile = '<script>alert(1)</script>';
     const { patch } = patchFrom(FIELDS, { ...pristine(), '#font': hostile }, CONFIG);
 

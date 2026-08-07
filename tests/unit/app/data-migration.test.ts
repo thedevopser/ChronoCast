@@ -6,28 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { migrateDataDirectory } from '../../../src/core/app/data-migration.js';
 
-/**
- * Reprise des données d'une installation précédente.
- *
- * Le passage au Microsoft Store déplace le répertoire de données de
- * `%APPDATA%\ChronoCast` vers `%USERPROFILE%\ChronoCast`. Le motif n'est pas
- * cosmétique : **MSIX virtualise ce que l'application écrit dans `%APPDATA%`**,
- * et le conteneur ainsi constitué part avec la désinstallation. Y laisser les
- * données contredirait la décision qui veut qu'un subathon en cours survive à
- * une réinstallation — c'est précisément ce qu'on fait quand quelque chose ne
- * va pas.
- *
- * Sans reprise, chaque utilisateur déjà installé perdrait son compteur, sa
- * configuration et ses jetons, et devrait refaire l'OAuth Twitch. Ce module est
- * donc le seul endroit du projet qui puisse détruire quelque chose, d'où les
- * trois propriétés que ces tests tiennent :
- *
- *   - **il n'écrase jamais rien** ;
- *   - **il est rejouable**, une reprise interrompue se terminant au lancement
- *     suivant ;
- *   - **il n'empêche jamais l'application de démarrer**, quoi qu'il arrive au
- *     système de fichiers.
- */
 describe('migrateDataDirectory', () => {
   let root: string;
   let source: string;
@@ -43,7 +21,6 @@ describe('migrateDataDirectory', () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  /** Installation NSIS complète et plausible : configuration, compteur, jetons, historique, journaux. */
   async function seedLegacyInstallation(): Promise<void> {
     await mkdir(join(source, 'history'), { recursive: true });
     await mkdir(join(source, 'logs'), { recursive: true });
@@ -54,7 +31,6 @@ describe('migrateDataDirectory', () => {
     await writeFile(join(source, 'history', 'events-2026-08-07.jsonl'), '{"type":"sub"}\n', 'utf8');
     await writeFile(join(source, 'logs', 'chronocast-2026-08-07.jsonl'), '{"level":"info"}\n', 'utf8');
 
-    // Écrit en dernier, comme la reprise elle-même l'écrit en dernier.
     await writeFile(join(source, 'config.json'), '{"app":{"startMinimized":true}}', 'utf8');
   }
 
@@ -89,18 +65,12 @@ describe('migrateDataDirectory', () => {
     it('rend compte de ce qu’elle a repris', async () => {
       const outcome = await migrateDataDirectory({ source, target });
 
-      // Le décompte part au journal du panneau. Une reprise silencieuse est
-      // indiscernable d'une installation neuve, et c'est exactement la
-      // confusion qui ferait conclure à tort que la migration fonctionne.
       expect(outcome).toMatchObject({ kind: 'migrated', fileCount: 6 });
     });
 
     it('laisse l’ancienne installation intacte', async () => {
       await migrateDataDirectory({ source, target });
 
-      // Une copie, jamais un déplacement. Si le passage au Store devait être
-      // annulé, la version NSIS doit retrouver ses données là où elle les a
-      // laissées.
       await expect(readFile(join(source, 'config.json'), 'utf8')).resolves.toBe(
         '{"app":{"startMinimized":true}}',
       );
@@ -112,14 +82,10 @@ describe('migrateDataDirectory', () => {
       const config = await stat(join(target, 'config.json'));
       const counter = await stat(join(target, 'counter.json'));
 
-      // C'est ce qui rend une reprise interrompue rattrapable : tant que
-      // `config.json` n'est pas là, la reprise n'a pas eu lieu et sera rejouée.
       expect(config.mtimeMs).toBeGreaterThanOrEqual(counter.mtimeMs);
     });
 
     it('termine une reprise interrompue sans écraser ce qui était déjà là', async () => {
-      // Reprise coupée après le compteur, avant `config.json` — et le fichier
-      // déjà copié a divergé depuis.
       await mkdir(target, { recursive: true });
       await writeFile(join(target, 'counter.json'), '{"remainingMs":1}', 'utf8');
 
@@ -129,8 +95,6 @@ describe('migrateDataDirectory', () => {
       await expect(readFile(join(target, 'config.json'), 'utf8')).resolves.toBe(
         '{"app":{"startMinimized":true}}',
       );
-      // Ce qui existe déjà fait foi : on ne remplace jamais un fichier de la
-      // cible par celui de la source.
       await expect(readFile(join(target, 'counter.json'), 'utf8')).resolves.toBe(
         '{"remainingMs":1}',
       );
@@ -143,8 +107,6 @@ describe('migrateDataDirectory', () => {
       const outcome = await migrateDataDirectory({ source, target });
 
       expect(outcome).toEqual({ kind: 'skipped', reason: 'cible-deja-configuree' });
-      // Le réglage modifié depuis la reprise survit : c'est l'idempotence qui
-      // compte ici, pas la copie.
       await expect(readFile(join(target, 'config.json'), 'utf8')).resolves.toBe(
         '{"app":{"startMinimized":false}}',
       );
@@ -160,8 +122,6 @@ describe('migrateDataDirectory', () => {
     });
 
     it('ne fait rien si l’ancien répertoire existe sans configuration', async () => {
-      // Un répertoire laissé par une désinstallation, ou créé par un essai
-      // avorté : il ne décrit aucune installation configurée.
       await mkdir(join(source, 'logs'), { recursive: true });
       await writeFile(join(source, 'logs', 'chronocast.jsonl'), '{}\n', 'utf8');
 
@@ -173,9 +133,6 @@ describe('migrateDataDirectory', () => {
     it('ne fait rien quand la source et la cible sont le même répertoire', async () => {
       await seedLegacyInstallation();
 
-      // Le cas du point d'entrée headless, et de tout poste où le déplacement
-      // n'a pas lieu d'être. Recopier un répertoire sur lui-même n'a aucun sens
-      // et pourrait le corrompre.
       const outcome = await migrateDataDirectory({ source, target: source });
 
       expect(outcome).toEqual({ kind: 'skipped', reason: 'source-et-cible-confondues' });
@@ -186,10 +143,6 @@ describe('migrateDataDirectory', () => {
     it('rend compte de l’échec sans jamais lever', async () => {
       await seedLegacyInstallation();
 
-      // Une cible qui est un fichier, et non un répertoire : la création
-      // échouera. Peu importe la cause exacte — ce qui compte est que
-      // l'application démarre malgré tout, avec une configuration neuve, plutôt
-      // que de refuser de se lancer pendant un direct.
       await writeFile(target, 'ceci n’est pas un répertoire', 'utf8');
 
       const outcome = await migrateDataDirectory({ source, target });

@@ -10,26 +10,8 @@ import { PROTOCOL_VERSION } from '../../../src/core/server/protocol.js';
 import { createWsHub, type HubTimers, type WsHub } from '../../../src/core/server/ws-hub.js';
 import { createSocketDouble, type SocketDouble } from '../../helpers/hub-socket.js';
 
-/**
- * Le hub est le lien entre l'application et l'overlay affiché en direct. Trois
- * situations dictent sa conception, et aucune n'est théorique.
- *
- *   - **OBS n'est pas rechargé.** Une Browser Source reste ouverte des heures. Le
- *     hub doit donc supporter des connexions très longues, et surtout détecter
- *     celles qui sont mortes sans l'avoir dit : d'où le ping/pong et la
- *     terminaison des sockets muettes. Un socket fantôme fait diffuser dans le
- *     vide, et le streamer voit un compteur figé sans comprendre pourquoi.
- *   - **Le décompte ne se diffuse pas à chaque top.** L'overlay interpole
- *     localement ; le serveur ne lui envoie l'état qu'une fois par seconde. Les
- *     mutations, elles, partent immédiatement : c'est le gift sub qui doit
- *     apparaître tout de suite, pas la seconde qui s'écoule.
- *   - **Le canal est en lecture seule.** Il diffuse, il ne commande pas. Un
- *     message inattendu est une anomalie, traitée comme telle.
- */
-
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
 
-/** Minuteurs contrôlés : aucune attente réelle, aucun test qui traîne. */
 function createTimersDouble() {
   const intervals = new Map<number, { handler: () => void; ms: number }>();
   let nextId = 1;
@@ -48,7 +30,6 @@ function createTimersDouble() {
 
   return {
     timers,
-    /** Déclenche tous les minuteurs actifs, comme le ferait le temps qui passe. */
     fire(): void {
       for (const entry of [...intervals.values()]) {
         entry.handler();
@@ -69,7 +50,6 @@ describe('createWsHub', () => {
   let monotonic: number;
   let client: SocketDouble;
 
-  /** Ne garde que les messages d'un type donné, pour des assertions lisibles. */
   function messagesOfType(socket: SocketDouble, type: string): Record<string, unknown>[] {
     return socket.sent.filter((message) => message['type'] === type);
   }
@@ -112,9 +92,6 @@ describe('createWsHub', () => {
     });
 
     it('annonce le port du WebSocket quand il diffère de celui du HTTP', () => {
-      // Mode `separate`. La page a déjà dû joindre ce port pour lire ce
-      // message — le marqueur du gabarit s'en est chargé — mais l'annoncer
-      // rend le contrat auto-descriptif et permet de vérifier la cohérence.
       const separate = createWsHub({
         bus,
         getConfig: () => config,
@@ -137,8 +114,6 @@ describe('createWsHub', () => {
     });
 
     it("transmet la configuration d'overlay dès l'accueil", () => {
-      // L'overlay applique ses variables CSS avant même le premier décompte :
-      // sans cela, il s'afficherait une fraction de seconde avec le style par défaut.
       hub.accept(client.socket, {});
 
       expect(client.sent[0]?.['overlay']).toEqual(DEFAULT_CONFIG.overlay);
@@ -197,8 +172,6 @@ describe('createWsHub', () => {
     });
 
     it('lisse le décompte à une diffusion par seconde', () => {
-      // Le compteur bat quatre fois par seconde par défaut ; l'overlay n'a besoin
-      // que d'un point de synchronisation par seconde.
       for (let index = 0; index < 4; index += 1) {
         monotonic += 250;
         bus.emit('counter:changed', {
@@ -273,8 +246,6 @@ describe('createWsHub', () => {
     });
 
     it('n’attache aucun libellé à un événement de plateforme', () => {
-      // Le libellé est propre aux commandes de chat. L'attacher partout ferait
-      // apparaître « Temps ajouté » au-dessus de chaque abonnement.
       bus.emit('counter:event-applied', {
         event: {
           id: 'evt-1',
@@ -293,9 +264,6 @@ describe('createWsHub', () => {
     });
 
     it('attache le libellé configuré à une commande de chat', () => {
-      // Le libellé vit dans le barème et non dans le sous-arbre `overlay` :
-      // l'overlay ne reçoit que ce dernier, il ne pourrait donc pas aller le
-      // chercher lui-même. C'est au hub de le joindre au message.
       bus.emit('counter:event-applied', {
         event: {
           id: 'evt-cmd',
@@ -318,8 +286,6 @@ describe('createWsHub', () => {
     });
 
     it('omet le libellé lorsqu’il a été vidé', () => {
-      // Vider le champ vaut « pas de libellé » : envoyer une chaîne vide
-      // ferait réserver la place d'une ligne que rien ne remplirait.
       config = configSchema.parse({ rewards: { chatCommand: { overlayText: '' } } });
 
       bus.emit('counter:event-applied', {
@@ -375,7 +341,6 @@ describe('createWsHub', () => {
       bus.emit('twitch:status', { status: 'ready' });
 
       expect(messagesOfType(second, 'twitch:status')).toHaveLength(1);
-      // Le client fautif est écarté : le garder ferait échouer chaque diffusion.
       expect(hub.clientCount()).toBe(1);
     });
   });
@@ -397,8 +362,6 @@ describe('createWsHub', () => {
     });
 
     it('restreint la diffusion aux canaux demandés', () => {
-      // L'overlay ne demande que le compteur : lui pousser chaque ligne de
-      // journal réveillerait OBS pour rien.
       client.receive(JSON.stringify({ type: 'subscribe', channels: ['counter'] }));
 
       hub.publishLog({
@@ -488,8 +451,6 @@ describe('createWsHub', () => {
     });
 
     it('termine un client resté muet', () => {
-      // Une Browser Source fermée brutalement laisse un socket ouvert côté
-      // serveur : sans cette détection, le hub diffuserait dans le vide.
       timers.fire();
       timers.fire();
 

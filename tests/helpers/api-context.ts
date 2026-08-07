@@ -1,12 +1,3 @@
-/**
- * Contexte d'API en mémoire.
- *
- * Les routes ne sont que de la délégation : leur intérêt est dans ce qu'elles
- * valident et dans ce qu'elles refusent de renvoyer, pas dans le métier qu'elles
- * appellent. Les doubles ci-dessous rendent donc chaque dépendance triviale et
- * observable, sans disque, sans réseau et sans minuteur.
- */
-
 import type { TwitchStatusPayload } from '../../src/core/app/app-events.js';
 import { DEFAULT_CONFIG } from '../../src/core/config/defaults.js';
 import type { ChronoCastConfig } from '../../src/core/config/schema.js';
@@ -35,7 +26,6 @@ export interface ApiDoubles {
   historyEntries: HistoryEntry[];
   twitchStatus: TwitchStatusPayload;
   clientSecret: string | null;
-  /** Fait échouer la prochaine opération Twitch, pour éprouver la remontée d'erreur. */
   failTwitch: boolean;
 }
 
@@ -58,8 +48,6 @@ export function createApiDoubles(): ApiDoubles {
     get: () => doubles.config,
     update: (patch: DeepPartial<ChronoCastConfig>) => {
       calls.push('config.update');
-      // Fusion naïve au premier niveau : suffisant pour observer ce que la route
-      // transmet, le vrai service étant testé pour lui-même.
       doubles.config = configSchema.parse({ ...doubles.config, ...patch });
       return Promise.resolve(doubles.config);
     },
@@ -179,9 +167,5 @@ export function createApiDoubles(): ApiDoubles {
     logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),
   };
 
-  // `Object.assign` et non un objet neuf : les doubles ci-dessus lisent
-  // `doubles.config` et `doubles.counterState` par référence. Recopier ces
-  // champs figerait les valeurs vues par les fermetures, et un test qui modifie
-  // la configuration n'aurait plus aucun effet.
   return Object.assign(doubles, { context, calls, ringBuffer });
 }

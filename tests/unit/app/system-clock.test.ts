@@ -3,18 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSystemClock } from '../../../src/core/app/system-clock.js';
 import { createSystemTicker } from '../../../src/core/app/system-ticker.js';
 
-/**
- * Deux horloges, et c'est tout l'enjeu.
- *
- * `now()` sert aux horodatages : elle peut reculer, au passage à l'heure d'hiver
- * comme après une synchronisation NTP. `monotonicMs()` sert à mesurer des durées
- * et ne recule jamais.
- *
- * Confondre les deux offrirait une heure de subathon chaque dernier dimanche
- * d'octobre. C'est pour cela que le décompte ne s'appuie que sur la seconde, et
- * que ce fichier existe.
- */
-
 describe('createSystemClock', () => {
   const clock = createSystemClock();
 
@@ -33,8 +21,6 @@ describe('createSystemClock', () => {
   });
 
   it("n'utilise pas l'horloge murale pour mesurer les durées", () => {
-    // Un recul brutal de l'heure système ne doit pas faire reculer le temps
-    // monotone : c'est exactement le scénario du changement d'heure.
     const monotonicBefore = clock.monotonicMs();
     vi.spyOn(Date, 'now').mockReturnValue(0);
 
@@ -75,8 +61,6 @@ describe('createSystemTicker', () => {
   });
 
   it('remplace le minuteur précédent plutôt que d’en cumuler un second', () => {
-    // Redémarrer le compteur après un changement de période ne doit pas laisser
-    // l'ancien cadenceur battre en parallèle : le décompte irait deux fois trop vite.
     vi.useFakeTimers();
     const ticker = createSystemTicker();
     const handler = vi.fn();
@@ -97,8 +81,6 @@ describe('createSystemTicker', () => {
   });
 
   it('ne retient pas la boucle d’événements', () => {
-    // Sans `unref`, le processus refuserait de se terminer tant que le cadenceur
-    // bat — c'est-à-dire toujours.
     const ticker = createSystemTicker();
     ticker.start(1_000, () => undefined);
 

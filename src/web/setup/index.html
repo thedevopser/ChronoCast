@@ -5,28 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ChronoCast — Première configuration</title>
 
-    <!--
-      Jeton CSRF, substitué par `routes/pages.ts` au moment de servir la page.
-      Il n'est exposé par aucune route : une page tierce ne peut ni le lire ni
-      le deviner, et c'est ce qui protège toutes les mutations de l'API.
-    -->
     <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
 
-    <!--
-      Le logo engendré depuis `assets/logo.png` par `scripts/prepare-icons.mjs`.
-      Servi par la même origine : `img-src 'self'` l'autorise, et l'application
-      doit fonctionner sans connexion.
-    -->
     <link rel="icon" type="image/png" href="/shared/logo.png" />
 
-    <!-- Port du WebSocket, substitué lui aussi. Ce n'est pas un secret. -->
     <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
 
-    <!--
-      Ordre imposé : les primitives d'Open Props d'abord, nos tokens
-      sémantiques ensuite — ils les référencent —, la feuille de page en
-      dernier. Elle ne connaît que nos tokens.
-    -->
     <link rel="stylesheet" href="/shared/open-props.css" />
     <link rel="stylesheet" href="/shared/theme.css" />
     <link rel="stylesheet" href="/setup/setup.css" />
@@ -39,16 +23,11 @@
         <p class="wizard__subtitle" id="resume-hint"></p>
       </header>
 
-      <!--
-        Aucun `<form>` : `form-action 'none'` interdit toute soumission. Les
-        boutons sont en `type="button"` et tout passe par `fetch`.
-      -->
       <nav class="steps" id="steps" aria-label="Étapes de la configuration"></nav>
 
       <p class="banner" id="banner" hidden></p>
 
       <main class="panel">
-        <!-- 1 -->
         <section class="step" id="step-intro" hidden>
           <h2>Créer une application Twitch</h2>
           <p>
@@ -86,7 +65,6 @@
           </div>
         </section>
 
-        <!-- 2 -->
         <section class="step" id="step-credentials" hidden>
           <h2>Identifiants de l'application</h2>
           <p>
@@ -118,7 +96,6 @@
           </div>
         </section>
 
-        <!-- 3 -->
         <section class="step" id="step-connect" hidden>
           <h2>Autoriser ChronoCast</h2>
           <p>
@@ -137,7 +114,6 @@
           </div>
         </section>
 
-        <!-- 4 -->
         <section class="step" id="step-channel" hidden>
           <h2>Chaîne détectée</h2>
           <p class="detected">
@@ -167,7 +143,6 @@
           </div>
         </section>
 
-        <!-- 5 -->
         <section class="step" id="step-counter" hidden>
           <h2>Compteur et barème</h2>
           <p>
@@ -213,7 +188,6 @@
           </div>
         </section>
 
-        <!-- 6 -->
         <section class="step" id="step-overlay" hidden>
           <h2>Ajouter l'overlay dans OBS</h2>
           <p>Dans OBS, ajoutez une source <em>Navigateur</em> et collez cette adresse :</p>

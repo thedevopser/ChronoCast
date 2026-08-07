@@ -4,17 +4,6 @@ import { createLogger, type LogRecord, type LogSink } from '../../../src/core/lo
 import { HelixError, createHelixClient } from '../../../src/core/twitch/helix-client.js';
 import { ReauthenticationRequiredError } from '../../../src/core/twitch/oauth-service.js';
 
-/**
- * Le client Helix crée et supprime les souscriptions EventSub, et résout
- * l'identité de la chaîne. C'est le seul composant qui parle à l'API REST de
- * Twitch.
- *
- * Sa robustesse détermine celle de toute la connexion : si la création des
- * souscriptions échoue au démarrage, le subathon ne reçoit aucun événement sans
- * que rien ne le signale visiblement. D'où une politique de reprise explicite,
- * différenciée selon la nature de l'échec.
- */
-
 const CLIENT_ID = 'client-id-public';
 
 function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
@@ -44,7 +33,6 @@ describe('createHelixClient', () => {
   beforeEach(() => {
     fetchMock = vi.fn();
     getAccessToken = vi.fn().mockResolvedValue('jeton-valide');
-    // Attente simulée : la suite ne doit jamais patienter réellement.
     sleep = vi.fn().mockResolvedValue(undefined);
     sink = createMemorySink();
   });
@@ -159,7 +147,6 @@ describe('createHelixClient', () => {
 
     it('supprime une souscription', async () => {
       const client = createClient();
-      // 204 interdit tout corps, fût-il vide : Twitch répond ainsi aux suppressions.
       fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
       await client.deleteEventSubSubscription('sub-1');
@@ -183,8 +170,6 @@ describe('createHelixClient', () => {
     });
 
     it('ne rejoue qu\'une seule fois après un 401', async () => {
-      // Un second refus signifie que le problème n'est pas l'expiration :
-      // insister ne ferait que retarder le diagnostic.
       const client = createClient();
       fetchMock.mockImplementation(() => jsonResponse(401, { message: 'Invalid OAuth token' }));
 
@@ -271,8 +256,6 @@ describe('createHelixClient', () => {
     });
 
     it('ne rejoue jamais une erreur de requête', async () => {
-      // Un 400 vient d'une condition ou d'un type de souscription erroné :
-      // le rejouer donnerait exactement le même refus.
       const client = createClient();
       fetchMock.mockImplementation(() => jsonResponse(400, { message: 'Invalid condition' }));
 

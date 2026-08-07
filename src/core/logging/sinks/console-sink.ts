@@ -1,28 +1,13 @@
-/**
- * Puits console.
- *
- * Sert au développement et aux diagnostics de démarrage, avant que les puits
- * fichier et mémoire ne soient branchés. En production, l'application tourne sans
- * terminal : ce puits n'y a alors aucun lecteur, mais son coût est nul.
- *
- * Les fonctions d'écriture sont injectables afin que le format soit vérifiable
- * par les tests sans capturer les flux du processus.
- */
-
 import type { LogLevel, LogRecord, LogSink } from '../logger.js';
 
 export interface ConsoleSinkOptions {
-  /** Destination des enregistrements courants. Par défaut, la sortie standard. */
   readonly writeOut?: (line: string) => void;
 
-  /** Destination des erreurs. Par défaut, la sortie d'erreur. */
   readonly writeError?: (line: string) => void;
 }
 
-/** Largeur du champ de niveau, pour que les portées restent alignées. */
 const LEVEL_WIDTH = 7;
 
-/** Niveaux dirigés vers la sortie d'erreur. */
 const ERROR_LEVELS: ReadonlySet<LogLevel> = new Set<LogLevel>(['error']);
 
 export function createConsoleSink(options: ConsoleSinkOptions = {}): LogSink {
@@ -50,9 +35,6 @@ export function createConsoleSink(options: ConsoleSinkOptions = {}): LogSink {
         try {
           suffix = ` ${JSON.stringify(record.context)}`;
         } catch {
-          // Une structure non sérialisable ne doit pas faire disparaître le
-          // message : le rédacteur neutralise déjà les cycles, ce filet ne couvre
-          // que les cas résiduels comme un BigInt.
           suffix = ' [contexte non sérialisable]';
         }
       }

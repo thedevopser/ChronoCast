@@ -6,17 +6,6 @@ import {
   withSecurityHeaders,
 } from '../../src/core/server/security/headers.js';
 
-/**
- * L'overlay affiche des pseudos et des messages écrits par des inconnus, dans une
- * Browser Source OBS qui est un vrai navigateur. Si une injection franchit malgré
- * tout le code applicatif, la CSP est la dernière barrière : sans `unsafe-inline`,
- * un `<script>` injecté ne s'exécute simplement pas.
- *
- * C'est aussi pour cela que les scripts et les styles sont servis en fichiers et
- * jamais en ligne : la CSP la plus stricte n'a de valeur que si l'application n'a
- * pas besoin de l'assouplir pour fonctionner.
- */
-
 describe('securityHeaders', () => {
   const headers = securityHeaders();
 
@@ -29,8 +18,6 @@ describe('securityHeaders', () => {
   });
 
   it("n'expose aucun en-tête CORS", () => {
-    // Un seul `Access-Control-Allow-Origin` permissif annulerait la garde d'Host :
-    // la page tierce pourrait alors lire les réponses.
     const cors = Object.keys(headers).filter((name) => name.startsWith('access-control-'));
     expect(cors).toEqual([]);
   });
@@ -59,7 +46,6 @@ describe('parseContentSecurityPolicy', () => {
   });
 
   it("n'autorise aucune police ni image distante", () => {
-    // Une CDN violerait la CSP et surtout l'exigence de fonctionnement hors ligne.
     expect(directives['font-src']).toEqual(["'self'"]);
     expect(directives['img-src']).toEqual(["'self'", 'data:']);
   });
@@ -76,13 +62,10 @@ describe('parseContentSecurityPolicy', () => {
   });
 
   it("interdit la réécriture de l'URL de base", () => {
-    // Sans `base-uri 'none'`, une balise `<base>` injectée détournerait chaque
-    // chemin relatif de la page vers un serveur distant.
     expect(directives['base-uri']).toEqual(["'none'"]);
   });
 
   it("n'autorise l'encadrement que par l'application elle-même", () => {
-    // L'aperçu d'apparence du panneau d'administration est une iframe locale.
     expect(directives['frame-ancestors']).toEqual(["'self'"]);
   });
 
@@ -108,7 +91,6 @@ describe('withSecurityHeaders', () => {
   });
 
   it("ne laisse pas une réponse écraser un en-tête de sécurité", () => {
-    // Une route ne doit jamais pouvoir désactiver la CSP, même par accident.
     const hardened = withSecurityHeaders({
       ...response,
       headers: {

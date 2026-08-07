@@ -1,20 +1,5 @@
-/**
- * Point d'entrée de l'assistant de première configuration.
- *
- * Ce fichier n'est que du câblage. La progression est décidée par `wizard.ts`,
- * les appels par `api-client.ts`, l'écriture dans le DOM par `safe-dom.ts` —
- * tous trois couverts par des tests. Ce qui reste ici — lire des champs,
- * accrocher des gestionnaires, montrer une section — n'est pas vérifiable sans
- * navigateur et n'a rien à décider.
- *
- * Aucun `console` : ESLint l'interdit dans `src/web`, et un incident se
- * diagnostique par les journaux du serveur, visibles depuis le panneau.
- */
-
 import { ApiError, createApiClient, readCsrfToken } from '../shared/api-client.js';
 import { clearChildren, requireElement, setText } from '../shared/safe-dom.js';
-// `resumeHint` est renommé : la variable du même nom désigne ici l'élément du
-// DOM qui porte la phrase, et non la phrase elle-même.
 import {
   isStepReachable,
   resumeHint as hintFor,
@@ -23,7 +8,6 @@ import {
   type SetupStepId,
 } from './wizard.js';
 
-/** Libellés du fil d'étapes. */
 const STEP_LABELS: Readonly<Record<SetupStepId, string>> = {
   intro: 'Application Twitch',
   credentials: 'Identifiants',
@@ -33,12 +17,6 @@ const STEP_LABELS: Readonly<Record<SetupStepId, string>> = {
   overlay: 'Overlay',
 };
 
-/**
- * Issues du rappel OAuth, telles que le serveur éphémère les renvoie.
- *
- * Codes clos et non un message : ce qui transite par une barre d'adresse ne
- * doit jamais venir de Twitch, dont les textes sont contrôlés par un tiers.
- */
 const OAUTH_MESSAGES: Readonly<Record<string, { text: string; kind: string }>> = {
   ok: { text: 'Connexion à Twitch réussie.', kind: 'banner--success' },
   denied: { text: 'Vous avez refusé l’autorisation. Vous pouvez réessayer.', kind: 'banner--error' },
@@ -90,10 +68,6 @@ function start(): void {
   let completed = false;
   let visible: SetupStepId = 'intro';
 
-  /* ---------------------------------------------------------------------- */
-  /* Affichage                                                              */
-  /* ---------------------------------------------------------------------- */
-
   function showBanner(text: string, kind: string): void {
     setText(banner, text, 200);
     banner.className = `banner ${kind}`;
@@ -101,8 +75,6 @@ function start(): void {
   }
 
   function reportFailure(error: unknown): void {
-    // `ApiError` porte déjà la phrase française écrite par le serveur : la
-    // remplacer par un message générique gâcherait tout le soin mis en amont.
     const message =
       error instanceof ApiError ? error.message : 'Une erreur inattendue est survenue.';
     showBanner(message, 'banner--error');
@@ -167,10 +139,6 @@ function start(): void {
     );
   }
 
-  /* ---------------------------------------------------------------------- */
-  /* Chargement de l'état                                                   */
-  /* ---------------------------------------------------------------------- */
-
   async function refresh(): Promise<void> {
     status = await api.get<TwitchStatus>('/api/twitch/status');
     const { config } = await api.get<ConfigPayload>('/api/config');
@@ -195,7 +163,6 @@ function start(): void {
     renderOverlayUrl();
   }
 
-  /** Neutralise le bouton le temps de l'appel : un double clic vaut deux flux. */
   async function guarded(button: HTMLButtonElement, action: () => Promise<void>): Promise<void> {
     button.disabled = true;
     try {
@@ -206,10 +173,6 @@ function start(): void {
       button.disabled = false;
     }
   }
-
-  /* ---------------------------------------------------------------------- */
-  /* Actions                                                                */
-  /* ---------------------------------------------------------------------- */
 
   for (const element of document.querySelectorAll('[data-goto]')) {
     element.addEventListener('click', () => {
@@ -244,8 +207,6 @@ function start(): void {
       const clientId = input('#client-id').value.trim();
       const clientSecret = input('#client-secret').value;
 
-      // Le secret est **frère** de `config` dans le corps, jamais son enfant :
-      // il va dans le magasin chiffré et ne ressort par aucune lecture.
       await api.patch('/api/config', {
         config: { twitch: { clientId } },
         ...(clientSecret === '' ? {} : { clientSecret }),
@@ -264,8 +225,6 @@ function start(): void {
     void guarded(button, async () => {
       const result = await api.post<{ authorizationUrl: string }>('/api/twitch/connect');
       if (result !== null) {
-        // Navigation dans le même onglet : une fenêtre séparée serait bloquée
-        // par le navigateur, le clic étant déjà consommé par l'appel réseau.
         window.location.assign(result.authorizationUrl);
       }
     });
@@ -295,8 +254,6 @@ function start(): void {
             },
             bits: { linear: { secondsPerUnit: Number(input('#reward-bits').value) } },
           },
-          // Marque la fin de l'assistant. C'est la seule chose que la
-          // progression ne sait pas déduire de l'état réel.
           setup: { completed: true },
         },
       });
@@ -306,16 +263,10 @@ function start(): void {
     });
   });
 
-  /* ---------------------------------------------------------------------- */
-  /* Démarrage                                                              */
-  /* ---------------------------------------------------------------------- */
-
   const outcome = new URLSearchParams(window.location.search).get('oauth');
   const announced = outcome === null ? undefined : OAUTH_MESSAGES[outcome];
   if (announced !== undefined) {
     showBanner(announced.text, announced.kind);
-    // L'issue est retirée de l'URL : un rechargement ne doit pas rejouer le
-    // message d'une opération qui date.
     window.history.replaceState(null, '', window.location.pathname);
   }
 

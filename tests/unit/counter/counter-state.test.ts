@@ -13,21 +13,9 @@ import {
   type CounterState,
 } from '../../../src/core/counter/counter-state.js';
 
-/**
- * Le compteur est le cœur métier de ChronoCast, et ces réducteurs en sont la
- * partie pure : pas d'horloge interne, pas d'entrées-sorties, pas de minuteur.
- * Toute la logique se ramène à « état + action donne nouvel état ».
- *
- * Cette séparation n'est pas de la coquetterie : elle rend vérifiables sans
- * attendre une seule seconde réelle des situations qui prendraient des heures à
- * reproduire — atteinte de zéro, plafond dépassé par une salve de gifts,
- * reprise après pause.
- */
-
 const BOUNDS: CounterBounds = { minRemainingMs: 0, maxRemainingMs: 86_400_000 };
 const NOW = 1_754_000_000_000;
 
-/** État de départ commun : douze heures de valeur initiale, décompte en cours. */
 function runningState(remainingMs = 43_200_000): CounterState {
   const started = applyResume(createInitialState({ initialMs: 43_200_000, now: NOW }), { now: NOW });
   return { ...started, remainingMs };
@@ -107,8 +95,6 @@ describe('applyTick', () => {
   });
 
   it('ignore un temps écoulé négatif', () => {
-    // L'horloge monotone ne devrait jamais reculer, mais une valeur aberrante ne
-    // doit en aucun cas créditer du temps au streamer.
     const state = runningState(10_000);
 
     const next = applyTick(state, { elapsedMs: -5_000, bounds: BOUNDS, now: NOW });
@@ -153,8 +139,6 @@ describe('applyAdd', () => {
   });
 
   it('relance un compteur achevé', () => {
-    // Un gift sub arrivant juste après la fin doit relancer le subathon : c'est
-    // exactement ce que le spectateur croit acheter.
     const finished = applyTick(runningState(1_000), { elapsedMs: 5_000, bounds: BOUNDS, now: NOW });
 
     const next = applyAdd(finished, { deltaMs: 180_000, bounds: BOUNDS, now: NOW });
@@ -260,8 +244,6 @@ describe('applyPause et applyResume', () => {
   });
 
   it('refuse de reprendre un compteur achevé', () => {
-    // Reprendre à zéro repartirait aussitôt en « achevé » : il faut d'abord
-    // créditer du temps ou réinitialiser.
     const finished = applyTick(runningState(1_000), { elapsedMs: 5_000, bounds: BOUNDS, now: NOW });
 
     expect(applyResume(finished, { now: NOW })).toBe(finished);
@@ -301,8 +283,6 @@ describe('applySetInitial', () => {
   });
 
   it('ne touche pas au temps restant d\'un décompte en cours', () => {
-    // Changer la valeur de départ en plein subathon ne doit pas effacer le temps
-    // déjà gagné par les spectateurs.
     const state = runningState(10_000);
 
     const next = applySetInitial(state, { initialMs: 7_200_000, bounds: BOUNDS, now: NOW });

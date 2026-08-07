@@ -1,29 +1,3 @@
-/**
- * Écriture dans le DOM, seul endroit du front autorisé à le faire.
- *
- * Le risque couvert est le seul vraiment grave de tout ce projet. L'overlay
- * affiche des pseudonymes et des messages **choisis par des tiers non fiables**
- * — n'importe quel spectateur — dans une Browser Source OBS qui tourne sans
- * surveillance, sur la machine du streamer. Un pseudo contenant du HTML ne doit
- * jamais être interprété.
- *
- * C'est précisément pour ce fichier que la suite dispose de `happy-dom`. Un
- * faux `document` écrit à la main prouverait qu'on a appelé `textContent` ; il
- * ne prouverait rien sur ce qu'un analyseur HTML fait de la chaîne, puisqu'il
- * n'y en aurait pas. Ici, on écrit dans un vrai arbre et on constate qu'aucun
- * élément n'est né de la charge utile.
- *
- * Deuxième famille d'attaques, moins connue et tout aussi réelle : les
- * caractères de contrôle. Un saut de ligne dans un pseudo casse la mise en page
- * d'une bulle, et U+202E inverse le sens de lecture de tout ce qui suit — de
- * quoi faire afficher n'importe quoi à l'écran sans la moindre balise.
- *
- * Ces caractères sont construits par `String.fromCodePoint` et jamais écrits en
- * littéral : un octet invisible dans le source ne se relit pas, ne se revoit
- * pas, et sa disparition accidentelle rendrait le test trivialement vert sans
- * que personne ne s'en aperçoive.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -41,7 +15,6 @@ const BYTE_ORDER_MARK = String.fromCodePoint(0xfeff);
 const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x202e);
 const ZERO_WIDTH_JOINER = String.fromCodePoint(0x200d);
 
-/** Élément neuf, détaché du document : chaque test part d'un arbre vierge. */
 function host(): HTMLElement {
   return document.createElement('div');
 }
@@ -57,8 +30,6 @@ describe('sanitizeText', () => {
     });
 
     it("retire les marques de direction d'écriture", () => {
-      // U+202E inverse le sens de lecture : sans ce filtre, un pseudo peut
-      // faire afficher à l'écran un texte que personne n'a écrit.
       expect(sanitizeText(`Alice${RIGHT_TO_LEFT_OVERRIDE}kcatta`, 64)).toBe('Alicekcatta');
     });
 
@@ -67,8 +38,6 @@ describe('sanitizeText', () => {
     });
 
     it('conserve le liant sans chasse, qui tient les emoji composés', () => {
-      // U+200D est invisible lui aussi, mais le retirer ferait éclater une
-      // famille en trois personnes et abîmerait des pseudos honnêtes.
       const family = `👨${ZERO_WIDTH_JOINER}👩${ZERO_WIDTH_JOINER}👧`;
 
       expect(sanitizeText(family, 64)).toBe(family);
@@ -89,14 +58,10 @@ describe('sanitizeText', () => {
     });
 
     it('ne coupe pas un caractère en deux', () => {
-      // Une troncature naïve par `slice` séparerait la paire de substitution
-      // d'un emoji et produirait un losange noir à l'écran.
       expect(sanitizeText('👍'.repeat(20), 5)).toBe('👍👍👍👍…');
     });
 
     it('compte un emoji composé pour un seul caractère', () => {
-      // Découpé par point de code, ce pseudo ferait cinq unités et serait
-      // tronqué au milieu d'une famille.
       const family = `👨${ZERO_WIDTH_JOINER}👩${ZERO_WIDTH_JOINER}👧`;
 
       expect(sanitizeText(`${family}${family}`, 2)).toBe(`${family}${family}`);
@@ -196,16 +161,12 @@ describe('requireElement', () => {
   });
 
   it('lève quand la page ne contient pas l’élément attendu', () => {
-    // Le gabarit est le nôtre : une absence est un défaut de programmation, et
-    // échouer au démarrage vaut mieux qu'un overlay muet pendant six heures.
     expect(() => requireElement(host(), '#absent')).toThrow(/#absent/u);
   });
 });
 
 describe('setCssVariables', () => {
   it('applique les variables sur l’élément', () => {
-    // La CSP interdit l'attribut `style` écrit en HTML, mais pas le CSSOM :
-    // c'est la seule voie pour répercuter la configuration de l'overlay.
     const target = host();
 
     setCssVariables(target, { '--cc-color': '#FFFFFF', '--cc-font-size': '96px' });
@@ -215,8 +176,6 @@ describe('setCssVariables', () => {
   });
 
   it('refuse un nom qui n’est pas une variable CSS', () => {
-    // Sans cette garde, une faute de frappe écrirait une propriété réelle et
-    // le défaut ne se verrait qu'à l'écran, en direct.
     expect(() => {
       setCssVariables(host(), { color: 'red' });
     }).toThrow(/color/u);

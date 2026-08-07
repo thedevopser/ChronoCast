@@ -1,35 +1,12 @@
-/**
- * Service de configuration : seul point d'écriture des réglages.
- *
- * Il assure trois garanties que l'interface d'administration ne peut pas offrir
- * seule :
- *
- *   - **une configuration invalide n'est jamais persistée** — la validation
- *     précède l'écriture, et l'état en mémoire n'avance que si le disque a suivi ;
- *   - **une mise à jour partielle n'efface jamais les réglages voisins** — changer
- *     la taille de police de l'overlay ne doit pas réinitialiser le barème ;
- *   - **un fichier importé est validé avant d'être appliqué** — c'est une entrée
- *     utilisateur, donc une surface d'attaque.
- */
-
 import type { Logger } from '../logging/logger.js';
 import type { AtomicJsonStore } from '../storage/atomic-json-store.js';
 import { createDefaultConfig } from './defaults.js';
 import { CONFIG_SCHEMA_VERSION, configSchema, type ChronoCastConfig } from './schema.js';
 
-/** Indentation du fichier exporté : il doit rester relisible et modifiable à la main. */
 const EXPORT_INDENTATION = 2;
 
-/**
- * Clés interdites dans toute entrée externe.
- *
- * Le schéma les écarterait déjà, mais elles sont neutralisées avant même la
- * validation : une charge utile hostile ne doit jamais atteindre les entrailles
- * de la bibliothèque de validation.
- */
 const FORBIDDEN_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
-/** Le service a été interrogé avant d'avoir chargé sa configuration. */
 export class ConfigNotLoadedError extends Error {
   public override readonly name = 'ConfigNotLoadedError';
 
@@ -38,7 +15,6 @@ export class ConfigNotLoadedError extends Error {
   }
 }
 
-/** Le contenu proposé à l'import n'est pas une configuration exploitable. */
 export class ConfigImportError extends Error {
   public override readonly name = 'ConfigImportError';
 
@@ -51,7 +27,6 @@ export class ConfigImportError extends Error {
   }
 }
 
-/** Mise à jour partielle : toute branche peut être omise. */
 export type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends readonly unknown[]
     ? T[K]
@@ -64,28 +39,16 @@ export type ConfigChangeListener = (config: ChronoCastConfig) => void;
 export type Unsubscribe = () => void;
 
 export interface ConfigService {
-  /** Charge, valide, migre si besoin, puis expose la configuration. */
   load(): Promise<ChronoCastConfig>;
 
-  /**
-   * Configuration courante.
-   * @throws ConfigNotLoadedError si {@link load} n'a pas encore abouti.
-   */
   get(): ChronoCastConfig;
 
-  /** Fusionne une modification partielle, valide, persiste et notifie. */
   update(patch: DeepPartial<ChronoCastConfig>): Promise<ChronoCastConfig>;
 
-  /** Sérialise la configuration courante pour l'export. */
   export(): string;
 
-  /**
-   * Remplace la configuration par le contenu d'un fichier importé.
-   * @throws ConfigImportError si le contenu est inexploitable.
-   */
   import(serialized: string): Promise<ChronoCastConfig>;
 
-  /** S'abonne aux changements. Renvoie de quoi se désabonner. */
   onChange(listener: ConfigChangeListener): Unsubscribe;
 }
 
@@ -94,17 +57,10 @@ export interface ConfigServiceOptions {
   readonly logger: Logger;
 }
 
-/** Vrai si la valeur est un objet ordinaire, à l'exclusion des tableaux. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * Retire récursivement les clés dangereuses d'une valeur d'origine externe.
- *
- * `JSON.parse` sait produire une propriété littérale `__proto__` ; la recopier
- * dans un objet par affectation redéfinirait le prototype.
- */
 function sanitize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(sanitize);
@@ -122,16 +78,9 @@ function sanitize(value: unknown): unknown {
     result[key] = sanitize(entry);
   }
 
-  // Reconversion en objet ordinaire : la validation manipule des objets normaux.
   return { ...result };
 }
 
-/**
- * Fusionne récursivement une modification partielle dans une base.
- *
- * Les tableaux sont **remplacés** et non fusionnés : combiner deux barèmes de
- * bits par index produirait un barème hybride que personne n'a demandé.
- */
 function deepMerge(base: unknown, patch: unknown): unknown {
   if (!isPlainObject(patch)) {
     return patch;
@@ -150,7 +99,6 @@ function deepMerge(base: unknown, patch: unknown): unknown {
   return result;
 }
 
-/** Messages de validation, aplatis pour être affichés à l'utilisateur. */
 function describeIssues(error: unknown): string[] {
   if (typeof error !== 'object' || error === null || !('issues' in error)) {
     return [];
@@ -189,8 +137,6 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
       try {
         listener(config);
       } catch (error) {
-        // Un abonné défaillant ne doit pas empêcher les suivants d'être avertis
-        // ni faire échouer l'enregistrement qui vient d'aboutir.
         logger.error('abonné à la configuration en échec', { cause: error });
       }
     }
@@ -218,9 +164,6 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
 
       current = parsed.data;
 
-      // Une version antérieure est réécrite immédiatement : la configuration sur
-      // le disque doit refléter ce que l'application manipule réellement, sans
-      // quoi la migration serait rejouée à chaque démarrage.
       if (previousVersion !== CONFIG_SCHEMA_VERSION) {
         const migrated: ChronoCastConfig = { ...current, schemaVersion: CONFIG_SCHEMA_VERSION };
         try {
@@ -231,8 +174,6 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
             to: CONFIG_SCHEMA_VERSION,
           });
         } catch (error) {
-          // Migration non persistée : l'application fonctionne avec la version
-          // en mémoire et retentera au prochain démarrage.
           logger.warning('migration de configuration non persistée', { cause: error });
           current = migrated;
         }
@@ -256,9 +197,6 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
         throw new ConfigImportError('configuration invalide', details, parsed.error);
       }
 
-      // L'écriture précède la mise à jour de l'état en mémoire : si la
-      // persistance échoue, l'utilisateur ne doit pas voir une valeur qu'il
-      // croirait enregistrée alors qu'elle sera perdue au redémarrage.
       await store.write(parsed.data);
       current = parsed.data;
 

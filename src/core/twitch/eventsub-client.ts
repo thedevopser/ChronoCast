@@ -1,27 +1,3 @@
-/**
- * Client EventSub WebSocket.
- *
- * Seul lien avec Twitch pendant toute la durée du subathon. S'il tombe sans se
- * relever, le compteur continue à descendre mais plus rien ne le fait monter — et
- * personne ne s'en aperçoit avant plusieurs minutes.
- *
- * Sa conception répond à trois situations réelles :
- *
- *   - **La coupure silencieuse.** La connexion paraît ouverte mais ne transporte
- *     plus rien. Aucune erreur n'est levée, aucun événement de fermeture n'est
- *     émis. L'absence de message est le seul signal disponible, d'où le chien de
- *     garde armé sur le délai de keepalive négocié avec Twitch.
- *   - **La migration de session.** Twitch demande de basculer sur une nouvelle
- *     URL. L'ancienne connexion n'est fermée qu'après confirmation de la
- *     nouvelle, sous peine de perdre les événements de l'intervalle. Les
- *     souscriptions ne sont pas recréées : Twitch les transfère.
- *   - **La révocation.** Twitch retire une souscription sans fermer la
- *     connexion. Rien ne se voit, sinon que les abonnements cessent de créditer.
- *
- * Le transport est injecté afin que la machine à états soit vérifiable sans
- * aucun socket réel, en injectant les messages de Twitch à la main.
- */
-
 import type { AppEvents, TwitchConnectionStatus } from '../app/app-events.js';
 import type { EventBus } from '../app/event-bus.js';
 import type { ChronoCastConfig } from '../config/schema.js';
@@ -29,16 +5,12 @@ import type { Logger } from '../logging/logger.js';
 import type { HelixClient } from './helix-client.js';
 import { resolveSubscriptions, type SubscriptionContext } from './subscription-plan.js';
 
-/** Marge appliquée au délai de keepalive avant de déclarer la connexion morte. */
 const KEEPALIVE_GRACE_FACTOR = 1.2;
 
-/** Attente initiale avant une nouvelle tentative de connexion. */
 const BASE_RECONNECT_DELAY_MS = 1_000;
 
-/** Plafond de l'attente entre deux tentatives. */
 const MAX_RECONNECT_DELAY_MS = 60_000;
 
-/** Transport minimal attendu par le client. */
 export interface EventSubSocket {
   readonly url: string;
   onOpen(handler: () => void): void;
@@ -48,16 +20,13 @@ export interface EventSubSocket {
   close(): void;
 }
 
-/** Fabrique de transport, injectée pour rendre la machine à états testable. */
 export type EventSubSocketFactory = (url: string) => EventSubSocket;
 
-/** Minuteurs injectés, afin qu'aucun test n'attende une durée réelle. */
 export interface Timers {
   setTimeout(handler: () => void, ms: number): number;
   clearTimeout(id: number): void;
 }
 
-/** Contexte transmis au convertisseur pour chaque notification reçue. */
 export interface NotificationContext {
   readonly messageId: string;
   readonly receivedAt: number;
@@ -65,10 +34,8 @@ export interface NotificationContext {
 }
 
 export interface EventSubClient {
-  /** Ouvre la connexion et souscrit aux événements du plan. */
   start(): Promise<void>;
 
-  /** Ferme la connexion et interrompt toute tentative de reconnexion. */
   stop(): Promise<void>;
 
   getStatus(): TwitchConnectionStatus;
@@ -81,9 +48,7 @@ export interface EventSubClientOptions {
   readonly timers: Timers;
   readonly bus: EventBus<AppEvents>;
   readonly logger: Logger;
-  /** Identités utilisées pour construire les conditions de souscription. */
   readonly identity: SubscriptionContext;
-  /** Appelé pour chaque notification, avant toute interprétation métier. */
   readonly onNotification: (context: NotificationContext, payload: unknown) => void;
 }
 
@@ -101,24 +66,15 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
 
   let status: TwitchConnectionStatus = 'disconnected';
 
-  /** Connexion en service, celle dont les notifications sont traitées. */
   let activeSocket: EventSubSocket | undefined;
 
-  /**
-   * Connexion ouverte sur demande de migration, en attente de son accueil.
-   *
-   * Tant qu'elle n'a pas confirmé, l'ancienne reste en service : c'est ce qui
-   * garantit qu'aucun événement n'est perdu pendant la bascule.
-   */
   let migratingSocket: EventSubSocket | undefined;
 
   let keepaliveTimer: number | undefined;
   let reconnectTimer: number | undefined;
 
-  /** Tentatives consécutives, pour l'espacement exponentiel. */
   let reconnectAttempts = 0;
 
-  /** Vrai après `stop()` : interdit toute reconnexion automatique. */
   let stopped = false;
 
   function setStatus(next: TwitchConnectionStatus, detail?: string): void {
@@ -143,12 +99,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     }
   }
 
-  /**
-   * (Ré)arme le chien de garde.
-   *
-   * Appelé à chaque message reçu, quel qu'en soit le type : keepalive,
-   * notification ou message de service. Tout trafic prouve que la connexion vit.
-   */
   function armKeepaliveWatchdog(keepaliveSeconds: number): void {
     clearKeepaliveWatchdog();
 
@@ -159,7 +109,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     }, timeoutMs);
   }
 
-  /** Ferme la connexion courante et programme une nouvelle tentative. */
   function forceReconnect(reason: string): void {
     if (stopped) {
       return;
@@ -176,12 +125,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     scheduleReconnect();
   }
 
-  /**
-   * Programme une tentative de connexion avec espacement croissant.
-   *
-   * Le facteur aléatoire évite qu'une panne de Twitch ne fasse revenir toutes
-   * les installations exactement au même instant.
-   */
   function scheduleReconnect(): void {
     if (stopped || reconnectTimer !== undefined) {
       return;
@@ -203,7 +146,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     }, delayMs);
   }
 
-  /** Crée les souscriptions du plan pour la session qui vient de s'ouvrir. */
   async function createSubscriptions(sessionId: string): Promise<void> {
     const config = getConfig();
     const planned = resolveSubscriptions(config.twitch, identity);
@@ -217,8 +159,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
           sessionId,
         });
       } catch (error) {
-        // Une souscription facultative en échec ne doit pas interrompre le
-        // subathon : seuls les abonnements et les bits sont vitaux.
         const level = subscription.required ? 'error' : 'warning';
         logger[level]('souscription EventSub en échec', {
           type: subscription.type,
@@ -238,7 +178,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     logger.info('souscriptions EventSub établies', { count: planned.length });
   }
 
-  /** Traite un message d'accueil, seul porteur de l'identifiant de session. */
   function handleWelcome(socket: EventSubSocket, payload: unknown): void {
     const session = isRecord(payload) ? payload['session'] : undefined;
     if (!isRecord(session)) {
@@ -257,9 +196,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
         ? session['keepalive_timeout_seconds']
         : getConfig().twitch.keepaliveTimeoutSeconds;
 
-    // Migration confirmée : la nouvelle connexion prend le relais et l'ancienne
-    // peut enfin être fermée. Les souscriptions sont transférées par Twitch, les
-    // recréer produirait des doublons facturés au quota.
     if (socket === migratingSocket) {
       logger.info('migration de session confirmée');
       activeSocket?.close();
@@ -275,11 +211,9 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     armKeepaliveWatchdog(keepaliveSeconds);
     setStatus('connected');
 
-    // Session nouvelle : les souscriptions doivent être créées.
     void createSubscriptions(sessionId);
   }
 
-  /** Traite une demande de migration en ouvrant la connexion cible. */
   function handleReconnectRequest(payload: unknown): void {
     const session = isRecord(payload) ? payload['session'] : undefined;
     const reconnectUrl = isRecord(session) ? readString(session, 'reconnect_url') : undefined;
@@ -310,14 +244,11 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     bus.emit('twitch:revocation', { subscriptionType, status: revocationStatus });
   }
 
-  /** Aiguille un message entrant selon son type. */
   function handleMessage(socket: EventSubSocket, data: string): void {
     let message: unknown;
     try {
       message = JSON.parse(data);
     } catch (error) {
-      // Un message illisible ne doit pas rompre la connexion, qui porte tout le
-      // reste du subathon.
       logger.warning('message EventSub illisible', { cause: error });
       return;
     }
@@ -338,7 +269,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
       return;
     }
 
-    // Tout trafic prouve que la connexion vit, pas seulement les keepalives.
     if (socket === activeSocket) {
       const keepaliveSeconds = getConfig().twitch.keepaliveTimeoutSeconds;
       armKeepaliveWatchdog(keepaliveSeconds);
@@ -350,12 +280,9 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
         return;
 
       case 'session_keepalive':
-        // Le chien de garde a déjà été réarmé ci-dessus : rien d'autre à faire.
         return;
 
       case 'notification': {
-        // Seule la connexion en service est écoutée : pendant une migration, la
-        // nouvelle n'a pas encore confirmé et pourrait doubler les événements.
         if (socket !== activeSocket) {
           return;
         }
@@ -384,13 +311,10 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
         return;
 
       default:
-        // Twitch peut introduire de nouveaux types : les ignorer poliment vaut
-        // mieux que rompre une connexion qui fonctionne.
         logger.debug('type de message EventSub non géré', { messageType });
     }
   }
 
-  /** Ouvre un transport et branche ses gestionnaires. */
   function openSocket(url: string): EventSubSocket {
     const socket = createSocket(url);
 
@@ -407,8 +331,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     });
 
     socket.onClose((code, reason) => {
-      // Une fermeture attendue — migration achevée, arrêt volontaire — ne doit
-      // pas déclencher de reconnexion.
       if (stopped || (socket !== activeSocket && socket !== migratingSocket)) {
         return;
       }
@@ -420,7 +342,6 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     return socket;
   }
 
-  /** Ouvre la connexion principale sur l'URL configurée. */
   function openConnection(): void {
     const config = getConfig();
     const url = new URL(config.twitch.eventsubUrl);

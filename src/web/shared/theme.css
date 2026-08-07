@@ -1,148 +1,60 @@
-/*
- * Tokens sémantiques de l'interface d'administration.
- *
- * Feuille partagée par l'assistant et par le panneau. Elle ne contient **que**
- * des variables : aucun sélecteur de composant, aucune règle de mise en page.
- * Les feuilles de chaque page consomment ces noms et ne connaissent aucune
- * valeur littérale — ni les nôtres, ni celles d'Open Props.
- *
- * ## Le rapport à Open Props
- *
- * `open-props.css` est chargé **avant** cette feuille et n'apporte que des
- * primitives. Une règle simple gouverne le rebasage :
- *
- *   - un token référence la primitive dès qu'elle vaut **exactement** la valeur
- *     retenue ;
- *   - sinon il garde son littéral, avec la raison en commentaire.
- *
- * Aligner de force une valeur sur la primitive la plus proche changerait le
- * rendu d'une page déjà livrée et relue, ce qui n'est pas un rebasage mais une
- * refonte déguisée. Une couche de tokens sémantiques a précisément le droit de
- * porter des valeurs que le jeu de primitives ne fournit pas ; c'est ce qui la
- * distingue d'un simple alias.
- *
- * Les couleurs, elles, ne sont pas rebasables par nature : ce sont celles de
- * Twitch, pas une échelle de gris générique.
- *
- * ## Thème
- *
- * Thème sombre assumé et unique. Un outil qu'on garde ouvert sur un second
- * écran pendant six heures de direct n'a pas à éclairer la pièce, et proposer
- * deux thèmes doublerait la surface à vérifier pour un bénéfice nul.
- *
- * Corollaire à ne pas perdre de vue : les seules primitives d'Open Props
- * sensibles à `prefers-color-scheme` sont `--shadow-color` et
- * `--shadow-strength`. Nous ne les employons pas — nos ombres sont écrites en
- * dur — donc la préférence système du poste n'a aucune prise sur ce thème.
- */
-
 :root {
-  /* ---------------------------------------------------------------------- */
-  /* Surfaces, du fond le plus profond au plus proche.                       */
-  /* Palette Twitch : aucune échelle de gris générique n'y correspond.       */
-  /* ---------------------------------------------------------------------- */
   --cc-bg: #0e0e10;
   --cc-surface: #18181b;
   --cc-surface-raised: #1f1f23;
   --cc-border: #2f2f35;
 
-  /* Texte, par ordre d'importance décroissante. */
   --cc-text: #efeff1;
   --cc-text-muted: #adadb8;
   --cc-text-faint: #7d7d87;
 
-  /* Accent Twitch, et ses déclinaisons d'état. */
   --cc-accent: #9146ff;
   --cc-accent-hover: #a970ff;
   --cc-accent-text: #ffffff;
 
-  /* Sémantique d'état. */
   --cc-success: #00c389;
   --cc-warning: #ffb224;
   --cc-danger: #ff5c5c;
 
-  /* Fonds teintés des bandeaux et pastilles, dérivés des couleurs d'état. */
   --cc-success-soft: #00c3891f;
   --cc-warning-soft: #ffb2241f;
   --cc-danger-soft: #ff5c5c1f;
   --cc-accent-soft: #9146ff26;
 
-  /* ---------------------------------------------------------------------- */
-  /* Espacement                                                              */
-  /* ---------------------------------------------------------------------- */
   --cc-space-1: var(--size-1); /* .25rem */
   --cc-space-2: var(--size-2); /* .5rem  */
   --cc-space-3: var(--size-3); /* 1rem   */
   --cc-space-4: var(--size-5); /* 1.5rem */
-  /* L'échelle d'Open Props saute de 2rem à 3rem : 2.5rem reste littéral. */
   --cc-space-5: 2.5rem;
   --cc-space-6: var(--size-8); /* 3rem */
 
-  /* ---------------------------------------------------------------------- */
-  /* Rayons                                                                  */
-  /* ---------------------------------------------------------------------- */
-  /* `--radius-2` vaut 5px et `--radius-3` 1rem : ni l'un ni l'autre ne rend
-     les 6px et 10px déjà livrés. Littéraux, donc. */
   --cc-radius: 6px;
   --cc-radius-lg: 10px;
   --cc-radius-pill: var(--radius-6);
 
-  /* ---------------------------------------------------------------------- */
-  /* Traits                                                                  */
-  /* ---------------------------------------------------------------------- */
   --cc-border-width: var(--border-size-1); /* 1px */
   --cc-focus-width: var(--border-size-2); /* 2px */
 
-  /* ---------------------------------------------------------------------- */
-  /* Typographie                                                             */
-  /* ---------------------------------------------------------------------- */
-  /* Sur Windows — seule cible de la V1 — `system-ui` résout vers Segoe UI :
-     la pile d'Open Props est donc équivalente à celle qui était écrite ici. */
   --cc-font: var(--font-sans);
-  /* Police à chasse fixe pour les identifiants et les URL, qu'on relit lettre
-     à lettre avant de les coller ailleurs. */
   --cc-font-mono: var(--font-mono);
 
   --cc-text-xs: var(--font-size-0); /* .75rem */
-  /* 0.85rem : entre `--font-size-0` (.75rem) et `--font-size-1` (1rem). */
   --cc-text-sm: 0.85rem;
   --cc-text-base: var(--font-size-1); /* 1rem    */
   --cc-text-lg: var(--font-size-3); /* 1.25rem */
-  /* 1.75rem : entre `--font-size-4` (1.5rem) et `--font-size-5` (2rem). */
   --cc-text-xl: 1.75rem;
-  /* Compteur du tableau de bord : lisible d'un coup d'œil depuis le fauteuil. */
   --cc-text-counter: var(--font-size-7); /* 3rem */
 
   --cc-weight-medium: var(--font-weight-5); /* 500 */
   --cc-weight-bold: var(--font-weight-7); /* 700 */
 
-  /* ---------------------------------------------------------------------- */
-  /* Élévation et mouvement                                                  */
-  /* ---------------------------------------------------------------------- */
-  /* Ombre écrite en dur : celles d'Open Props se règlent sur
-     `prefers-color-scheme`, or ce thème est sombre quoi qu'en dise le poste. */
   --cc-shadow: 0 2px 12px rgb(0 0 0 / 40%);
   --cc-ease: var(--ease-3);
 
-  /* ---------------------------------------------------------------------- */
-  /* Gabarit                                                                 */
-  /* ---------------------------------------------------------------------- */
-  /* Largeur de lecture confortable : au-delà, l'œil perd la ligne.
-     En `rem` et non en `ch` — l'assistant l'a été dès l'origine, et la mesure
-     en `ch` dépendrait de la police, donc du poste. */
   --cc-measure: 46rem;
   --cc-sidebar-width: 15rem;
 }
 
-/*
- * Réinitialisation minimale.
- *
- * Volontairement courte : ce n'est pas une page publique à rendre identique sur
- * quinze navigateurs, mais une page servie en local à Chromium.
- */
-*,
-*::before,
-*::after {
   box-sizing: border-box;
 }
 
@@ -159,7 +71,6 @@ a {
   color: var(--cc-accent-hover);
 }
 
-/* Le focus reste visible : les deux pages se parcourent entièrement au clavier. */
 :focus-visible {
   outline: var(--cc-focus-width) solid var(--cc-accent-hover);
   outline-offset: 2px;

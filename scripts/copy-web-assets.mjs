@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-/**
- * Copie les ressources non TypeScript de `src/web` vers `dist/public/`.
- *
- * TypeScript ne compile que les `.ts` ; les pages, feuilles de style et polices
- * doivent être placées à côté du JavaScript émis pour que le serveur statique
- * serve une arborescence cohérente.
- *
- * Ce script est volontairement dépourvu de dépendance : il ne s'appuie que sur
- * la bibliothèque standard de Node.
- */
 
 import { cp, mkdir, readdir, stat } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
@@ -18,10 +8,6 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_DIR = join(REPO_ROOT, 'src', 'web');
 const TARGET_DIR = join(REPO_ROOT, 'dist', 'public');
 
-/**
- * Extensions copiées telles quelles. Une liste blanche plutôt qu'une liste noire :
- * un fichier d'un type inattendu ne doit pas se retrouver servi par accident.
- */
 const COPIED_EXTENSIONS = new Set([
   '.html',
   '.css',
@@ -33,12 +19,6 @@ const COPIED_EXTENSIONS = new Set([
   '.json',
 ]);
 
-/**
- * Parcourt récursivement un répertoire et renvoie les chemins des fichiers à copier.
- *
- * @param {string} directory
- * @returns {Promise<string[]>}
- */
 async function collectAssets(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const collected = [];

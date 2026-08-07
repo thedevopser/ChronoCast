@@ -1,22 +1,3 @@
-/**
- * Client WebSocket des pages, et sa reconnexion.
- *
- * Le risque couvert est propre à OBS. Une Browser Source n'est **jamais**
- * rechargée automatiquement : elle est chargée une fois, au démarrage de la
- * scène, et vit ensuite des heures. Si la connexion tombe — redémarrage de
- * ChronoCast, mise en veille de la machine, changement de port — personne ne
- * viendra rafraîchir la page. Le client doit donc se reconnecter seul,
- * indéfiniment, sans intervention.
- *
- * Ce qu'il ne doit pas faire non plus : marteler le serveur. D'où le retrait
- * exponentiel plafonné, vérifié ici sur la suite complète des délais plutôt
- * que sur le premier.
- *
- * Rien n'attend réellement : le socket, les minuteurs et la source d'aléa sont
- * injectés. Un test qui prendrait trente secondes pour vérifier un plafond de
- * trente secondes ne serait pas exécuté assez souvent pour servir.
- */
-
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ServerMessage } from '../../../../src/web/shared/protocol.js';
@@ -26,10 +7,6 @@ import {
   type WsClientStatus,
   type WsSocket,
 } from '../../../../src/web/shared/ws-client.js';
-
-/* -------------------------------------------------------------------------- */
-/* Doublures                                                                   */
-/* -------------------------------------------------------------------------- */
 
 interface SocketDouble {
   readonly socket: WsSocket;
@@ -64,7 +41,6 @@ function createSocketDouble(): SocketDouble {
   return double;
 }
 
-/** Minuteurs contrôlés à la main : aucune attente réelle, aucun `vi.useFakeTimers`. */
 function createTimerDouble() {
   const pending = new Map<number, { run: () => void; delay: number }>();
   let nextId = 1;
@@ -80,10 +56,8 @@ function createTimerDouble() {
         pending.delete(id);
       },
     },
-    /** Délais des minuteurs en attente, dans l'ordre de programmation. */
     delays: (): number[] => [...pending.values()].map((entry) => entry.delay),
     pendingCount: (): number => pending.size,
-    /** Déclenche le minuteur le plus ancien. */
     fire: (): void => {
       const [id] = [...pending.keys()];
       if (id === undefined) {
@@ -102,7 +76,6 @@ interface Harness {
   readonly sockets: SocketDouble[];
   readonly messages: ServerMessage[];
   readonly statuses: WsClientStatus[];
-  /** Dernier socket créé. */
   last(): SocketDouble;
 }
 
@@ -142,13 +115,10 @@ function createHarness(random = () => 0.5): Harness {
   };
 }
 
-/* -------------------------------------------------------------------------- */
-
 describe('backoffDelay', () => {
   const options = { initialDelayMs: 500, maxDelayMs: 30_000, factor: 2, jitterRatio: 0.2 };
 
   it('rend le délai initial à la première tentative', () => {
-    // Aléa neutre : 0,5 place le jitter pile au centre de sa fourchette.
     expect(backoffDelay(1, options, () => 0.5)).toBe(500);
   });
 
@@ -159,8 +129,6 @@ describe('backoffDelay', () => {
   });
 
   it('plafonne le délai', () => {
-    // Sans plafond, la vingtième tentative attendrait plusieurs jours et
-    // l'overlay ne reviendrait jamais.
     expect(backoffDelay(20, options, () => 0.5)).toBe(30_000);
   });
 
@@ -193,8 +161,6 @@ describe('createWsClient', () => {
     });
 
     it('annonce ses canaux dès l’ouverture', () => {
-      // Sans cet abonnement, le hub pousse tout — y compris chaque ligne de
-      // journal — vers une Browser Source qui n'en fait rien.
       const harness = createHarness();
       harness.client.start();
 
@@ -234,7 +200,6 @@ describe('createWsClient', () => {
       harness.last().receive('{ceci n’est pas du JSON');
       harness.last().receive('{"type":"pong"}');
 
-      // Le message valide qui suit doit passer : la boucle a survécu.
       expect(harness.messages).toStrictEqual([{ type: 'pong' }]);
     });
   });
@@ -277,8 +242,6 @@ describe('createWsClient', () => {
     });
 
     it('repart du délai initial après une connexion réussie', () => {
-      // Sans cette remise à zéro, une coupure brève survenue tard dans un
-      // subathon ferait attendre trente secondes pour rien.
       const harness = createHarness();
       harness.client.start();
 
@@ -294,8 +257,6 @@ describe('createWsClient', () => {
     });
 
     it('ne programme qu’une seule reconnexion quand l’erreur précède la fermeture', () => {
-      // Un navigateur émet `error` puis `close` sur un échec de connexion :
-      // les compter deux fois doublerait la cadence des tentatives.
       const harness = createHarness();
       harness.client.start();
 

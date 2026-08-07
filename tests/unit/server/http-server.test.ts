@@ -7,19 +7,6 @@ import { jsonResponse, type HttpRequest, type HttpResponse } from '../../../src/
 import { createHttpServer, type HttpServer } from '../../../src/core/server/http-server.js';
 import type { Router } from '../../../src/core/server/router.js';
 
-/**
- * L'adaptateur `node:http` est la seule partie du serveur qui touche à un socket.
- * Tout ce qu'il fait — lire un corps, appeler le routeur, écrire une réponse — est
- * mécanique ; ce qui mérite d'être testé, ce sont ses trois refus.
- *
- * Il ne se lie qu'à la boucle locale, sans quoi le panneau d'administration, qui
- * peut remettre le compteur à zéro, serait offert à tout le réseau du streamer.
- * Il plafonne le corps des requêtes, sans quoi un seul POST saturerait la
- * mémoire. Et il survit à un port déjà pris, parce que 3777 est banal et qu'un
- * démarrage qui échoue sans explication est un bogue que personne ne saura
- * diagnostiquer.
- */
-
 function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
   const records: LogRecord[] = [];
   return {
@@ -31,7 +18,6 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
   };
 }
 
-/** Routeur d'essai : consigne ce qu'il reçoit et renvoie ce qu'on lui a dit. */
 function createRouterDouble() {
   const seen: HttpRequest[] = [];
   let next: HttpResponse = jsonResponse(200, { ok: true });
@@ -52,7 +38,6 @@ function createRouterDouble() {
   };
 }
 
-/** Occupe un port et le renvoie, pour éprouver le repli. */
 async function occupyPort(): Promise<{ port: number; release: () => Promise<void> }> {
   const blocker: Server = createServer();
 
@@ -140,14 +125,11 @@ describe('createHttpServer', () => {
     expect(request?.method).toBe('POST');
     expect(request?.path).toBe('/api/history');
     expect(request?.query.get('limit')).toBe('10');
-    // Les noms d'en-tête sont normalisés en minuscules : les gardes en dépendent.
     expect(request?.headers['x-chronocast-token']).toBe('abc');
     expect(request?.body).toBe('{"a":1}');
   });
 
   it('décode le chemin une seule fois', async () => {
-    // Décoder deux fois transformerait `%252e%252e` en `..` et rouvrirait la
-    // traversée que le service statique referme.
     const double = createRouterDouble();
     server = build({ router: double.router });
     const port = await server.start();
@@ -214,7 +196,6 @@ describe('createHttpServer', () => {
     await server.stop();
     server = null;
 
-    // Si le port n'était pas libéré, ce second serveur basculerait sur un repli.
     const second = build({ port });
     try {
       expect(await second.start()).toBe(port);
@@ -233,7 +214,6 @@ describe('createHttpServer', () => {
     const response = await fetch(`http://127.0.0.1:${String(port)}/api/state`);
     expect(response.status).toBe(500);
 
-    // Le processus doit encore répondre : une requête ne met pas le serveur à terre.
     expect((await fetch(`http://127.0.0.1:${String(port)}/api/state`)).status).toBe(500);
   });
 });

@@ -30,25 +30,6 @@ import {
   chatNotificationSubPrime,
 } from '../fixtures/eventsub-payloads.js';
 
-/**
- * Ce fichier est ce qui valide la Phase 4.
- *
- * Il ne teste aucun module en particulier : il démarre l'**application entière**
- * — configuration, journaux, compteur, historique, serveur HTTP, hub WebSocket,
- * pipeline de déduplication — lui injecte des notifications EventSub réelles, et
- * observe ce que le streamer verrait.
- *
- * Rien n'y touche le réseau. La socket EventSub et `fetch` sont des doubles, les
- * données vont dans un répertoire temporaire, et la seule vraie connexion est un
- * WebSocket vers `127.0.0.1` — celui-là même qu'OBS ouvrira.
- *
- * Les scénarios sont ceux dont dépend la crédibilité du produit : l'événement qui
- * crédite, la retransmission qui ne recrédite pas, le don annoncé deux fois qui
- * ne compte qu'une, le Prime vu par deux flux, et surtout le redémarrage — parce
- * qu'un compteur qui repart de zéro après un crash n'a aucune valeur.
- */
-
-/** Cadenceur manuel : les tests décident quand le temps passe. */
 function createManualTicker(): Ticker & { tick(): void } {
   let handler: (() => void) | null = null;
   return {
@@ -64,7 +45,6 @@ function createManualTicker(): Ticker & { tick(): void } {
   };
 }
 
-/** Magasin de secrets en mémoire : aucun chiffrement à éprouver ici. */
 function createMemorySecretStore(): SecretStore {
   const entries = new Map<string, string>();
   return {
@@ -81,13 +61,6 @@ function createMemorySecretStore(): SecretStore {
   };
 }
 
-/**
- * Requête HTTP brute, en maîtrisant l'en-tête `Host`.
- *
- * `fetch` refuse de le fixer : c'est un en-tête protégé, que la couche cliente
- * écrase. Or c'est exactement celui que la garde anti-rebinding examine, et un
- * attaquant, lui, n'utilise pas `fetch`.
- */
 function rawRequestStatus(host: string, path: string, port: number): Promise<number> {
   return new Promise((resolve, reject) => {
     const request = httpRequest(
@@ -102,7 +75,6 @@ function rawRequestStatus(host: string, path: string, port: number): Promise<num
   });
 }
 
-/** Collecte les messages d'un client WebSocket réel. */
 function collect(socket: WebSocket) {
   const received: Record<string, unknown>[] = [];
 
@@ -134,26 +106,11 @@ describe('application complète', () => {
   let port: number;
   let sequence = 0;
   const sockets: WebSocket[] = [];
-  /** Trace du serveur de rappel OAuth, remplacé par un double. */
   let oauthEvents: string[] = [];
-  /** Routeur du rappel, capturé au passage : il est piloté directement. */
   let oauthRouter: Router | null = null;
-  /**
-   * `fetch` de l'application, remplacé par les seuls tests qui en ont besoin.
-   *
-   * Partout ailleurs il refuse : aucun test ne doit toucher au réseau, et un
-   * appel non prévu doit se voir plutôt que de partir vers Twitch.
-   */
   let appFetch: typeof fetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
-  /**
-   * Ancien répertoire de données, quand le test en met un en scène.
-   *
-   * `undefined` partout ailleurs : c'est le cas du point d'entrée headless, qui
-   * n'a jamais rien à reprendre.
-   */
   let legacyDataDirectory: string | undefined;
 
-  /** Construit une application sur le répertoire de données courant. */
   function build(): Application {
     ticker = createManualTicker();
 
@@ -165,9 +122,6 @@ describe('application complète', () => {
         webRootDirectory: join(dataDirectory, 'public'),
         resolveDataFile: (...segments) => join(dataDirectory, ...segments),
       },
-      // Étalé conditionnellement : `exactOptionalPropertyTypes` distingue
-      // « propriété absente » de « propriété à `undefined` », et seule la
-      // première décrit une application qui n'a rien à reprendre.
       ...(legacyDataDirectory === undefined ? {} : { legacyDataDirectory }),
       secrets: createMemorySecretStore(),
       clock: createSystemClock(),
@@ -175,7 +129,6 @@ describe('application complète', () => {
       ticker,
       appVersion: '0.1.0',
       hubTimers: {
-        // Aucun battement réel : la vivacité est testée dans `ws-hub.test.ts`.
         setInterval: () => 0,
         clearInterval: () => undefined,
       },
@@ -183,8 +136,6 @@ describe('application complète', () => {
         setTimeout: () => 0,
         clearTimeout: () => undefined,
       },
-      // Le port 37771 est fixe et imposé par Twitch : l'ouvrir réellement
-      // ferait échouer deux tests exécutés en parallèle sur la même machine.
       createOAuthServer: (router) => {
         oauthEvents.push('créé');
         oauthRouter = router;
@@ -207,7 +158,6 @@ describe('application complète', () => {
     });
   }
 
-  /** Injecte une notification EventSub comme le ferait le client. */
   function notify(subscriptionType: string, payload: unknown, messageId?: string): Promise<void> {
     sequence += 1;
     return application.ingestNotification(
@@ -224,7 +174,6 @@ describe('application complète', () => {
     return fetch(`http://127.0.0.1:${String(port)}${path}`, init);
   }
 
-  /** Requête mutante, jeton compris. */
   function mutate(path: string, body?: string): Promise<Response> {
     return api(path, {
       method: 'POST',
@@ -263,7 +212,6 @@ describe('application complète', () => {
     return socket;
   }
 
-  /** Lit l'état persisté sur le disque, tel qu'il serait relu au redémarrage. */
   async function readPersistedCounter(): Promise<{ remainingMs: number; status: string }> {
     const raw = await readFile(join(dataDirectory, 'counter.json'), 'utf8');
     return JSON.parse(raw) as { remainingMs: number; status: string };
@@ -288,8 +236,6 @@ describe('application complète', () => {
     });
 
     it('démarre sans Twitch configuré, sans échouer', async () => {
-      // Cas d'une installation neuve : rien ne crédite le compteur, mais tout le
-      // reste fonctionne. C'est ce qui permet à l'assistant de s'ouvrir.
       const twitch = (await (await api('/api/twitch/status')).json()) as Record<string, unknown>;
 
       expect(twitch['connected']).toBe(false);
@@ -309,17 +255,13 @@ describe('application complète', () => {
 
       await notify('channel.subscribe', channelSubscribe);
 
-      // 1 — le compteur a monté.
       const state = (await (await api('/api/state')).json()) as {
         counter: { remainingMs: number };
       };
       expect(state.counter.remainingMs).toBe(43_200_000 + 180_000);
 
-      // 2 — l'état est écrit tout de suite : une mutation ne peut pas attendre
-      // la prochaine sauvegarde périodique, sinon un crash l'effacerait.
       expect((await readPersistedCounter()).remainingMs).toBe(43_380_000);
 
-      // 3 — l'historique en garde la trace et l'explication.
       const history = (await (await api('/api/history')).json()) as {
         entries: { type: string; rewardSeconds: number; applied: boolean }[];
       };
@@ -329,7 +271,6 @@ describe('application complète', () => {
         applied: true,
       });
 
-      // 4 — l'overlay l'a reçu.
       await overlay.waitFor(() => overlay.ofType('counter').length > 0, 'diffusion du compteur');
       expect(overlay.ofType('event')).toHaveLength(1);
     });
@@ -342,15 +283,10 @@ describe('application complète', () => {
         counter: { remainingMs: number };
       };
 
-      // Twitch retransmet : sans cette garde, chaque retransmission serait un
-      // abonnement de plus.
       expect(state.counter.remainingMs).toBe(43_200_000 + 180_000);
     });
 
     it('ne crédite un don d’abonnements qu’une seule fois', async () => {
-      // Twitch annonce le don deux fois : `channel.subscription.gift` au
-      // donateur, puis un `channel.subscribe` avec `is_gift: true` par
-      // bénéficiaire. Les compter tous deux doublerait la récompense.
       await notify('channel.subscription.gift', channelSubscriptionGift);
       const afterGift = (await (await api('/api/state')).json()) as {
         counter: { remainingMs: number };
@@ -365,9 +301,6 @@ describe('application complète', () => {
     });
 
     it('ne crédite pas deux fois un Prime vu par deux flux', async () => {
-      // `channel.subscribe` et `channel.chat.notification` décrivent le même
-      // abonnement. La clé sémantique assimile Prime et Tier 1 précisément pour
-      // attraper ce doublon-là.
       await notify('channel.chat.notification', chatNotificationSubPrime);
       const afterPrime = (await (await api('/api/state')).json()) as {
         counter: { remainingMs: number };
@@ -394,23 +327,11 @@ describe('application complète', () => {
     it('reste debout sur une charge utile non conforme', async () => {
       await notify('channel.subscribe', { n_importe: 'quoi' });
 
-      // Aucun crédit, mais surtout : le serveur répond encore.
       expect((await api('/api/state')).status).toBe(200);
     });
   });
 
-  /**
-   * Commandes de chat.
-   *
-   * C'est la première source d'événements de ChronoCast qui ne vient pas d'un
-   * soutien financier, et la première dont le déclencheur est une intention
-   * humaine plutôt qu'une action de plateforme. Deux conséquences se vérifient
-   * ici, et pas ailleurs : le **filtrage précoce** — rien n'entre dans
-   * l'historique de ce qui n'aboutit pas — et le fait que deux commandes
-   * identiques soient **deux crédits**, contrairement à tout le reste.
-   */
   describe('commandes de chat', () => {
-    /** Active la lecture du chat, comme le ferait la case du panneau. */
     async function enableChatCommands(patch: unknown = {}): Promise<void> {
       const response = await api('/api/config', {
         method: 'PATCH',
@@ -462,8 +383,6 @@ describe('application complète', () => {
       await notify('channel.chat.message', chatMessageViewerAddTime);
 
       expect(await remainingMs()).toBe(43_200_000);
-      // Rien dans l'historique non plus : sans ce filtrage précoce, un
-      // spectateur martelant la commande le remplirait une ligne à la fois.
       expect(await historyEntries()).toHaveLength(0);
     });
 
@@ -486,8 +405,6 @@ describe('application complète', () => {
     });
 
     it('reste inerte tant que les commandes ne sont pas activées', async () => {
-      // Le réglage est éteint par défaut : lire tout le chat d'une chaîne ne
-      // s'active pas dans le dos de qui met simplement à jour.
       await notify('channel.chat.message', chatMessageModeratorAddTime);
 
       expect(await remainingMs()).toBe(43_200_000);
@@ -504,10 +421,6 @@ describe('application complète', () => {
     });
 
     it('crédite deux fois deux commandes identiques', async () => {
-      // **Le cas qui distingue une commande de tout le reste.** La
-      // déduplication sémantique reconnaît un même fait de plateforme annoncé
-      // par deux flux ; deux `!addtime 300` à trois secondes d'écart sont deux
-      // intentions, et les confondre volerait cinq minutes au streamer.
       await enableChatCommands();
 
       await notify('channel.chat.message', chatMessageModeratorAddTime, 'msg-a');
@@ -542,8 +455,6 @@ describe('application complète', () => {
     });
 
     it('ne décompte pas le temps passé hors ligne', async () => {
-      // Mode gel : un crash nocturne ne doit rien coûter au streamer. C'est la
-      // décision d'architecture la plus visible pour l'utilisateur final.
       await mutate('/api/counter/resume');
       const before = (await readPersistedCounter()).remainingMs;
 
@@ -571,26 +482,12 @@ describe('application complète', () => {
     });
   });
 
-  /**
-   * Le passage au Microsoft Store déplace le répertoire de données hors du
-   * conteneur MSIX, qui part avec la désinstallation. La reprise est ce qui
-   * évite que chaque utilisateur déjà installé perde son subathon en cours et
-   * doive refaire l'OAuth Twitch.
-   *
-   * Les cas unitaires sont dans `tests/unit/app/data-migration.test.ts`. Ce
-   * qu'on éprouve ici est ce que les tests unitaires ne peuvent pas voir :
-   * qu'un vrai répertoire, écrit par une vraie application, soit relu par une
-   * autre application démarrée ailleurs.
-   */
   describe('reprise d’une installation précédente', () => {
     it('retrouve compteur et historique écrits à l’ancien emplacement', async () => {
       await notify('channel.subscribe', channelSubscribe);
       const before = (await readPersistedCounter()).remainingMs;
       await application.stop();
 
-      // Ce que la première application a écrit devient l'installation NSIS
-      // qu'on laisse derrière soi, et la nouvelle démarre sur un répertoire
-      // vierge — exactement la situation d'un poste qui installe depuis le Store.
       legacyDataDirectory = dataDirectory;
       dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-store-'));
 
@@ -611,8 +508,6 @@ describe('application complète', () => {
       const legacyRemaining = (await readPersistedCounter()).remainingMs;
       await application.stop();
 
-      // L'ancienne installation, et une nouvelle qui démarre à côté sans rien
-      // savoir d'elle : elle écrit sa propre configuration et son propre compteur.
       const previous = dataDirectory;
       dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-store-'));
       application = build();
@@ -620,10 +515,6 @@ describe('application complète', () => {
       const ownRemaining = (await readPersistedCounter()).remainingMs;
       await application.stop();
 
-      // C'est le deuxième lancement après migration. Rejouer la reprise
-      // écraserait le compteur du direct en cours par celui, périmé, de
-      // l'installation qu'on a quittée — exactement ce que le marqueur
-      // `config.json` empêche.
       expect(ownRemaining).not.toBe(legacyRemaining);
       legacyDataDirectory = previous;
       application = build();
@@ -676,10 +567,6 @@ describe('application complète', () => {
 
   describe('gardes de sécurité en conditions réelles', () => {
     it('refuse une requête dont le Host n’est pas local', async () => {
-      // `fetch` interdit de fixer l'en-tête `Host` : c'est un en-tête protégé,
-      // que la couche cliente écrase silencieusement. Il faut donc passer par
-      // `node:http` — ce que fait précisément un attaquant, et ce que fait un
-      // navigateur victime de rebinding DNS.
       const status = await rawRequestStatus('evil.com', '/api/state', port);
 
       expect(status).toBe(403);
@@ -733,15 +620,12 @@ describe('application complète', () => {
         body: JSON.stringify({ clientSecret: 'secret-tres-confidentiel' }),
       });
 
-      // Une fois déclaré au rédacteur, le secret est masqué partout — y compris
-      // s'il se retrouve au milieu d'un message d'erreur.
       const logs = await (await api('/api/logs')).text();
       expect(logs).not.toContain('secret-tres-confidentiel');
     });
   });
 
   describe('flux OAuth', () => {
-    /** Déclenche un flux et rend le `state` que Twitch devra renvoyer. */
     async function beginAuthorization(): Promise<string> {
       const response = await mutate('/api/twitch/connect');
       const { authorizationUrl } = (await response.json()) as { authorizationUrl: string };
@@ -761,7 +645,6 @@ describe('application complète', () => {
     });
 
     it('n’accepte le state qu’une seule fois', async () => {
-      // Un `state` rejouable autoriserait le rejeu d'un rappel déjà consommé.
       const state = await beginAuthorization();
 
       expect(application.verifyOAuthState(state)).toBe(true);
@@ -769,9 +652,6 @@ describe('application complète', () => {
     });
 
     it('refuse un state étranger sans consommer la demande en cours', async () => {
-      // N'importe quelle page distante peut provoquer une navigation vers la
-      // boucle locale. Si un `state` erroné consommait la demande, le premier
-      // venu ferait échouer la connexion du streamer, à distance et en boucle.
       const state = await beginAuthorization();
 
       expect(application.verifyOAuthState('b'.repeat(64))).toBe(false);
@@ -783,19 +663,12 @@ describe('application complète', () => {
     });
 
     it('annonce l’issue du rappel sur le bus', async () => {
-      // C'est par là que la coquille Electron ramène sa fenêtre au premier
-      // plan. Sans cet événement, l'utilisateur termine sa configuration dans
-      // le navigateur pendant que la fenêtre reste à l'étape précédente — et
-      // c'est exactement ce qui se passait avant cette correction.
       const state = await beginAuthorization();
       const settled: string[] = [];
       application.bus.on('oauth:settled', (payload) => {
         settled.push(payload.outcome);
       });
 
-      // L'échange échouera : ces tests n'ont aucun accès réseau. C'est bien la
-      // situation à couvrir — un échec doit ramener la fenêtre autant qu'une
-      // réussite, sans quoi l'utilisateur reste devant un assistant muet.
       await oauthRouter?.handle(
         makeRequest({ path: '/callback', query: { code: 'abc', state } }),
       );
@@ -812,15 +685,11 @@ describe('application complète', () => {
     });
 
     it('referme le port de rappel à l’arrêt de l’application', async () => {
-      // Un port laissé ouvert après extinction est une surface offerte pour
-      // rien : plus personne n'attend de rappel.
       await beginAuthorization();
 
       await application.stop();
       expect(oauthEvents).toContain('arrêté');
 
-      // Reconstruite pour que le démontage global, qui arrête l'application,
-      // travaille sur une instance vivante.
       application = build();
       port = await application.start();
     });

@@ -3,17 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { createLogger, type LogRecord, type LogSink } from '../../../src/core/logging/logger.js';
 import { createRedactor, REDACTED } from '../../../src/core/logging/redaction.js';
 
-/**
- * Le logger est le seul canal de diagnostic dont dispose l'utilisateur final :
- * l'application tourne sans terminal, et le panneau d'administration affiche
- * exactement ce que ces enregistrements contiennent.
- *
- * Deux exigences en découlent, et ce sont elles que ces tests verrouillent :
- * un puits défaillant ne doit jamais interrompre l'appelant, et aucun secret ne
- * doit franchir cette frontière.
- */
-
-/** Puits de test conservant les enregistrements en mémoire. */
 function createMemorySink(name = 'memory'): LogSink & { readonly records: LogRecord[] } {
   const records: LogRecord[] = [];
   return {
@@ -25,7 +14,6 @@ function createMemorySink(name = 'memory'): LogSink & { readonly records: LogRec
   };
 }
 
-/** Horloge figée : les horodatages doivent être déterministes en test. */
 function fixedClock(iso: string): () => Date {
   const instant = new Date(iso);
   return () => instant;

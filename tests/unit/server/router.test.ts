@@ -9,18 +9,6 @@ import { CSRF_HEADER } from '../../../src/core/server/security/csrf.js';
 import type { StaticHandler } from '../../../src/core/server/static-handler.js';
 import { makeRequest } from '../../helpers/http-request.js';
 
-/**
- * Le routeur est le seul chemin par lequel une requête entre dans l'application.
- * C'est donc le seul endroit où les gardes de sécurité peuvent être rendues
- * inévitables : posées ici, en amont de toute résolution de route, aucune route
- * ajoutée plus tard ne peut les oublier.
- *
- * L'ordre compte. La garde d'`Host` passe en premier parce qu'elle refuse la
- * requête sans rien exécuter. La garde CSRF vient ensuite, avant même de savoir
- * si la route existe : répondre `404` à une mutation non authentifiée
- * renseignerait un attaquant sur la carte de l'API.
- */
-
 const TOKEN = 'f'.repeat(64);
 
 function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
@@ -113,7 +101,6 @@ describe('createRouter', () => {
     });
 
     it("refuse une mutation sur une route inexistante sans révéler qu'elle n'existe pas", async () => {
-      // Un 404 ici dessinerait la carte de l'API à qui la demande.
       const response = await router.handle(makeRequest({ method: 'POST', path: '/api/inconnue' }));
 
       expect(response.status).toBe(403);
@@ -201,7 +188,6 @@ describe('createRouter', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toBe('');
-      // La longueur reste annoncée : c'est tout l'intérêt d'un HEAD.
       expect(response.headers['content-length']).toBe(String(JSON.stringify({ ok: true }).length));
     });
   });
@@ -250,8 +236,6 @@ describe('createRouter', () => {
 
   describe('feuille de style personnelle', () => {
     it('sert /custom.css sans passer par le statique', async () => {
-      // Le fichier vit dans le répertoire de données, pas dans la racine web :
-      // le gestionnaire statique ne saurait pas le trouver.
       const response = await router.handle(makeRequest({ path: '/custom.css' }));
 
       expect(response.status).toBe(200);
@@ -260,8 +244,6 @@ describe('createRouter', () => {
     });
 
     it('reste après les pages et avant le statique', async () => {
-      // L'ordre compte : une page ne doit pas pouvoir être masquée par ce
-      // gestionnaire, et le statique reste le dernier recours.
       pageResponse = null;
       await router.handle(makeRequest({ path: '/inconnu.css' }));
 
@@ -285,8 +267,6 @@ describe('createRouter', () => {
   });
 
   it('lit le jeton à chaque requête', async () => {
-    // Le jeton est engendré au démarrage : un routeur qui le capturerait une fois
-    // pour toutes casserait au premier redémarrage à chaud.
     const getToken = vi.fn(() => TOKEN);
     const fresh = createRouter({
       routes,

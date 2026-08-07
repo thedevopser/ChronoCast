@@ -5,16 +5,6 @@ import { createConsoleSink } from '../../../src/core/logging/sinks/console-sink.
 import { createJsonlSink } from '../../../src/core/logging/sinks/jsonl-sink.js';
 import { createRingBufferSink } from '../../../src/core/logging/sinks/ring-buffer-sink.js';
 
-/**
- * Les trois destinations d'un enregistrement, chacune avec une raison d'être :
- *
- *   - le tampon circulaire alimente la vue « Logs » de l'administration, qui doit
- *     répondre instantanément sans relire le disque ;
- *   - le fichier JSONL conserve la trace après redémarrage, pour le diagnostic ;
- *   - la console sert au développement et aux diagnostics de démarrage, avant que
- *     les autres puits ne soient branchés.
- */
-
 function makeRecord(overrides: Partial<LogRecord> = {}): LogRecord {
   return {
     timestamp: '2026-08-01T10:00:00.000Z',
@@ -125,7 +115,6 @@ describe('createConsoleSink', () => {
 });
 
 describe('createJsonlSink', () => {
-  /** Magasin JSONL simulé : seule la méthode `append` est utilisée par le puits. */
   function createStoreDouble() {
     const appended: LogRecord[] = [];
     let rejectWith: Error | undefined;
@@ -165,8 +154,6 @@ describe('createJsonlSink', () => {
 
     sink.write(makeRecord());
 
-    // L'écriture est différée : le puits ne doit pas bloquer le fil d'exécution
-    // qui traite un événement Twitch.
     expect(double.appended).toHaveLength(0);
   });
 

@@ -1,18 +1,3 @@
-/**
- * Point d'entrée du panneau d'administration.
- *
- * Ce fichier n'est **que du câblage**, comme `overlay/main.ts` et
- * `setup/main.ts`. Il ne décide rien : la navigation est arbitrée par
- * `router.ts`, le contenu par `dashboard-model.ts`, le décompte par
- * `countdown.ts`, les appels par `api-client.ts`, l'écriture dans le DOM par
- * `safe-dom.ts` — tous couverts par des tests. Ce qui reste ici — obtenir des
- * éléments, accrocher des gestionnaires, demander une image — n'est pas
- * vérifiable sans navigateur et n'a rien à décider.
- *
- * Aucun `console` : ESLint l'interdit dans `src/web`, et un incident se
- * diagnostique par les journaux du serveur, que ce panneau montrera.
- */
-
 import { createApiClient, readCsrfToken, ApiError } from '../shared/api-client.js';
 import { createCountdown, type SyncMode } from '../shared/countdown.js';
 import {
@@ -74,7 +59,6 @@ import {
   type FieldViewId,
 } from './router.js';
 
-/** Pastille de liaison, par état du client WebSocket. */
 const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {
   connecting: 'dot dot--warning',
   open: 'dot dot--ok',
@@ -82,7 +66,6 @@ const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {
   stopped: 'dot dot--danger',
 };
 
-/** Pastille du compteur, par statut. */
 const COUNTER_PILLS: Readonly<Record<CounterState['status'], string>> = {
   idle: 'pill',
   running: 'pill pill--ok',
@@ -90,7 +73,6 @@ const COUNTER_PILLS: Readonly<Record<CounterState['status'], string>> = {
   finished: 'pill pill--danger',
 };
 
-/** Ce que `GET /api/twitch/status` renvoie, réduit à ce que la vue affiche. */
 interface TwitchDescription {
   readonly broadcasterLogin: string;
   readonly clientId: string;
@@ -100,12 +82,6 @@ interface TwitchDescription {
   readonly missingScopes: readonly string[];
 }
 
-/**
- * Adaptateur du `WebSocket` du navigateur vers le port attendu par le client.
- *
- * Identique à celui de l'overlay : il déplie `MessageEvent.data` pour que
- * `ws-client` n'ait pas à connaître le DOM.
- */
 function createBrowserSocket(url: string): WsSocket {
   const native = new WebSocket(url);
 
@@ -153,10 +129,6 @@ function start(): void {
   let painted: DashboardModel | null = null;
   let renderedCountdown = '';
 
-  /* ---------------------------------------------------------------------- */
-  /* Bandeau                                                                */
-  /* ---------------------------------------------------------------------- */
-
   function showBanner(text: string, kind: string): void {
     setText(banner, text, 200);
     banner.className = `banner ${kind}`;
@@ -164,18 +136,13 @@ function start(): void {
   }
 
   function reportFailure(error: unknown): void {
-    // `ApiError` porte déjà la phrase française écrite par le serveur : la
-    // remplacer par un message générique gâcherait tout le soin mis en amont.
     const message =
       error instanceof ApiError ? error.message : 'Une erreur inattendue est survenue.';
     showBanner(message, 'banner--error');
   }
 
-  /** Neutralise le bouton le temps de l'appel : un double clic vaut deux actions. */
   async function guarded(target: HTMLButtonElement, action: () => Promise<void>): Promise<void> {
     target.disabled = true;
-    // Le bandeau est effacé **avant** l'action, jamais après : l'effacer après
-    // emporterait le message que l'action vient elle-même d'afficher.
     banner.hidden = true;
     try {
       await action();
@@ -186,18 +153,11 @@ function start(): void {
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  /* Navigation                                                             */
-  /* ---------------------------------------------------------------------- */
-
   function showView(view: AdminViewId): void {
     for (const candidate of ADMIN_VIEWS as readonly string[]) {
       requireElement(document, `#view-${candidate}`).hidden = candidate !== view;
     }
 
-    // L'aperçu n'est chargé qu'à la première ouverture de la vue Apparence :
-    // le charger d'emblée ouvrirait une seconde connexion WebSocket qui
-    // resterait en vie tout le direct, pour un cadre que personne ne regarde.
     if (view === 'appearance') {
       const preview = requireElement(document, '#overlay-preview') as HTMLIFrameElement;
       if (preview.getAttribute('src') === null) {
@@ -228,10 +188,6 @@ function start(): void {
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  /* Peinture                                                               */
-  /* ---------------------------------------------------------------------- */
-
   function paintEvents(): void {
     clearChildren(eventsList);
     eventsEmpty.hidden = model.events.length > 0;
@@ -244,8 +200,6 @@ function start(): void {
       type.className = 'event__type';
       setText(type, EVENT_LABELS[event.type]);
 
-      // Le pseudo vient de Twitch, donc d'un inconnu : `setText` tronque,
-      // retire les caractères de contrôle et n'interprète jamais de HTML.
       const user = document.createElement('span');
       user.className = 'event__user';
       setText(user, event.userName);
@@ -298,7 +252,6 @@ function start(): void {
     painted = model;
   }
 
-  /** Une érosion de routine se rattrape ; tout le reste s'impose. */
   function syncModeOf(origin: CounterChangeOrigin): SyncMode {
     return origin === 'tick' ? 'tick' : 'authoritative';
   }
@@ -313,8 +266,6 @@ function start(): void {
         break;
 
       case 'log':
-        // Le tampon continue de se remplir même en pause : figer l'affichage
-        // sert à lire une pile d'appel, pas à perdre ce qui arrive pendant.
         logs = appendRecords(logs, [message.record]);
         if (!logsPaused) {
           paintScopes();
@@ -329,8 +280,6 @@ function start(): void {
       case 'config':
       case 'pong':
       case 'error':
-        // Rien à resynchroniser : ces messages n'affectent que le modèle, qui
-        // les reçoit juste en dessous.
         break;
     }
 
@@ -352,11 +301,6 @@ function start(): void {
     window.requestAnimationFrame(render);
   }
 
-  /* ---------------------------------------------------------------------- */
-  /* Actions                                                                */
-  /* ---------------------------------------------------------------------- */
-
-  /** Rejoue l'état renvoyé par une mutation, sans attendre la diffusion. */
   function adopt(state: CounterState | undefined): void {
     if (state !== undefined) {
       countdown.sync(state, performance.now(), 'authoritative');
@@ -434,11 +378,6 @@ function start(): void {
     });
   }
 
-  /* ---------------------------------------------------------------------- */
-  /* Vues de réglage                                                        */
-  /* ---------------------------------------------------------------------- */
-
-  /** Dernière configuration connue, référence de comparaison des saisies. */
   let config: unknown = {};
 
   const containerOf = (view: FieldViewId): HTMLElement =>
@@ -446,7 +385,6 @@ function start(): void {
 
   const tiersList = requireElement(document, '#bits-tiers');
 
-  /** Ajoute une ligne à l'éditeur de paliers. */
   function appendTierRow(minBits: string, seconds: string): void {
     const row = document.createElement('li');
     row.className = 'tier';
@@ -483,7 +421,6 @@ function start(): void {
     tiersList.append(row);
   }
 
-  /** Lit l'éditeur de paliers, ligne par ligne. */
   function readTierRows(): TierInput[] {
     return [...tiersList.querySelectorAll('.tier')].map((row) => ({
       minBits: row.querySelector<HTMLInputElement>('[data-tier="min"]')?.value ?? '',
@@ -502,7 +439,6 @@ function start(): void {
     appendTierRow('', '');
   });
 
-  /** Repeint tous les champs de réglage depuis la configuration en mémoire. */
   function paintFields(): void {
     for (const view of FIELD_VIEWS) {
       const fields = fieldsOf(view);
@@ -521,13 +457,6 @@ function start(): void {
     paintFields();
   }
 
-  /**
-   * Enregistre une vue de réglage.
-   *
-   * Seuls les champs **modifiés** partent : renvoyer les soixante-dix
-   * écraserait une valeur changée entre-temps par l'assistant resté ouvert
-   * dans une fenêtre voisine.
-   */
   async function saveView(view: FieldViewId, extra?: Record<string, unknown>): Promise<void> {
     const fields = fieldsOf(view);
     const container = containerOf(view);
@@ -543,9 +472,6 @@ function start(): void {
       const filled = rows.filter((row) => row.minBits.trim() !== '' || row.seconds.trim() !== '');
       const modeField = container.querySelector<HTMLSelectElement>('#reward-bits-mode');
 
-      // Les paliers ne sont exigés qu'en mode « tiers ». En mode linéaire on
-      // les enregistre tout de même s'ils sont renseignés : c'est ainsi qu'on
-      // les prépare avant de basculer.
       if (modeField?.value === 'tiers' || filled.length > 0) {
         const { tiers, errors: tierErrors } = normalizeTiers(rows);
         if (tierErrors.length > 0) {
@@ -571,8 +497,6 @@ function start(): void {
       return;
     }
 
-    // Le secret client est **frère** de `config` dans le corps, jamais son
-    // enfant : il va dans le magasin chiffré et ne ressort par aucune lecture.
     await api.patch('/api/config', { ...(Object.keys(patch).length > 0 ? { config: patch } : {}), ...extra });
     await refreshConfig();
     showBanner('Modifications enregistrées.', 'banner--success');
@@ -590,10 +514,6 @@ function start(): void {
       void guarded(control, () => saveView(view));
     });
   }
-
-  /* ---------------------------------------------------------------------- */
-  /* Vue Twitch                                                             */
-  /* ---------------------------------------------------------------------- */
 
   async function refreshTwitch(): Promise<void> {
     const status = await api.get<TwitchDescription>('/api/twitch/status');
@@ -678,10 +598,6 @@ function start(): void {
     void guarded(refreshSubs, refreshSubscriptions);
   });
 
-  // Renvoi vers Paramètres → Applications → Démarrage. **Aucune adresse ne
-  // part d'ici** : la route ne porte pas de charge utile, et la destination est
-  // une constante de la coquille. En headless elle répond `501`, que `guarded`
-  // affiche dans le bandeau — la seule situation où il n'y a rien à ouvrir.
   const startupSettings = button('#open-startup-settings');
   startupSettings.addEventListener('click', () => {
     void guarded(startupSettings, async () => {
@@ -689,11 +605,6 @@ function start(): void {
     });
   });
 
-  /* ---------------------------------------------------------------------- */
-  /* Vue Historique                                                         */
-  /* ---------------------------------------------------------------------- */
-
-  /** Une page d'affichage, alignée sur la borne basse de l'API. */
   const HISTORY_PAGE_SIZE = 25;
 
   let historyEntries: readonly HistoryEntry[] = [];
@@ -737,16 +648,12 @@ function start(): void {
       const main = document.createElement('span');
       main.className = 'record__main';
 
-      // Le pseudo vient de Twitch, donc d'un inconnu : `setText` tronque,
-      // retire les caractères de contrôle et n'interprète jamais de HTML.
       const title = document.createElement('span');
       title.className = 'record__title';
       setText(title, item.userName);
 
       const detail = document.createElement('span');
       detail.className = 'record__detail';
-      // Le motif vient du serveur et explique pourquoi rien n'a été crédité :
-      // c'est l'information qu'on vient chercher ici.
       setText(detail, [formatDetail(item), item.reason].filter((part) => part !== '').join(' · '), 200);
 
       main.append(title, detail);
@@ -771,8 +678,6 @@ function start(): void {
 
   for (const selector of ['#history-type', '#history-applied', '#history-search']) {
     requireElement(document, selector).addEventListener('input', () => {
-      // Tout changement de filtre ramène à la première page : rester sur la
-      // huitième d'une liste qui n'en compte plus que deux afficherait le vide.
       historyPage = 0;
       paintHistory();
     });
@@ -798,17 +703,12 @@ function start(): void {
     void guarded(historyRefresh, refreshHistory);
   });
 
-  /* ---------------------------------------------------------------------- */
-  /* Vue Journaux                                                           */
-  /* ---------------------------------------------------------------------- */
-
   let logs: LogBuffer = createLogBuffer();
   let logsPaused = false;
 
   const logsList = requireElement(document, '#logs-list');
   const logsScope = requireElement(document, '#logs-scope') as HTMLSelectElement;
 
-  /** Classe de la ligne, pour que l'œil trouve une erreur sans lire. */
   function logClassOf(level: string): string {
     if (level === 'error') {
       return 'record record--error';
@@ -816,7 +716,6 @@ function start(): void {
     return level === 'warning' ? 'record record--warning' : 'record';
   }
 
-  /** Met la liste des portées à jour sans perdre celle qui est choisie. */
   function paintScopes(): void {
     const chosen = logsScope.value;
     const scopes = scopesOf(logs.records);
@@ -853,8 +752,6 @@ function start(): void {
 
       const time = document.createElement('span');
       time.className = 'record__time';
-      // L'horodatage est en UTC dans le fichier ; l'afficher tel quel
-      // obligerait le streamer à convertir de tête pendant un incident.
       setText(time, new Date(item.timestamp).toLocaleTimeString('fr-FR'), 20);
 
       const scope = document.createElement('span');
@@ -870,9 +767,6 @@ function start(): void {
       main.append(title);
 
       if (item.context !== undefined) {
-        // Le contexte est écrit en JSON indenté dans un seul nœud texte,
-        // jamais reconstruit en éléments : sa profondeur et son contenu
-        // viennent de l'exécution, pas d'une forme connue à l'avance.
         const context = document.createElement('pre');
         context.className = 'record__context';
         setText(context, JSON.stringify(item.context, null, 2), 2_000);
@@ -896,8 +790,6 @@ function start(): void {
   }
 
   async function refreshLogs(): Promise<void> {
-    // Rechargement complet : conserver ce que le WebSocket a déjà livré ferait
-    // apparaître deux fois les enregistrements présents dans les deux sources.
     const payload = await api.get<{ records: readonly LogRecord[] }>('/api/logs?limit=1000');
     logs = appendRecords(createLogBuffer(), payload.records);
     paintScopes();
@@ -938,10 +830,6 @@ function start(): void {
     );
   });
 
-  /* ---------------------------------------------------------------------- */
-  /* Import et export                                                       */
-  /* ---------------------------------------------------------------------- */
-
   const importButton = button('#import-config');
   importButton.addEventListener('click', () => {
     void guarded(importButton, async () => {
@@ -956,10 +844,6 @@ function start(): void {
       showBanner('Configuration importée.', 'banner--success');
     });
   });
-
-  /* ---------------------------------------------------------------------- */
-  /* Démarrage                                                              */
-  /* ---------------------------------------------------------------------- */
 
   for (const view of FIELD_VIEWS) {
     renderFieldGroups(document, containerOf(view), fieldsOf(view), groupsOf(view));
@@ -979,8 +863,6 @@ function start(): void {
       protocol: window.location.protocol,
       port: readWebSocketPort(document),
     }),
-    // Le panneau prend tout : il montre le compteur, les événements, le statut
-    // Twitch, et — dès le lot 3 — les journaux au fil de l'eau.
     channels: DEFAULT_CHANNELS,
     createSocket: createBrowserSocket,
     onMessage: handle,
@@ -995,8 +877,6 @@ function start(): void {
     },
   });
 
-  // La configuration n'est pas dans l'instantané du WebSocket, qui ne diffuse
-  // que la section `overlay` : elle se lit par l'API.
   void refreshConfig().then(
     () => {
       const initial = (config as { counter?: { initialSeconds?: number } }).counter?.initialSeconds;
@@ -1016,14 +896,11 @@ function start(): void {
     reportFailure(error);
   });
 
-  // Twitch en dernier et sans bloquer : c'est justement quand Twitch ne répond
-  // pas que le streamer doit pouvoir ouvrir son panneau.
   void refreshTwitch().catch((error: unknown) => {
     reportFailure(error);
   });
   void refreshSubscriptions().catch(() => {
-    // Sans jeton, cette route répond 502 : l'annoncer sur chaque ouverture du
-    // panneau d'une installation neuve n'apprendrait rien à personne.
+    // Sans jeton, cette route répond 502 sur une installation neuve.
   });
 
   client.start();

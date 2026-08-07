@@ -1,24 +1,3 @@
-# Construction du paquet MSIX destiné au Microsoft Store.
-#
-# **Ce workflow ne publie plus rien.** Il produit un artefact, et c'est
-# l'utilisateur qui le dépose dans Partner Center. Deux raisons : automatiser la
-# soumission demanderait une inscription d'application Azure AD et trois secrets
-# dans le dépôt — qui en dispose publie sous l'identité du projet — et c'est
-# l'utilisateur qui publie, ici comme pour les PR.
-#
-# Deux façons de le déclencher :
-#
-#   - **Un tag `vX.Y.Z` poussé** produit le paquet destiné à la soumission, et
-#     vérifie au préalable que l'identité de Partner Center est renseignée.
-#   - **Un déclenchement manuel** (onglet Actions → « Release » → « Run
-#     workflow ») produit le paquet **sans ce contrôle**. Il reste installable
-#     par chargement latéral pour éprouver le packaging, ce qui est précisément
-#     son usage — une identité marqueuse n'empêche rien de fonctionner en local.
-#
-# Le build tourne sur un runner **Windows**, nativement : la cible AppX réclame
-# `makeappx.exe` du SDK Windows, présent sur les runners `windows-latest` et
-# nulle part dans le conteneur de développement. Voir docs/BUILD.md.
-
 name: Release
 
 on:
@@ -42,16 +21,9 @@ jobs:
           node-version: '22'
           cache: npm
 
-      # electron-builder télécharge lui-même le runtime Electron dont il a
-      # besoin : le script post-install du paquet npm n'est pas nécessaire, et
-      # la règle `--ignore-scripts` tient donc aussi ici.
       - name: Installer les dépendances
         run: npm ci --ignore-scripts
 
-      # Le tag fait foi, mais `package.json` est ce qui finit dans le paquet et
-      # dans la version que lit le Store. Les laisser diverger publierait une
-      # release `v1.2.0` contenant un paquet en `1.1.0` : le Store refuserait la
-      # soumission suivante, la version devant croître à chaque fois.
       - name: Vérifier la cohérence du tag et de package.json
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -64,14 +36,6 @@ jobs:
           fi
           echo "version : $manifest"
 
-      # Une identité de paquet fausse produit un `.appx` en tout point valide,
-      # que **rien ne distingue** d'un paquet soumettable — jusqu'au rejet de
-      # certification, un à trois jours plus tard. Le contrôle ne vaut que sur un
-      # tag : un build manuel avec une identité marqueuse reste utile pour
-      # éprouver le packaging par chargement latéral.
-      #
-      # Le marqueur cherché ici est celui qu'un test tient accordé à
-      # `electron-builder.yml` : voir `tests/unit/assets/packaging.test.ts`.
       - name: Vérifier l’identité du paquet
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -83,8 +47,6 @@ jobs:
           fi
           echo "identité du paquet renseignée"
 
-      # La même vérification qu'en CI, avant de produire quoi que ce soit : un
-      # paquet bâti sur une suite rouge n'a aucune raison d'exister.
       - name: Vérifier
         run: npm run verify
 
@@ -94,12 +56,6 @@ jobs:
       - name: Construire le paquet MSIX
         run: npx electron-builder --windows --publish never
 
-      # Meilleur effort, et jamais bloquant. Le kit de certification attrape une
-      # bonne part des motifs de rejet — ressources graphiques incomplètes,
-      # capacités mal déclarées — mais il lui arrive d'échouer pour des raisons
-      # qui lui appartiennent, et faire échouer la release là-dessus coûterait
-      # plus que ça ne rapporte. Son rapport est joint à l'artefact : il se lit
-      # avant de soumettre, pas après le rejet.
       - name: Passer le Windows App Certification Kit
         continue-on-error: true
         shell: pwsh
@@ -113,10 +69,6 @@ jobs:
           & $appcert reset
           & $appcert test -appxpackagepath $package.FullName -reportoutputpath release\wack-report.xml
 
-      # Seul livrable du workflow : c'est ce fichier qu'on dépose dans Partner
-      # Center. Partner Center accepte le `.appx` tel quel — le `.msixupload` est
-      # un format d'empaquetage propre à Visual Studio, il n'y a pas à le
-      # produire.
       - name: Publier l’artefact de l’exécution
         uses: actions/upload-artifact@v4
         with:

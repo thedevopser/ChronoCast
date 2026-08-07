@@ -1,26 +1,3 @@
-/**
- * Charges utiles EventSub, reproduites fidèlement d'après la documentation
- * Twitch.
- *
- * Elles sont typées `unknown` à dessein : le convertisseur doit les valider
- * comme s'il les recevait du réseau, et non se reposer sur un typage que la
- * réalité ne garantit pas.
- *
- * Regroupées dans un module TypeScript plutôt que dans des fichiers JSON, afin
- * de pouvoir les commenter — c'est précisément là que se trouvent les pièges du
- * protocole.
- */
-
-/* -------------------------------------------------------------------------- */
-/* Abonnements                                                                 */
-/* -------------------------------------------------------------------------- */
-
-/**
- * `channel.subscribe` v1.
- *
- * Le palier `1000` recouvre le Tier 1 **et** le Prime : aucun indicateur ne les
- * distingue ici. Seul `channel.chat.notification` permet de les séparer.
- */
 export const channelSubscribe: unknown = {
   user_id: '1234',
   user_login: 'cool_user',
@@ -35,16 +12,8 @@ export const channelSubscribe: unknown = {
 export const channelSubscribeTier2: unknown = { ...(channelSubscribe as object), tier: '2000' };
 export const channelSubscribeTier3: unknown = { ...(channelSubscribe as object), tier: '3000' };
 
-/**
- * `channel.subscribe` avec `is_gift: true`.
- *
- * Twitch émet un tel événement **par bénéficiaire**, en plus du
- * `channel.subscription.gift` envoyé au donateur. Les compter tous deux
- * doublerait la récompense.
- */
 export const channelSubscribeGifted: unknown = { ...(channelSubscribe as object), is_gift: true };
 
-/** `channel.subscription.message` v1 — réabonnement avec message. */
 export const channelSubscriptionMessage: unknown = {
   user_id: '1234',
   user_login: 'cool_user',
@@ -62,7 +31,6 @@ export const channelSubscriptionMessage: unknown = {
   duration_months: 6,
 };
 
-/** `channel.subscription.gift` v1 — don d'abonnements. */
 export const channelSubscriptionGift: unknown = {
   user_id: '1234',
   user_login: 'cool_user',
@@ -76,12 +44,6 @@ export const channelSubscriptionGift: unknown = {
   is_anonymous: false,
 };
 
-/**
- * Don anonyme.
- *
- * Twitch met alors `user_id`, `user_login` et `user_name` à `null` : le
- * convertisseur doit produire un nom d'affichage de repli sans échouer.
- */
 export const channelSubscriptionGiftAnonymous: unknown = {
   user_id: null,
   user_login: null,
@@ -95,11 +57,6 @@ export const channelSubscriptionGiftAnonymous: unknown = {
   is_anonymous: true,
 };
 
-/* -------------------------------------------------------------------------- */
-/* Bits, raid, follow                                                          */
-/* -------------------------------------------------------------------------- */
-
-/** `channel.cheer` v1. */
 export const channelCheer: unknown = {
   is_anonymous: false,
   user_id: '1234',
@@ -124,12 +81,6 @@ export const channelCheerAnonymous: unknown = {
   bits: 500,
 };
 
-/**
- * `channel.raid` v1.
- *
- * Les champs ne sont pas préfixés `user_` mais `from_broadcaster_user_` : le
- * raideur est un diffuseur, pas un spectateur.
- */
 export const channelRaid: unknown = {
   from_broadcaster_user_id: '1234',
   from_broadcaster_user_login: 'cool_user',
@@ -140,7 +91,6 @@ export const channelRaid: unknown = {
   viewers: 9001,
 };
 
-/** `channel.follow` v2. */
 export const channelFollow: unknown = {
   user_id: '1234',
   user_login: 'cool_user',
@@ -151,11 +101,6 @@ export const channelFollow: unknown = {
   followed_at: '2026-08-01T18:16:11.17106713Z',
 };
 
-/* -------------------------------------------------------------------------- */
-/* channel.chat.notification — source primaire                                 */
-/* -------------------------------------------------------------------------- */
-
-/** Champs communs à toutes les notifications de chat. */
 const chatNotificationBase = {
   broadcaster_user_id: '1337',
   broadcaster_user_login: 'cooler_user',
@@ -183,12 +128,6 @@ const chatNotificationBase = {
   charity_donation: null,
 };
 
-/**
- * Abonnement Prime.
- *
- * C'est l'unique endroit du protocole où `is_prime` apparaît : c'est ce qui rend
- * ce flux indispensable pour appliquer un barème Prime distinct du Tier 1.
- */
 export const chatNotificationSubPrime: unknown = {
   ...chatNotificationBase,
   notice_type: 'sub',
@@ -218,12 +157,6 @@ export const chatNotificationResub: unknown = {
   },
 };
 
-/**
- * Don groupé.
- *
- * Porte le total. Les `sub_gift` individuels qui suivent référencent ce don via
- * `community_gift_id` et ne doivent donc pas être comptés une seconde fois.
- */
 export const chatNotificationCommunitySubGift: unknown = {
   ...chatNotificationBase,
   notice_type: 'community_sub_gift',
@@ -235,7 +168,6 @@ export const chatNotificationCommunitySubGift: unknown = {
   },
 };
 
-/** Don individuel rattaché à un don groupé : déjà comptabilisé. */
 export const chatNotificationSubGiftInCommunity: unknown = {
   ...chatNotificationBase,
   notice_type: 'sub_gift',
@@ -250,7 +182,6 @@ export const chatNotificationSubGiftInCommunity: unknown = {
   },
 };
 
-/** Don individuel isolé : à comptabiliser. */
 export const chatNotificationSubGiftStandalone: unknown = {
   ...chatNotificationBase,
   notice_type: 'sub_gift',
@@ -265,33 +196,12 @@ export const chatNotificationSubGiftStandalone: unknown = {
   },
 };
 
-/** Type de notification sans intérêt pour le compteur. */
 export const chatNotificationAnnouncement: unknown = {
   ...chatNotificationBase,
   notice_type: 'announcement',
   announcement: { color: 'PRIMARY' },
 };
 
-/* -------------------------------------------------------------------------- */
-/* Messages de chat                                                            */
-/* -------------------------------------------------------------------------- */
-
-/**
- * `channel.chat.message` v1.
- *
- * Deux champs seuls décident ici, et ce sont les deux pièges du flux :
- *
- *   1. **`badges`** porte l'habilitation, `set_id` valant `broadcaster` ou
- *      `moderator`. C'est une donnée que Twitch pose lui-même ; le pseudo, lui,
- *      s'imite. L'autorisation ne se lit jamais ailleurs.
- *   2. **`message.text`** est le texte affiché, fragments recomposés. Twitch y
- *      appose `U+E0000` lorsqu'un compte répète la même ligne, pour contourner
- *      sa propre détection de doublon.
- *
- * Le reste de la charge utile réelle — `message.fragments`, `color`,
- * `message_type`, `cheer`, `reply` — n'est jamais lu et n'est pas reproduit :
- * l'y ajouter laisserait croire qu'il compte.
- */
 function chatMessage(text: string, badges: unknown[]): unknown {
   return {
     broadcaster_user_id: '1337',
@@ -308,22 +218,17 @@ function chatMessage(text: string, badges: unknown[]): unknown {
 
 const MODERATOR_BADGES: unknown[] = [{ set_id: 'moderator', id: '1', info: '' }];
 
-/** Un modérateur crédite cinq minutes. */
 export const chatMessageModeratorAddTime: unknown = chatMessage('!addtime 300', MODERATOR_BADGES);
 
-/** Le même geste par un spectateur ordinaire : rien ne doit se produire. */
 export const chatMessageViewerAddTime: unknown = chatMessage('!addtime 300', []);
 
-/** Un modérateur qui bavarde. La quasi-totalité du flux ressemble à ceci. */
 export const chatMessageSmallTalk: unknown = chatMessage('bonne chance !', MODERATOR_BADGES);
 
-/** Valeur au-delà du plafond : refusée, jamais écrêtée. */
 export const chatMessageModeratorTooMuch: unknown = chatMessage(
   '!addtime 99999',
   MODERATOR_BADGES,
 );
 
-/** Valeur qui n'est pas un entier. */
 export const chatMessageModeratorNotANumber: unknown = chatMessage(
   '!addtime beaucoup',
   MODERATOR_BADGES,

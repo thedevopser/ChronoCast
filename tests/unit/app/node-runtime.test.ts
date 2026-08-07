@@ -2,20 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createNodeRuntime } from '../../../src/core/app/node-runtime.js';
 
-/**
- * Câblage runtime commun aux deux points d'entrée.
- *
- * Le point d'entrée headless et la coquille Electron composent la même
- * application avec les mêmes briques Node : minuteurs, sockets, `fetch`,
- * temporisation. Seuls diffèrent les trois ports qui touchent réellement à la
- * plateforme — chemins, secrets, navigateur. Recopier ce câblage dans la
- * coquille en aurait fait deux sources de vérité pour une plomberie identique,
- * et la première divergence serait passée inaperçue.
- *
- * Ce qui doit être vérifié ici tient en une propriété : **tous les minuteurs
- * sont `unref`és**. Sans cela, le battement de vivacité du hub empêcherait le
- * processus de se terminer, et un arrêt propre ne se terminerait jamais.
- */
 describe('createNodeRuntime', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -61,10 +47,6 @@ describe('createNodeRuntime', () => {
 
       const id = runtime.hubTimers.setInterval(() => undefined, 1_000);
 
-      // Le handle est un `Timeout` à l'exécution, quoi qu'en dise le type
-      // `number` du contrat : c'est lui qui sait s'il retient la boucle
-      // d'événements. Sans `unref`, `application.stop()` rendrait la main sans
-      // que le processus ne s'arrête jamais.
       expect((id as unknown as NodeJS.Timeout).hasRef()).toBe(false);
 
       runtime.hubTimers.clearInterval(id);
@@ -121,9 +103,6 @@ describe('createNodeRuntime', () => {
     });
 
     it('n’empêche pas le processus de se terminer pendant l’attente', async () => {
-      // Une temporisation entre deux tentatives Helix peut durer plusieurs
-      // secondes : un `Ctrl+C` pendant cette attente ne doit pas attendre son
-      // terme pour rendre la main.
       const runtime = createNodeRuntime();
 
       await expect(runtime.sleep(1)).resolves.toBeUndefined();
@@ -142,10 +121,6 @@ describe('createNodeRuntime', () => {
     });
 
     it('reste appelable détaché de son objet', async () => {
-      // `fetch` lève une `TypeError` s'il est appelé sans son `this` d'origine.
-      // Le lier à la création est ce qui permet de le passer en option comme
-      // une fonction ordinaire, et cette liaison doit être vérifiée : sans
-      // elle, la panne n'apparaîtrait qu'au premier appel réel à Twitch.
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('ok')));
 
       const { fetch: detached } = createNodeRuntime();
@@ -156,8 +131,6 @@ describe('createNodeRuntime', () => {
 
   describe('fabrique de sockets', () => {
     it('fournit de quoi ouvrir une connexion EventSub', () => {
-      // Aucun socket n'est ouvert ici : ce serait un accès réseau dans un test
-      // unitaire. Seule compte la présence de la fabrique dans le câblage.
       const runtime = createNodeRuntime();
 
       expect(typeof runtime.createSocket).toBe('function');

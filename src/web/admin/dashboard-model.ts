@@ -1,21 +1,3 @@
-/**
- * Modèle du tableau de bord.
- *
- * Le panneau reçoit le même flux que l'overlay, mais en fait tout autre chose :
- * il montre un état, il propose des commandes, et il doit dire lesquelles ont
- * un sens à l'instant présent. Cette décision — quoi afficher, quoi activer,
- * quoi retenir — vit ici, dans un module pur, et non dans le câblage.
- *
- * Deux conventions reprises du noyau, pour les mêmes raisons qu'ailleurs :
- *
- *   - **le modèle est immuable**, et renvoyé *identique par référence* quand un
- *     message ne change rien. La vue s'en sert pour ne pas repeindre une liste
- *     inchangée à chaque battement ;
- *   - **rien n'est assaini ici.** Les pseudos traversent tels quels et ne sont
- *     nettoyés qu'à l'écriture, par `safe-dom`. Deux endroits où s'en souvenir,
- *     c'est un endroit où l'oublier.
- */
-
 import type {
   CounterState,
   CounterStatus,
@@ -24,35 +6,23 @@ import type {
   TwitchConnectionStatus,
 } from '../shared/protocol.js';
 
-/**
- * Nombre d'événements récents conservés.
- *
- * Cinq : de quoi vérifier d'un coup d'œil que la chaîne fonctionne. Au-delà,
- * c'est le rôle de la vue historique, qui sait filtrer et paginer.
- */
 export const MAX_RECENT_EVENTS = 5;
 
-/** Un événement, réduit à ce que la vignette du tableau de bord affiche. */
 export interface RecentEvent {
   readonly id: string;
-  /** Non assaini : `safe-dom` s'en charge à l'écriture. */
   readonly userName: string;
   readonly type: DomainEventType;
   readonly rewardSeconds: number;
-  /** Faux quand le barème ou un plafond a écarté l'événement. */
   readonly applied: boolean;
   readonly occurredAt: number;
 }
 
 export interface DashboardModel {
-  /** `null` tant que le premier instantané n'est pas arrivé. */
   readonly counter: CounterState | null;
   readonly twitch: {
     readonly status: TwitchConnectionStatus;
-    /** Jamais `undefined` : « undefined » finirait affiché tel quel. */
     readonly detail: string;
   };
-  /** Le plus récent d'abord. */
   readonly events: readonly RecentEvent[];
   readonly appVersion: string;
   readonly port: number;
@@ -70,7 +40,6 @@ export function createDashboardModel(): DashboardModel {
   return EMPTY;
 }
 
-/** Vrai si les deux états décrivent exactement la même chose. */
 function sameCounter(left: CounterState | null, right: CounterState): boolean {
   return (
     left !== null &&
@@ -91,7 +60,6 @@ function sameTwitch(
   return current.status === status && current.detail === detail;
 }
 
-/** Intègre un message du serveur. Ne modifie jamais le modèle reçu. */
 export function applyMessage(model: DashboardModel, message: ServerMessage): DashboardModel {
   switch (message.type) {
     case 'hello':
@@ -122,8 +90,6 @@ export function applyMessage(model: DashboardModel, message: ServerMessage): Das
     }
 
     case 'event': {
-      // Le hub rediffuse à la reconnexion, et deux tests d'overlay lancés dans
-      // la même milliseconde partagent leur identifiant.
       if (model.events.some((entry) => entry.id === message.event.id)) {
         return model;
       }
@@ -144,8 +110,6 @@ export function applyMessage(model: DashboardModel, message: ServerMessage): Das
     case 'log':
     case 'pong':
     case 'error':
-      // Rien à retenir ici : l'apparence appartient à la vue *apparence*, les
-      // journaux à la vue *journaux*, et un `pong` ne dit rien de l'état.
       return model;
   }
 }
@@ -156,13 +120,6 @@ export interface CounterControls {
   readonly canReset: boolean;
 }
 
-/**
- * Commandes ayant un sens pour l'état courant.
- *
- * Tout est inerte tant que l'état n'est pas connu : commander un compteur
- * qu'on n'a pas encore reçu, c'est agir à l'aveugle, et la première chose
- * qu'on verrait serait un `400` inexplicable.
- */
 export function counterControls(counter: CounterState | null): CounterControls {
   if (counter === null) {
     return { canPause: false, canResume: false, canReset: false };
@@ -170,8 +127,6 @@ export function counterControls(counter: CounterState | null): CounterControls {
 
   return {
     canPause: counter.status === 'running',
-    // `finished` compris : créditer du temps rouvre un subathon achevé, la
-    // reprise doit pouvoir en faire autant.
     canResume: counter.status !== 'running',
     canReset: true,
   };
@@ -200,7 +155,6 @@ export function twitchLabel(status: TwitchConnectionStatus): string {
   return TWITCH_LABELS[status];
 }
 
-/** Libellés des types d'événement, pour la liste des derniers reçus. */
 export const EVENT_LABELS: Readonly<Record<DomainEventType, string>> = {
   sub: 'Abonnement',
   resub: 'Réabonnement',

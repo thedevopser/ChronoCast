@@ -2,16 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createEventBus, type Unsubscribe } from '../../../src/core/app/event-bus.js';
 
-/**
- * Le bus est la colonne vertébrale de l'application : le client EventSub, le
- * service compteur, le serveur WebSocket et le panneau d'administration ne se
- * connaissent pas et ne communiquent que par lui.
- *
- * Sa robustesse est donc critique : un abonné défaillant ne doit jamais empêcher
- * les autres de recevoir l'événement. Concrètement, si la diffusion vers
- * l'overlay échoue, la persistance du compteur doit malgré tout avoir lieu.
- */
-
 interface TestEvents extends Record<string, unknown> {
   readonly 'counter:changed': { readonly restantMs: number };
   readonly 'twitch:status': { readonly connected: boolean };
@@ -199,10 +189,6 @@ describe('createEventBus', () => {
       const jamaisAppele = vi.fn();
       const retraits: Unsubscribe[] = [];
 
-      // Le premier abonné retire le second avant que celui-ci ne soit atteint :
-      // un désabonnement doit prendre effet immédiatement, y compris en pleine
-      // diffusion. C'est le cas réel de l'arrêt de l'application, où un composant
-      // se détache pendant qu'un événement circule encore.
       bus.on('counter:changed', () => {
         for (const retirer of retraits) {
           retirer();

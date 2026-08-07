@@ -12,22 +12,6 @@ import {
 import { createTokenStore, type TwitchCredentials } from '../../../src/core/twitch/token-store.js';
 import type { SecretStore } from '../../../src/core/app/ports.js';
 
-/**
- * Le service OAuth doit tenir une promesse forte du cahier des charges :
- * « l'utilisateur ne doit plus jamais refaire la manipulation ».
- *
- * Cela se traduit par trois comportements vérifiés ici. Le renouvellement est
- * proactif, déclenché avant expiration plutôt qu'après un refus, afin qu'aucun
- * appel ne parte avec un jeton mort. Un rejet ponctuel du réseau est réessayé,
- * mais un jeton de rafraîchissement invalide ne l'est jamais : insister
- * n'aboutirait pas et masquerait la seule action utile, qui est de prévenir
- * l'utilisateur.
- *
- * Le flux retenu est le code d'autorisation, seul à délivrer un jeton de
- * rafraîchissement utilisateur — indispensable aux portées d'abonnements, de
- * bits et de chat.
- */
-
 const NOW = 1_754_000_000_000;
 const CLIENT_ID = 'client-id-public';
 const CLIENT_SECRET = 'secret-client-tres-long-abc123';
@@ -73,7 +57,6 @@ function createSecretStoreDouble(): SecretStore {
   };
 }
 
-/** Réponse HTTP simulée, au format attendu de `fetch`. */
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -123,8 +106,6 @@ describe('buildAuthorizationUrl', () => {
   });
 
   it('force le consentement afin d\'obtenir un jeton de rafraîchissement neuf', () => {
-    // Sans force_verify, une réautorisation silencieuse peut renvoyer un jeton
-    // de rafraîchissement déjà expiré côté Twitch.
     const url = new URL(
       buildAuthorizationUrl({
         idBaseUrl: 'https://id.twitch.tv',
@@ -223,8 +204,6 @@ describe('createOAuthService', () => {
     });
 
     it('transmet le secret client dans le corps et non dans l\'URL', async () => {
-      // Un secret placé en chaîne de requête finirait dans les journaux du
-      // serveur distant et dans l'historique des mandataires.
       const { service } = createService();
       fetchMock.mockResolvedValueOnce(jsonResponse(200, TOKEN_RESPONSE));
 
@@ -257,8 +236,6 @@ describe('createOAuthService', () => {
     });
 
     it('renouvelle avant expiration plutôt qu\'après un refus', async () => {
-      // Marge de sécurité : un appel ne doit jamais partir avec un jeton qui
-      // expirera pendant son trajet.
       const { service } = await serviceWithCredentials(60_000);
       fetchMock.mockResolvedValueOnce(jsonResponse(200, TOKEN_RESPONSE));
 
@@ -284,8 +261,6 @@ describe('createOAuthService', () => {
     });
 
     it('conserve le secret client au fil des renouvellements', async () => {
-      // Twitch ne le renvoie pas : le perdre rendrait tout renouvellement
-      // ultérieur impossible.
       const { service, tokenStore } = await serviceWithCredentials(-1_000);
       fetchMock.mockResolvedValueOnce(jsonResponse(200, TOKEN_RESPONSE));
 
@@ -328,8 +303,6 @@ describe('createOAuthService', () => {
     });
 
     it('mutualise les renouvellements concurrents en un seul appel réseau', async () => {
-      // Le client EventSub et le client Helix peuvent réclamer un jeton au même
-      // instant : deux renouvellements simultanés invalideraient l'un l'autre.
       const { service } = await serviceWithCredentials(-1_000);
       fetchMock.mockResolvedValue(jsonResponse(200, TOKEN_RESPONSE));
 
@@ -409,8 +382,6 @@ describe('createOAuthService', () => {
     });
 
     it('efface les identifiants même si Twitch refuse la révocation', async () => {
-      // Le jeton local est de toute façon inutilisable : le conserver
-      // n'apporterait rien et bloquerait une nouvelle authentification.
       const { service, tokenStore } = createService();
       fetchMock.mockResolvedValueOnce(jsonResponse(200, TOKEN_RESPONSE));
       await service.exchangeCode('code-recu', CLIENT_SECRET);

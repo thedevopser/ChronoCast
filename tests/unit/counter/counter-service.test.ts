@@ -11,22 +11,8 @@ import type { SubEvent, FollowEvent } from '../../../src/core/events/domain-even
 import { createLogger, type LogRecord, type LogSink } from '../../../src/core/logging/logger.js';
 import { StoreWriteError, type AtomicJsonStore } from '../../../src/core/storage/atomic-json-store.js';
 
-/**
- * Le service compteur assemble les réducteurs purs, l'horloge, la persistance et
- * la diffusion. C'est lui qui tient les promesses visibles par l'utilisateur.
- *
- * Deux d'entre elles sont vérifiées ici de façon centrale :
- *
- *   - **le mode gel** : le temps écoulé application fermée n'est jamais
- *     décompté, si bien qu'un crash nocturne ne coûte rien au streamer ;
- *   - **la persistance immédiate des mutations** : un événement Twitch est écrit
- *     sur le disque avant même d'être diffusé, alors que la simple érosion du
- *     temps qui passe est sauvegardée périodiquement.
- */
-
 const START_EPOCH = 1_754_000_000_000;
 
-/** Horloge pilotée manuellement : aucun test n'attend une seconde réelle. */
 function createFakeClock(): Clock & { advance(ms: number): void } {
   let epoch = START_EPOCH;
   let monotonic = 0;
@@ -41,7 +27,6 @@ function createFakeClock(): Clock & { advance(ms: number): void } {
   };
 }
 
-/** Cadenceur piloté manuellement, en lieu et place de setInterval. */
 function createFakeTicker() {
   let callback: (() => void) | undefined;
   let intervalMs = 0;
@@ -75,7 +60,6 @@ function createStoreDouble(initial?: CounterState) {
 
   const store: AtomicJsonStore<CounterState | null> = {
     filePath: '/mémoire/counter.json',
-    // `null` représente une installation neuve : rien n'a jamais été persisté.
     read: () => Promise.resolve(persisted ?? null),
     write: (value: CounterState | null) => {
       if (value === null) {
@@ -168,9 +152,6 @@ describe('createCounterService', () => {
     });
 
     it('écrit l\'état de départ sur le disque dès le démarrage', async () => {
-      // Sans cette écriture, le fichier d'état n'existe qu'après la première
-      // mutation : le répertoire de données ne décrit pas l'application, et un
-      // changement de valeur de départ suivi d'un crash précoce serait perdu.
       const { service, double } = createService();
 
       await service.start();
@@ -199,7 +180,6 @@ describe('createCounterService', () => {
     });
 
     it('ne décompte jamais le temps passé application fermée', async () => {
-      // Cœur du mode gel : un crash nocturne ne doit rien coûter au streamer.
       const persisted: CounterState = {
         remainingMs: 3_600_000,
         status: 'running',
@@ -208,7 +188,6 @@ describe('createCounterService', () => {
         totalRemovedMs: 0,
         startedAt: START_EPOCH - 86_400_000,
         finishedAt: null,
-        // Dernière écriture il y a huit heures.
         updatedAt: START_EPOCH - 28_800_000,
         schemaVersion: 1,
       };
@@ -284,8 +263,6 @@ describe('createCounterService', () => {
       clock.advance(250);
       ticker.fire();
 
-      // La décroissance naturelle est sauvegardée périodiquement : écrire à
-      // quatre hertz userait le disque sans bénéfice.
       expect(double.writes.length).toBe(avant);
     });
 
@@ -383,7 +360,6 @@ describe('createCounterService', () => {
       bus.on('counter:changed', changed);
       const avant = double.writes.length;
 
-      // Le compteur est déjà à l'arrêt : une mise en pause ne change rien.
       await service.pause();
 
       expect(double.writes.length).toBe(avant);
@@ -509,8 +485,6 @@ describe('createCounterService', () => {
 
   describe('résilience de la persistance', () => {
     it('conserve le temps crédité même si le disque refuse l\'écriture', async () => {
-      // Un subathon en direct ne doit pas s'arrêter parce que le disque est
-      // saturé : le compteur continue, l'incident est journalisé.
       const { service, double } = createService();
       await service.start();
       double.failNextWrite(new StoreWriteError('/mémoire/counter.json', new Error('disque plein')));

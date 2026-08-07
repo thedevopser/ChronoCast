@@ -1,22 +1,3 @@
-/**
- * Rendu et lecture des champs engendrés.
- *
- * C'est la seule frontière du panneau où l'on écrit réellement dans le DOM à
- * partir d'une description. Trois choses s'y jouent, et chacune échoue en
- * silence si personne ne la vérifie :
- *
- * - **le type de champ** produit pour chaque genre. Un booléen rendu en champ
- *   texte se lit par `.value`, vaut « on » quoi qu'il arrive, et le réglage ne
- *   se décoche jamais ;
- * - **l'aller-retour** entre la configuration et les champs. Une valeur écrite
- *   puis relue doit être identique, sans quoi le premier enregistrement modifie
- *   des réglages auxquels personne n'a touché ;
- * - **la non-interprétation du contenu**. Les libellés sont les nôtres, mais
- *   c'est ici qu'on prouve que le chemin d'écriture passe bien par
- *   `textContent` — une preuve qu'un faux `document` ne pourrait pas donner,
- *   faute de parseur.
- */
-
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { AdminField } from '../../../../src/web/admin/fields.js';
@@ -44,7 +25,6 @@ const FIELDS: readonly AdminField[] = [
   },
 ];
 
-/** Groupes réellement couverts par les chemins ci-dessus, dans l'ordre. */
 const GROUPS = ['Compteur', 'Texte du compteur'] as const;
 
 let root: HTMLElement;
@@ -85,8 +65,6 @@ describe('renderFieldGroups', () => {
   });
 
   it('reporte les bornes sur le champ', () => {
-    // Le navigateur ne s'en sert que pour ses flèches : la validation reste
-    // celle de `form-binding`, puis celle de Zod. C'est un confort, pas un contrôle.
     expect(root.querySelector<HTMLInputElement>('#a-int')?.min).toBe('1');
   });
 
@@ -121,8 +99,6 @@ describe('renderFieldGroups', () => {
   });
 
   it('remplace le contenu précédent au lieu de l’empiler', () => {
-    // Les vues se rechargent après chaque enregistrement : sans remplacement,
-    // les champs se dupliqueraient à chaque sauvegarde.
     renderFieldGroups(document, root, FIELDS, GROUPS);
 
     expect(root.querySelectorAll('#a-int')).toHaveLength(1);
@@ -152,8 +128,6 @@ describe('writeFieldValues et readFieldValues', () => {
   });
 
   it('omet des valeurs lues les champs absents du conteneur', () => {
-    // Chaque vue ne rend que ses propres champs : lire les autres les ferait
-    // passer pour vidés, et `patchFrom` les refuserait tous.
     const partial = document.createElement('div');
     renderFieldGroups(document, partial, FIELDS.slice(0, 1), ['Compteur']);
 
@@ -181,8 +155,6 @@ describe('erreurs de saisie', () => {
   });
 
   it('efface les messages précédents', () => {
-    // Sans cela, une erreur corrigée resterait affichée sous un champ devenu
-    // valide, et l'utilisateur chercherait un problème qui n'existe plus.
     showFieldErrors(root, [{ selector: '#a-int', path: 'x', message: 'Faux.' }]);
     clearFieldErrors(root, FIELDS);
 

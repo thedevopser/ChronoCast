@@ -1,28 +1,3 @@
-/**
- * Service compteur : assemblage des réducteurs purs, de l'horloge, de la
- * persistance et de la diffusion.
- *
- * C'est ici que se tiennent les promesses visibles par l'utilisateur.
- *
- * **Mode gel.** Le temps écoulé application fermée n'est jamais décompté. Le
- * décompte ne progresse qu'au rythme des tops reçus pendant l'exécution, si bien
- * qu'un crash nocturne ne coûte rien au streamer.
- *
- * **Deux régimes de persistance.** Une mutation — événement Twitch, action
- * manuelle — est écrite sur le disque immédiatement, avant même d'être diffusée.
- * La simple érosion du temps qui passe, elle, est sauvegardée périodiquement : en
- * cas de crash on perd au pire cet intervalle, toujours en faveur du streamer,
- * alors qu'écrire à quatre hertz userait le disque sans bénéfice.
- *
- * **Le disque ne fait jamais tomber le subathon.** Un échec d'écriture est
- * journalisé et signalé sur le bus, mais l'état en mémoire reste appliqué : un
- * direct ne doit pas s'arrêter parce que le disque est saturé.
- *
- * **L'horloge monotone fait foi.** Le décompte mesure des durées avec
- * `monotonicMs`, jamais avec l'heure du système : un passage à l'heure d'hiver
- * offrirait autrement une heure de subathon.
- */
-
 import type { AppEvents, CounterChangeOrigin } from '../app/app-events.js';
 import type { EventBus } from '../app/event-bus.js';
 import type { Clock } from '../app/ports.js';
@@ -44,65 +19,40 @@ import {
 } from './counter-state.js';
 import { computeReward, type RewardComputation } from './reward-engine.js';
 
-/** Durée de la fenêtre glissante du quota de follows. */
 const ONE_HOUR_MS = 3_600_000;
 
-/**
- * Cadenceur du décompte.
- *
- * Injecté plutôt qu'appelé directement : les tests pilotent ainsi le temps sans
- * jamais attendre une seconde réelle, et sans dépendre des minuteurs simulés de
- * l'outil de test.
- */
 export interface Ticker {
   start(intervalMs: number, onTick: () => void): void;
   stop(): void;
 }
 
-/** Résultat de l'évaluation d'un événement Twitch. */
 export interface CounterEventOutcome {
   readonly reward: RewardComputation;
   readonly state: CounterState;
 }
 
 export interface CounterService {
-  /** Restaure l'état persisté et démarre le cadenceur. */
   start(): Promise<void>;
 
-  /** Arrête le cadenceur après avoir sauvegardé l'état courant. */
   stop(): Promise<void>;
 
-  /** État courant. Toujours défini une fois {@link start} appelé. */
   getState(): CounterState;
 
   pause(): Promise<CounterState>;
   resume(): Promise<CounterState>;
   reset(): Promise<CounterState>;
 
-  /** Crédite du temps manuellement. */
   addTime(seconds: number, reason: string): Promise<CounterState>;
 
-  /** Retire du temps manuellement. */
   removeTime(seconds: number, reason: string): Promise<CounterState>;
 
-  /** Change la valeur de départ. */
   setInitialSeconds(seconds: number): Promise<CounterState>;
 
-  /** Évalue un événement Twitch et applique le barème. */
   applyEvent(event: DomainEvent): Promise<CounterEventOutcome>;
 }
 
 export interface CounterServiceOptions {
-  /**
-   * Magasin de l'état.
-   *
-   * Le type nullable est délibéré : `null` signifie « rien n'a jamais été
-   * persisté », cas où le service construit l'état de départ à partir de la
-   * configuration. Sans cette distinction, le magasin devrait connaître la
-   * valeur initiale du compteur, ce qui n'est pas sa responsabilité.
-   */
   readonly store: AtomicJsonStore<CounterState | null>;
-  /** Lu à chaque opération : une modification de configuration prend effet aussitôt. */
   readonly getConfig: () => ChronoCastConfig;
   readonly clock: Clock;
   readonly ticker: Ticker;
@@ -115,13 +65,10 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
 
   let state: CounterState | undefined;
 
-  /** Repère du dernier top, sur l'horloge monotone. */
   let lastTickAt = 0;
 
-  /** Instant de la dernière écriture de la décroissance naturelle. */
   let lastPersistAt = 0;
 
-  /** Horodatages des follows récompensés, pour la fenêtre glissante. */
   let rewardedFollows: number[] = [];
 
   function requireState(): CounterState {
@@ -139,12 +86,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
     };
   }
 
-  /**
-   * Écrit l'état sans jamais propager l'échec.
-   *
-   * Le compteur doit continuer de fonctionner même si la persistance échoue :
-   * l'incident est journalisé et signalé, l'état en mémoire reste appliqué.
-   */
   async function persist(next: CounterState): Promise<void> {
     try {
       await store.write(next);
@@ -155,13 +96,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
     }
   }
 
-  /**
-   * Adopte un nouvel état, le persiste et le diffuse.
-   *
-   * Sans effet si le réducteur a renvoyé l'état identique : les réducteurs
-   * garantissent l'égalité de référence lorsqu'une action n'a rien changé, ce
-   * qui évite une écriture disque et une diffusion WebSocket inutiles.
-   */
   async function commit(
     next: CounterState,
     origin: CounterChangeOrigin,
@@ -184,8 +118,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
       reason,
     });
 
-    // Émis sur la transition uniquement : un compteur resté au plancher ne doit
-    // pas déclencher l'animation de fin à chaque top.
     if (!wasFinished && next.status === 'finished') {
       bus.emit('counter:finished', { state: next });
     }
@@ -193,7 +125,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
     return next;
   }
 
-  /** Top du cadenceur : fait progresser le décompte. */
   function onTick(): void {
     const previous = state;
     if (previous === undefined) {
@@ -228,8 +159,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
       bus.emit('counter:finished', { state: next });
     }
 
-    // Sauvegarde périodique de l'érosion naturelle. L'atteinte du plancher, elle,
-    // est écrite tout de suite : c'est un événement, pas une simple progression.
     const shouldPersist =
       next.status === 'finished' ||
       monotonic - lastPersistAt >= getConfig().counter.persistIntervalMs;
@@ -244,8 +173,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
       const config = getConfig();
       const restored = await store.read();
 
-      // Le temps restant est repris tel quel : aucune soustraction du temps
-      // passé hors ligne. C'est tout le mode gel.
       state =
         restored ??
         createInitialState({
@@ -257,11 +184,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
         state = applyPause(state, { now: clock.now() });
       }
 
-      // L'état est écrit dès le démarrage, y compris sur une installation neuve.
-      // Sans cela le fichier n'existerait qu'après la première mutation : le
-      // répertoire de données ne décrirait pas l'application, et un crash
-      // survenant dans les premières secondes effacerait la valeur de départ
-      // que l'utilisateur venait de choisir.
       await persist(state);
 
       lastTickAt = clock.monotonicMs();
@@ -293,8 +215,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
     },
 
     async resume(): Promise<CounterState> {
-      // Le repère monotone est réarmé : le temps passé en pause ne doit pas être
-      // décompté d'un seul coup au premier top qui suit la reprise.
       lastTickAt = clock.monotonicMs();
       return commit(applyResume(requireState(), { now: clock.now() }), 'manual', 'reprise');
     },
@@ -343,8 +263,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
     async applyEvent(event: DomainEvent): Promise<CounterEventOutcome> {
       const config = getConfig();
 
-      // Fenêtre glissante du quota de follows : on purge avant d'évaluer, sinon
-      // le quota resterait saturé indéfiniment après une salve.
       const threshold = clock.now() - ONE_HOUR_MS;
       rewardedFollows = rewardedFollows.filter((instant) => instant > threshold);
 

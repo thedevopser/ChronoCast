@@ -1,26 +1,5 @@
-# Packaging de ChronoCast.
-#
-# Cible unique : Windows, paquet **MSIX** destiné au Microsoft Store. Linux et
-# macOS restent hors périmètre.
-#
-# La cible NSIS a disparu avec le passage au Store, et ce n'est pas un détail de
-# format. Un certificat de signature de code coûte 300 à 500 € par an, ce que ce
-# projet n'engage pas : l'installeur non signé faisait afficher un avertissement
-# SmartScreen au premier lancement, se faisait mettre en quarantaine par des
-# antivirus, et n'était trouvable que sur GitHub. **C'est Microsoft qui signe le
-# paquet à la certification**, ce qui règle les trois d'un coup.
-#
-# Ce que cela coûte, en connaissance de cause : tout correctif attend un à trois
-# jours de certification, et les postes sans Store n'ont plus de chemin.
-
 appId: dev.thedevopser.chronocast
 
-# Doit rester identique à l'`app.setName('ChronoCast')` de `src/main/main.ts`.
-# C'est de lui que dérive `%APPDATA%\ChronoCast`, **d'où la reprise des données
-# va chercher l'installation précédente**. Les désaccorder ferait chercher dans
-# un répertoire que personne n'a jamais écrit : la reprise ne trouverait rien, et
-# l'utilisateur retrouverait une installation neuve sans le moindre message. Un
-# test tient les deux ensemble.
 productName: ChronoCast
 
 copyright: © ChronoCast
@@ -29,35 +8,14 @@ directories:
   output: release
   buildResources: assets
 
-# Liste explicite plutôt que les exclusions par défaut. Ce qui n'est pas nommé
-# ici n'entre pas dans le paquet : ni les sources TypeScript, ni les tests, ni
-# la configuration d'outillage.
-#
-# `assets/**` est indispensable et facile à oublier : `src/main/main.ts` y
-# résout l'icône de la fenêtre et celle du tray. Sans ce motif, l'application
-# démarrerait avec l'icône par défaut d'Electron et un tray vide, sans
-# qu'Electron n'émette le moindre avertissement.
 files:
   - dist/**/*
   - assets/**/*
   - package.json
-  # Les cartes de source ne servent qu'au développement, et les outils de
-  # développement sont fermés dans une application packagée : personne ne les
-  # lira jamais. Elles pèsent en revanche plusieurs centaines de kilooctets, et
-  # celles du code web étaient de surcroît servies en 404, la liste blanche du
-  # serveur statique ne les connaissant pas. Un fichier à la fois inutile et
-  # inaccessible n'a rien à faire dans un paquet.
   - '!**/*.map'
 
-# Archive asar : les sources compilées ne traînent pas en clair dans
-# `resources/app`. Ce n'est pas une protection — une archive asar se lit — mais
-# cela évite qu'une modification accidentelle passe inaperçue.
 asar: true
 
-# Aucune publication automatique depuis le build. Le workflow `Release` produit
-# l'artefact, après avoir vérifié la cohérence du tag, et c'est l'utilisateur qui
-# le dépose dans Partner Center. Un electron-builder qui publierait lui-même
-# contournerait cette vérification.
 publish: null
 
 win:
@@ -66,43 +24,20 @@ win:
       arch:
         - x64
   icon: assets/icon.ico
-  # Aucune signature ici, et il faut le dire explicitement : c'est le Store qui
-  # signe, à la certification. Sans cette ligne, une variable d'environnement de
-  # certificat traînant sur un runner ferait échouer le build au lieu de produire
-  # le paquet non signé qu'attend Partner Center.
   forceCodeSigning: false
 
 appx:
-  # Les trois valeurs suivantes sont **assignées par Partner Center**, et se
-  # relisent dans la fiche du produit, section « Identité du produit ». Elles se
-  # recopient au caractère près, casse comprise : soumettre un paquet dont
-  # l'identité ne correspond pas à celle réservée le fait rejeter à la
-  # certification, c'est-à-dire un à trois jours plus tard.
-  #
-  # Le workflow `Release` refuse de produire un paquet sur un tag tant qu'elles
-  # portent le marqueur `IDENTITE-PARTNER-CENTER`.
   identityName: TheDevOpser.ChronoCast
   publisher: CN=33DC4855-2DBC-41EE-ABD5-0605A97F5AD5
   publisherDisplayName: TheDevOpser
 
   displayName: ChronoCast
 
-  # Sans point ni tiret, et commençant par une lettre : le manifeste l'exige.
   applicationId: ChronoCast
 
-  # Fond des tuiles du menu Démarrer. Les logos sont livrés avec un canal alpha
-  # pour que cette couleur reste visible derrière eux.
   backgroundColor: '#1a1626'
 
   languages:
     - fr-FR
 
-  # Déclare la tâche `windows.startupTask`, qui remplace un réglage disparu.
-  # Sous MSIX, `app.setLoginItemSettings` écrit dans `HKCU\...\Run`, que le
-  # conteneur du paquet virtualise : la case du panneau aurait coché, et rien
-  # n'aurait démarré au redémarrage suivant — sans erreur, sans journal.
-  #
-  # `appx.addAutoLaunchExtension` ferait la même chose, mais dépend du paquet
-  # `electron-winstore-auto-launch` : ce projet n'a que `ws` et `zod` en
-  # production, et cela ne changera pas pour une extension de quatre lignes.
   customExtensionsPath: assets/appx/extensions.xml
