@@ -55,6 +55,9 @@
   --cc-sidebar-width: 15rem;
 }
 
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
