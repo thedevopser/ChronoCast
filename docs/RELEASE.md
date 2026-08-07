@@ -57,6 +57,8 @@ Le workflow démarre seul. À la fin, l'artefact `chronocast-msix` de l'exécuti
 6. **Description du Store** : texte, captures. Celles de [images/](images/) conviennent.
 7. **Soumettre au Store.**
 
+**Les textes à coller sont dans [STORE-SUBMISSION.md](STORE-SUBMISSION.md)** : justification de `runFullTrust`, notes aux testeurs, description, et le reste du formulaire.
+
 Comptez **un à trois jours** de certification. C'est le coût du canal, et il ne se contourne pas : prévoyez-le avant de publier un correctif attendu.
 
 ## 4. Numéroter

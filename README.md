@@ -76,6 +76,7 @@ version ultérieure.
 | [docs/CRASH-RECOVERY.md](docs/CRASH-RECOVERY.md) | Récupération après crash |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modèle de menace et contrôles de sécurité |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | Politique de confidentialité |
+| [docs/STORE-SUBMISSION.md](docs/STORE-SUBMISSION.md) | Textes à coller dans Partner Center |
 | [docs/REPRISE-V2.md](docs/REPRISE-V2.md) | Document de reprise : état d'avancement et décisions en vigueur |
 | [docs/REPRISE.md](docs/REPRISE.md) | Archive de la V1 : les huit phases et leurs décisions |
 

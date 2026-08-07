@@ -340,6 +340,7 @@ Le paquet est signé par Microsoft à la certification. Plus d'avertissement Sma
 | [DEVELOPER.md](DEVELOPER.md) | Le développeur : environnement, règles, points d'extension |
 | [SECURITY.md](SECURITY.md) | Le développeur : modèle de menace et contrôles |
 | [PRIVACY.md](PRIVACY.md) | Le streamer, et la certification du Store : ce qui est collecté, et ce qui ne l'est pas |
+| [STORE-SUBMISSION.md](STORE-SUBMISSION.md) | Les textes à coller dans Partner Center, dont la justification de `runFullTrust` |
 | [BUILD.md](BUILD.md) | Compilation en conteneur, paquet MSIX en CI |
 | [RELEASE.md](RELEASE.md) | Publier une version au Microsoft Store |
 | [TESTING-TWITCH-CLI.md](TESTING-TWITCH-CLI.md) | Simuler des événements sans attendre un vrai sub |
