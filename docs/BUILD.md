@@ -39,6 +39,27 @@ Onglet **Actions** du dépôt → workflow **Release** dans la colonne de gauche
 
 C'est le mode à utiliser pour vérifier qu'un changement n'a pas cassé le packaging. Le contrôle d'identité de Partner Center **ne s'applique pas** dans ce mode : un paquet portant une identité en attente reste parfaitement installable par chargement latéral.
 
+### Installer le paquet en local, pour l'éprouver
+
+**Windows refuse d'installer un MSIX non signé** dont le `Publisher` n'appartient pas à « l'espace de noms non signé » — un marqueur qui empêche un paquet non signé de se faire passer pour un éditeur réel. Le nôtre porte l'identité Partner Center : `Add-AppxPackage -AllowUnsigned` échoue donc en `0x80073D2C`, et modifier `publisher` pour contourner casserait la soumission.
+
+Le workflow sait produire un paquet signé pour l'essai. Onglet **Actions** → **Release** → **Run workflow** → cocher **« Signer le paquet avec un certificat auto-signé »**. L'option n'existe qu'en déclenchement manuel : sur un tag, elle est ignorée, ce paquet-là n'étant pas soumettable.
+
+L'artefact contient alors le `.appx` signé **et** `ChronoCast-essai.cer`. Sur le poste d'essai, en administrateur :
+
+```powershell
+Import-Certificate -FilePath .\ChronoCast-essai.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+Add-AppxPackage -Path ".\ChronoCast 0.7.0.appx"
+```
+
+Le nom du paquet porte une espace : les guillemets ne sont pas optionnels. Pour désinstaller :
+
+```powershell
+Get-AppxPackage *ChronoCast* | Remove-AppxPackage
+```
+
+Le certificat auto-signé n'est valable que sur ce poste. Il ne change rien à ce que reçoit un utilisateur du Store, dont le paquet est signé par Microsoft — mais **le conteneur MSIX est le même**, et c'est lui qu'on vient éprouver : la reprise des données et la tâche de démarrage se comportent ici exactement comme elles se comporteront là-bas.
+
 ### Avec intention de soumettre — voir [RELEASE.md](RELEASE.md)
 
 Un tag `vX.Y.Z` poussé produit le paquet **et** vérifie que l'identité est renseignée. Rien n'est publié pour autant : c'est vous qui déposez le fichier dans Partner Center.
