@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il est **vivant** : il est mis à jour à chaque lot, et il fait foi.
 
-**Dernière mise à jour :** 4 août 2026, après la fusion de la PR #23. Le chantier 1 — la mise à jour automatique — est **livré, éprouvé sur un vrai poste Windows, et fusionné dans `main`**. La version est en **`0.5.0`** ; le tag `v0.5.0` est poussé par l'utilisateur, et c'est le workflow `Release` qui produit l'installeur.
+**Dernière mise à jour :** 7 août 2026, après la fusion de la PR #24. Le chantier 1 — la mise à jour automatique — est livré et éprouvé sur un vrai poste Windows. Le chantier 2 a livré son **premier lot, réduit** : la commande de chat `!addtime`. La version passe à **`0.6.0`** ; le tag `v0.6.0` est poussé par l'utilisateur, et c'est le workflow `Release` qui produit l'installeur.
 
 **La V1 est terminée et publiée.** Son document de reprise, [REPRISE.md](REPRISE.md), est **clos** : il reste l'archive complète des huit phases, de la release `v0.4.0` et de tout ce qui a été décidé en chemin. On y va pour comprendre pourquoi une chose est construite comme elle l'est — les trois pièges du protocole EventSub, les quatre tentatives du cadre de l'overlay, la leçon de la Phase 7. Rien de tout cela n'est répété ici.
 
@@ -64,6 +64,11 @@ Ces décisions ont été validées par l'utilisateur. **Ne pas les rouvrir.** Le
 | Source | Constante, jamais configurable | Rendre la source réglable transformerait un réglage en exécution de code arbitraire |
 | Signature de code | **Toujours aucune** | Non tranché pour la suite : voir section 9 |
 | Plateformes | **Windows seul**, comme la V1 | Linux et macOS restent hors périmètre |
+| **Commandes de chat** | Une commande unique, **`!addtime <secondes>`**, plutôt que le catalogue nommé conçu au chantier 2 | Le besoin réel est de créditer une durée qu'aucun barème ne pouvait prévoir. Un catalogue de commandes à durée fixe ne l'aurait pas couvert |
+| Qui déclenche | **Modérateurs et diffuseur seuls**, sur le badge porté par la charge utile. Jamais sur le pseudo | Le badge est une donnée que Twitch pose lui-même ; le pseudo est une chaîne qu'on peut imiter |
+| Juge des secondes | **Le message**, et non le barème. Le schéma garde le **plafond** | Écart assumé au principe « aucune valeur métier hors du schéma » : voir le chantier 2 ci-dessous |
+| Bot de chat tiers | **Aucun.** ChronoCast n'écrit jamais dans le chat, et rien n'annonce la commande aux spectateurs | La bulle de l'overlay est le seul retour visible. Il n'y a donc **aucun réglage à accorder à la main** avec un tiers |
+| Portées OAuth | **Aucune nouvelle** | `channel.chat.message` réclame exactement ce que réclame déjà `channel.chat.notification`, active par défaut |
 
 ### Pourquoi pas `electron-updater`
 
@@ -80,20 +85,21 @@ L'updater maison tient en quatre modules purs et un port. Toute la décision se 
 
 ## 5. État du dépôt
 
-**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. La PR #23 est fusionnée en squash.
+**Branche courante : `chore/version-0.6.0`**, qui porte le passage de version et cette mise à jour. La PR #24 est fusionnée en squash dans `main`.
 
 ```
-a75e0a8 Mise à jour automatique — ChronoCast 0.5.0 (#23)          <- main
-67d0efb docs: illustrer le README de trois captures du panneau (#22)   <- v0.4.0
+9cc12e9 Commande de chat `!addtime` — créditer du temps depuis le direct (#24)   <- main
+a75e0a8 Mise à jour automatique — ChronoCast 0.5.0 (#23)              <- v0.5.0
+67d0efb docs: illustrer le README de trois captures du panneau (#22)  <- v0.4.0
 ```
 
-**1 667 tests, 79 fichiers.** Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur. (1 527 à la fin de la V1, plus les **140** du chantier 1.)
+**1 737 tests, 82 fichiers.** Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur. (1 527 à la fin de la V1, plus les **140** du chantier 1 et les **70** du premier lot du chantier 2.)
 
 **`npm audit` reste à zéro et aucune dépendance n'a été ajoutée** — c'est l'un des arguments de la conception, et il se vérifie mécaniquement.
 
-**La version est en `0.5.0`**, à deux endroits qui doivent rester alignés : [package.json](../package.json) et `APP_VERSION` dans [src/core/app/version.ts](../src/core/app/version.ts). Un test de cohérence les tient ensemble.
+**La version est en `0.6.0`**, à deux endroits qui doivent rester alignés : [package.json](../package.json) et `APP_VERSION` dans [src/core/app/version.ts](../src/core/app/version.ts). Un test de cohérence les tient ensemble.
 
-**Seule modification en attente : ce fichier.** La mise à jour post-fusion a été écrite après coup, et partira dans le premier commit du prochain lot — c'est la façon de faire de la V1, conservée telle quelle. `git status` ne doit signaler aucun autre fichier : `dist/`, `release/` et `PR-*.md` sont ignorés.
+**Aucune modification en attente.** `git status` ne doit rien signaler : `dist/`, `release/` et `PR-*.md` sont ignorés.
 
 ### Première action à la reprise
 
@@ -153,11 +159,57 @@ L'application interroge GitHub au lancement puis toutes les six heures, téléch
 
 **Ce que cela règle :** tout ce que le conteneur ne pouvait pas montrer a tourné pour de vrai — le `spawn` détaché, l'écriture d'une centaine de mégaoctets dans `%APPDATA%`, l'extinction propre, l'assistant NSIS écrasant une installation existante, et la relance. Le pari du chantier se vérifie une fois de plus : la seule pièce non couverte par les tests tenait en cinq lignes, et rien n'a dû y être corrigé après coup.
 
-### Chantier 2 — Commandes de chat Twitch — **conçu, non commencé**
+### Chantier 2 — Commandes de chat Twitch — **premier lot livré, sous une forme réduite**
 
-Un modérateur tape `!addmort` dans le chat, ChronoCast ajoute les secondes définies dans son barème. **Sa conception est arrêtée et consignée dans [CHANTIER-2-COMMANDES-CHAT.md](CHANTIER-2-COMMANDES-CHAT.md)** : décisions actées, architecture, découpage en trois lots, pièges et méthode de vérification. Aucune ligne de code n'a été écrite ; il n'y a rien à ré-analyser pour le démarrer.
+Un modérateur ou le diffuseur tape `!addtime 300` dans le chat, et le compteur monte de cinq minutes. Une bulle l'annonce sur l'overlay, l'historique en garde la trace avec le pseudo de son auteur.
 
-Ce qu'il faut en retenir sans ouvrir le document : **ChronoCast reste en lecture seule sur Twitch** — c'est un bot tiers qui répond dans le chat, l'application se contente d'écouter — et **aucune portée OAuth nouvelle** n'est demandée dans la configuration par défaut. Le modèle de menace est donc inchangé aux deux premiers lots. Le troisième, qui servirait des images déposées par l'utilisateur, est le seul à l'amender, et il se décide à part.
+**Ce n'est pas le lot 1 conçu dans [CHANTIER-2-COMMANDES-CHAT.md](CHANTIER-2-COMMANDES-CHAT.md), et l'écart est délibéré.** Ce document prévoyait un catalogue de commandes nommées — `!addmort`, `!addpari` — dont les secondes viennent du barème. Le besoin réel s'est révélé autre : créditer une durée qu'aucun barème ne pouvait prévoir. Le catalogue nommé reste possible ; ce lot a construit exactement le pipeline qu'il réutiliserait. **Le reste du document reste valable**, y compris les lots 2 et 3, non décidés.
+
+| Fichier | Rôle |
+| --- | --- |
+| `core/chat/command-parser.ts` | Syntaxe seule : texte → `{ name, argument }` ou `null`. Ne connaît ni la configuration ni le compteur |
+| `core/chat/chatter-badges.ts` | `isPrivileged(badges)`. Douze lignes, testé à part : c'est la porte d'autorisation |
+| `core/chat/command-service.ts` | Toutes les décisions : résolution, habilitation, conversion, plafond |
+| `core/config/schema.ts` | `twitch.enableChatCommands`, et `rewards.chatCommand.{name, maxSeconds, overlayText}` |
+| `core/app/application.ts` | La branche du pipeline, **avant** le convertisseur |
+| `core/server/ws-hub.ts` | Joint le libellé de la bulle au message `event` |
+| `web/admin/form-binding.ts` | Nouveau `allowEmpty`, seule échappatoire au refus du texte vide |
+
+**Décisions prises pendant ce lot, à connaître avant d'y toucher :**
+
+- **La valeur vient du chat, et le principe « le barème est le seul juge des secondes » est donc amendé.** Ce qui reste juge est le **plafond**, `rewards.chatCommand.maxSeconds`, appliqué **deux fois** : refus dans le service avant même de produire l'événement, écrêtage défensif dans le moteur de barème pour les chemins qui ne passent pas par lui — le bouton de test de l'overlay en est un.
+- **Refus au-delà du plafond, jamais écrêtage.** Une valeur démesurée est une faute de frappe bien plus souvent qu'une intention, et créditer une heure à qui en voulait dix obligerait à corriger le compteur à la main, en direct.
+- **L'habilitation se lit sur le badge, jamais sur le pseudo.** Aucun appel Helix, aucune portée de modération : `channel.chat.message` transporte déjà l'information.
+- **Aucun message n'est écarté sur l'identité de son auteur, et c'est un défaut corrigé en cours de route.** Une première version ignorait les messages du compte authentifié, par crainte d'une boucle avec un bot tiers. Or ce compte est, dans le cas courant, **celui du streamer** : la garde lui refusait sa propre commande sur sa propre chaîne. Les tests ne l'avaient pas vu, Twitch n'y démarrant jamais. **ChronoCast n'écrivant jamais dans le chat, il ne peut produire aucun message susceptible de le redéclencher** : seul le badge décide.
+- **La branche se place avant le convertisseur**, et non comme un cas de plus dedans. `channel.chat.message` livre *chaque* message de la chaîne : le faire traverser `mapNotification` puis la déduplication sémantique serait du gaspillage à chaque ligne et remplirait les journaux.
+- **La déduplication sémantique ne s'applique pas aux commandes.** Elle reconnaît un même fait de plateforme annoncé par deux flux ; une commande est une intention humaine. Deux `!addtime 300` à trois secondes d'écart sont **deux crédits**. La retransmission par Twitch, elle, reste écartée par le `message_id`.
+- **Zéro et les valeurs négatives sont refusés explicitement**, alors même que le périmètre est l'ajout seul. `applyAdd` ignore un delta négatif ou nul **sans rien signaler** : sans ce refus, l'historique dirait l'événement appliqué pendant que le compteur n'aurait pas bougé.
+- **La conversion passe par une expression régulière d'entier décimal, et non par `Number()`**, qui accepterait `0x10`, `1e3`, `2.5`, `Infinity` et les chiffres de pleine chasse — autant de valeurs qu'aucun modérateur n'a voulu taper.
+- **`U+E0000` est normalisé.** Twitch l'appose aux messages répétés pour contourner sa propre détection de doublon ; sans cela, la **seconde** occurrence d'une commande ne serait jamais reconnue, et la cause serait introuvable à la lecture.
+- **Le nom doit être collé au préfixe.** `!  300` nommait autrement une commande « 300 ». Le test l'a attrapé.
+- **Le libellé de la bulle voyage dans le message WebSocket**, l'overlay ne recevant que le sous-arbre `overlay` de la configuration alors que ce texte vit dans le barème. Vidé, il est **omis** et non envoyé vide : une chaîne vide ferait réserver la place d'une ligne que rien ne remplirait.
+- **`PROTOCOL_VERSION` reste à 1.** Un champ facultatif et un membre d'union de plus sont purement additifs.
+- **Un seul interrupteur**, `twitch.enableChatCommands`, éteint par défaut. Il commande la souscription : sans elle aucun message n'arrive, si bien qu'un second réglage côté barème ne pourrait rien éteindre de plus. Un réglage inerte est pire qu'un réglage absent.
+
+**Trois garde-fous ont rougi tout seuls**, et c'est leur raison d'être : `fields.test.ts` dès l'arrivée des réglages au schéma, le contrôle d'exhaustivité de TypeScript sur `semanticKey`, `detailOf`, `buildTestEvent` et `dashboard-model`, et le test d'assignabilité mutuelle des deux protocoles dès l'ajout du libellé.
+
+**Le modèle de menace est inchangé** : aucune écriture sur Twitch, aucune portée nouvelle, aucun trafic sortant nouveau, aucune route ni port de plus.
+
+**Ce lot n'a aucune surface propre à Windows** — ni processus lancé, ni écriture hors du répertoire de données, ni comportement d'installeur. Contrairement au chantier 1, un `verify` vert en conteneur disait ici presque tout.
+
+#### Validation sur une vraie chaîne — faite
+
+**Éprouvée par l'utilisateur le 7 août 2026**, en direct : `!addtime 3600` tapé par le diffuseur crédite bien une heure. Ce que cela règle, et que le conteneur ne pouvait pas montrer : **un vrai modérateur porte bien le badge attendu**, et l'habilitation lue sur la charge utile réelle se comporte comme les fixtures le supposaient.
+
+#### Le piège qui a coûté la première session de test
+
+**Cocher la case ne crée pas la souscription : il faut redémarrer l'application.** Le premier essai n'a rien donné — ni compteur, ni bulle, **ni la moindre ligne de journal**, ce dernier point étant le symptôme qui oriente le diagnostic : un message écarté aurait laissé une trace, zéro trace signifie qu'aucun message n'est jamais arrivé.
+
+La cause est dans [application.ts](../src/core/app/application.ts) : `configService.onChange` rafraîchit le niveau de journalisation, le hub et le service de mise à jour, mais **ne relance jamais le client EventSub**. Les souscriptions ne sont créées qu'au démarrage, par `startTwitch`, et `restartTwitch` n'est appelé qu'à l'issue du flux OAuth.
+
+**Ce n'est pas propre aux commandes** : `twitch.enableRaid` et `twitch.enableFollow` se comportent de la même façon depuis la V1, et personne ne s'en était aperçu — sans doute parce qu'on les active en général avant de lancer un subathon, et non pendant.
+
+**Non corrigé à ce jour.** Deux voies, à trancher : relancer EventSub lorsqu'un réglage *affectant les souscriptions* change — et lui seul, une couleur d'overlay ne doit pas faire tomber la connexion Twitch en plein direct — ou se contenter d'annoncer dans le panneau qu'un redémarrage est nécessaire. La première est la bonne, la seconde coûte une ligne.
 
 ### Chantiers suivants
 

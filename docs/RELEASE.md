@@ -11,9 +11,9 @@ Une release ChronoCast, c'est un tag poussé. Tout le reste — vérification, c
 | Fichier | Rôle |
 | --- | --- |
 | `package.json` | Nom de l'installeur produit, et ce que rend `app.getVersion()` |
-| `src/headless/index.ts` | Constante `APP_VERSION`, le point d'entrée headless n'ayant pas accès au premier |
+| `src/core/app/version.ts` | Constante `APP_VERSION`, le noyau n'ayant pas accès au premier — sa disposition change au packaging |
 
-Rien ne vérifie automatiquement cet alignement : la seule garde est de les modifier ensemble.
+**Cet alignement est tenu par un test** : [tests/unit/assets/packaging.test.ts](../tests/unit/assets/packaging.test.ts) compare les deux valeurs et refuse de passer si l'une des deux a été oubliée. Il vérifie aussi que la version reste sémantique, `x.y.z` sans suffixe — une pré-version ne se met jamais à jour toute seule, la grammaire de l'updater la refusant délibérément.
 
 **Le tag et `package.json` doivent désigner la même version.** Là, en revanche, le workflow vérifie et **échoue** si ce n'est pas le cas. Une release `v1.2.0` contenant un `ChronoCast-Setup-1.1.0.exe` rendrait impossible de savoir ce qui est installé.
 
