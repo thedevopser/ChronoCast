@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il est **vivant** : il est mis à jour à chaque lot, et il fait foi.
 
-**Dernière mise à jour :** 4 août 2026, sur la branche `feat/auto-update`. Le chantier 1 — la mise à jour automatique — est **livré et éprouvé sur un vrai poste Windows**. La version est en **`0.5.0`**, prête à être publiée.
+**Dernière mise à jour :** 4 août 2026, après la fusion de la PR #23. Le chantier 1 — la mise à jour automatique — est **livré, éprouvé sur un vrai poste Windows, et fusionné dans `main`**. La version est en **`0.5.0`** ; le tag `v0.5.0` est poussé par l'utilisateur, et c'est le workflow `Release` qui produit l'installeur.
 
 **La V1 est terminée et publiée.** Son document de reprise, [REPRISE.md](REPRISE.md), est **clos** : il reste l'archive complète des huit phases, de la release `v0.4.0` et de tout ce qui a été décidé en chemin. On y va pour comprendre pourquoi une chose est construite comme elle l'est — les trois pièges du protocole EventSub, les quatre tentatives du cadre de l'overlay, la leçon de la Phase 7. Rien de tout cela n'est répété ici.
 
@@ -80,7 +80,12 @@ L'updater maison tient en quatre modules purs et un port. Toute la décision se 
 
 ## 5. État du dépôt
 
-**Branche courante : `feat/auto-update`.** Le chantier 1 y est écrit en quatre commits. `main` est sur `67d0efb`, tag `v0.4.0`.
+**Branche courante : `main`**, à jour avec `origin/main`. Aucune branche de travail en cours, aucun document de PR en attente, aucun artefact de build. La PR #23 est fusionnée en squash.
+
+```
+a75e0a8 Mise à jour automatique — ChronoCast 0.5.0 (#23)          <- main
+67d0efb docs: illustrer le README de trois captures du panneau (#22)   <- v0.4.0
+```
 
 **1 667 tests, 79 fichiers.** Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur. (1 527 à la fin de la V1, plus les **140** du chantier 1.)
 
@@ -88,10 +93,13 @@ L'updater maison tient en quatre modules purs et un port. Toute la décision se 
 
 **La version est en `0.5.0`**, à deux endroits qui doivent rester alignés : [package.json](../package.json) et `APP_VERSION` dans [src/core/app/version.ts](../src/core/app/version.ts). Un test de cohérence les tient ensemble.
 
+**Seule modification en attente : ce fichier.** La mise à jour post-fusion a été écrite après coup, et partira dans le premier commit du prochain lot — c'est la façon de faire de la V1, conservée telle quelle. `git status` ne doit signaler aucun autre fichier : `dist/`, `release/` et `PR-*.md` sont ignorés.
+
 ### Première action à la reprise
 
 ```bash
-git branch --show-current
+git branch --show-current    # doit afficher main
+git pull --ff-only origin main
 ./scripts/dc.sh verify       # doit être intégralement vert
 ```
 
@@ -145,9 +153,17 @@ L'application interroge GitHub au lancement puis toutes les six heures, téléch
 
 **Ce que cela règle :** tout ce que le conteneur ne pouvait pas montrer a tourné pour de vrai — le `spawn` détaché, l'écriture d'une centaine de mégaoctets dans `%APPDATA%`, l'extinction propre, l'assistant NSIS écrasant une installation existante, et la relance. Le pari du chantier se vérifie une fois de plus : la seule pièce non couverte par les tests tenait en cinq lignes, et rien n'a dû y être corrigé après coup.
 
+### Chantier 2 — Commandes de chat Twitch — **conçu, non commencé**
+
+Un modérateur tape `!addmort` dans le chat, ChronoCast ajoute les secondes définies dans son barème. **Sa conception est arrêtée et consignée dans [CHANTIER-2-COMMANDES-CHAT.md](CHANTIER-2-COMMANDES-CHAT.md)** : décisions actées, architecture, découpage en trois lots, pièges et méthode de vérification. Aucune ligne de code n'a été écrite ; il n'y a rien à ré-analyser pour le démarrer.
+
+Ce qu'il faut en retenir sans ouvrir le document : **ChronoCast reste en lecture seule sur Twitch** — c'est un bot tiers qui répond dans le chat, l'application se contente d'écouter — et **aucune portée OAuth nouvelle** n'est demandée dans la configuration par défaut. Le modèle de menace est donc inchangé aux deux premiers lots. Le troisième, qui servirait des images déposées par l'utilisateur, est le seul à l'amender, et il se décide à part.
+
 ### Chantiers suivants
 
-Aucun n'est décidé. Voir la section 9 pour ce qui a été évoqué sans être tranché.
+Aucun autre n'est décidé. Voir la section 9 pour ce qui a été évoqué sans être tranché.
+
+**Ce que la `0.5.0` rend possible, et qui n'était pas vrai avant :** à partir d'elle, un poste installé se met à jour tout seul. Les chantiers suivants parviendront donc aux utilisateurs sans qu'ils aient à faire quoi que ce soit — mais **seulement à ceux qui seront passés par la `0.5.0`**. Un poste resté en `0.4.0` ou antérieur ne bougera jamais de lui-même : cette version-là ne sait pas se mettre à jour. Il faut le savoir avant de compter sur la boucle pour diffuser un correctif urgent.
 
 ---
 
@@ -210,6 +226,7 @@ L'installeur **n'est pas signé** : `forceCodeSigning: false`, aucun certificat,
 | Document | Pour qui |
 | --- | --- |
 | [REPRISE.md](REPRISE.md) | **Archive de la V1**, close. Les huit phases et toutes leurs décisions |
+| [CHANTIER-2-COMMANDES-CHAT.md](CHANTIER-2-COMMANDES-CHAT.md) | Le développeur : conception du chantier 2, arrêtée et non commencée |
 | [USER-GUIDE.md](USER-GUIDE.md) | Le streamer : installation, application Twitch, OBS, dépannage |
 | [OVERLAY-CUSTOMIZATION.md](OVERLAY-CUSTOMIZATION.md) | Le streamer : réglages d'apparence et `custom.css` |
 | [CRASH-RECOVERY.md](CRASH-RECOVERY.md) | Le streamer : ce qu'il perd au pire, et comment le rattraper |
