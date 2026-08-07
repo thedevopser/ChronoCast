@@ -2,6 +2,17 @@
   Extensions fusionnées dans l'`AppxManifest.xml` par electron-builder, via
   `appx.customExtensionsPath` dans `electron-builder.yml`.
 
+  **Ce fichier est un fragment, pas un document.** electron-builder écrit
+  `<Extensions>` lui-même et y concatène ce contenu : une balise racine ici
+  produirait un `<Extensions><Extensions>` que `makeappx.exe` refuse — et il le
+  refuse sur le runner Windows, c'est-à-dire au seul endroit où le conteneur ne
+  voit rien. Deux tests tiennent désormais ce point.
+
+  **Le préfixe est `desktop:`, et il ne se choisit pas.** Le gabarit de
+  manifeste d'electron-builder ne déclare que `uap`, `desktop` et `rescap` ;
+  un `uap5:` y serait un préfixe non lié, et le manifeste invalide. C'est aussi
+  le préfixe qu'emploie electron-builder pour sa propre extension de démarrage.
+
   Une seule extension, et elle remplace un réglage disparu. Sous MSIX,
   `app.setLoginItemSettings` écrit dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
   que le conteneur du paquet **virtualise** : la valeur n'atteint jamais le vrai
@@ -20,18 +31,19 @@
   HTTP sur la boucle locale serait soumis aux restrictions de bouclage d'UWP, et
   OBS ne pourrait pas atteindre l'overlay.
 
-  `electron-builder` propose aussi `appx.addAutoLaunchExtension`, écarté
-  volontairement : il dépend du paquet `electron-winstore-auto-launch`, et ce
-  projet n'a que `ws` et `zod` en production.
+  `Executable` doit rester accordé au `productName` d'`electron-builder.yml`,
+  dont dérive le nom de l'exécutable empaqueté.
+
+  `appx.addAutoLaunchExtension` ferait la même chose, mais dépend du paquet
+  `electron-winstore-auto-launch` : ce projet n'a que `ws` et `zod` en
+  production, et cela ne changera pas pour une extension de quatre lignes.
 -->
-<Extensions xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5">
-  <uap5:Extension
-    Category="windows.startupTask"
-    Executable="ChronoCast.exe"
-    EntryPoint="Windows.FullTrustApplication">
-    <uap5:StartupTask
-      TaskId="ChronoCastStartupTask"
-      Enabled="false"
-      DisplayName="ChronoCast" />
-  </uap5:Extension>
-</Extensions>
+<desktop:Extension
+  Category="windows.startupTask"
+  Executable="ChronoCast.exe"
+  EntryPoint="Windows.FullTrustApplication">
+  <desktop:StartupTask
+    TaskId="ChronoCastStartupTask"
+    Enabled="false"
+    DisplayName="ChronoCast" />
+</desktop:Extension>

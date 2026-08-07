@@ -136,6 +136,82 @@ describe('electron-builder.yml', () => {
     );
   });
 
+  /**
+   * Le fragment d'extensions du manifeste AppX.
+   *
+   * Ces deux tests existent parce que leur absence a coûté un build. Le fichier
+   * était syntaxiquement valide, `packaging.test.ts` y trouvait toutes les
+   * chaînes attendues, et `makeappx.exe` l'a refusé sur le runner Windows —
+   * c'est-à-dire au seul endroit où le conteneur ne voit rien.
+   *
+   * Le manifeste engendré n'est validé qu'au packaging. Ce qui suit est donc la
+   * seule barrière avant lui.
+   */
+  describe('assets/appx/extensions.xml', () => {
+    /** Le gabarit de manifeste d'electron-builder, source de vérité des préfixes. */
+    const TEMPLATE = 'node_modules/app-builder-lib/templates/appx/appxmanifest.xml';
+
+    /**
+     * Le fragment débarrassé de ses commentaires.
+     *
+     * Ils citent le balisage qu'ils expliquent — `<Extensions>`, les préfixes
+     * écartés — et une recherche naïve y verrait le défaut qu'elle cherche.
+     * C'est le même piège que le marqueur d'identité de Partner Center : ce
+     * qu'on contrôle est le **balisage effectif**, jamais le texte du fichier.
+     */
+    async function markup(): Promise<string> {
+      return (await read('assets/appx/extensions.xml')).replace(/<!--[\s\S]*?-->/g, '');
+    }
+
+    it('est un fragment, sans balise `Extensions` racine', async () => {
+      // electron-builder écrit `<Extensions>` lui-même et **concatène** ce
+      // fichier à l'intérieur. Une balise racine ici produit un
+      // `<Extensions><Extensions>`, que `makeappx.exe` refuse avec un message
+      // qui ne dit pas d'où vient le doublon.
+      const fragment = await markup();
+
+      expect(fragment).not.toMatch(/<Extensions[\s>]/);
+      expect(fragment).not.toContain('</Extensions>');
+      expect(fragment).toMatch(/<\w+:Extension\s/);
+    });
+
+    it('n’emploie que des préfixes de namespace déclarés par le gabarit', async () => {
+      // Le gabarit ne déclare que `uap`, `desktop` et `rescap`. Un `uap5:` y
+      // est un préfixe **non lié** : le manifeste est alors invalide, et rien
+      // dans ce dépôt ne le dirait avant le runner Windows.
+      const [fragment, template] = await Promise.all([markup(), read(TEMPLATE)]);
+
+      const declared = new Set(
+        [...template.matchAll(/xmlns:(\w+)=/g)].map((match) => match[1]),
+      );
+      expect(declared.size).toBeGreaterThan(0);
+
+      const used = new Set(
+        [...fragment.matchAll(/<\/?(\w+):/g)].map((match) => match[1]),
+      );
+
+      for (const prefix of used) {
+        expect(declared).toContain(prefix);
+      }
+    });
+
+    it('nomme l’exécutable exactement comme le `productName` l’engendre', async () => {
+      // electron-builder dérive le nom de l'exécutable empaqueté du
+      // `productName`. Les désaccorder déclarerait une tâche de démarrage
+      // pointant sur un fichier absent du paquet : Windows l'accepterait, et
+      // rien ne démarrerait — le même échec silencieux que le réglage qu'elle
+      // remplace.
+      const [fragment, config] = await Promise.all([
+        markup(),
+        read('electron-builder.yml'),
+      ]);
+
+      const productName = /^productName: (\S+)$/m.exec(config)?.[1];
+      expect(productName).toBeDefined();
+      expect(fragment).toContain(`Executable="${String(productName)}.exe"`);
+    });
+  });
+
   it('ne publie rien depuis le build', async () => {
     // C'est le workflow de release qui produit l'artefact, après avoir vérifié
     // la cohérence du tag, et c'est l'utilisateur qui le dépose dans Partner
