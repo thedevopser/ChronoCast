@@ -211,4 +211,5 @@ export const EVENT_LABELS: Readonly<Record<DomainEventType, string>> = {
   bits: 'Bits',
   raid: 'Raid',
   follow: 'Follow',
+  command: 'Commande de chat',
 };

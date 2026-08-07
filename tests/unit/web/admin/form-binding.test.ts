@@ -32,7 +32,11 @@ import {
 
 const CONFIG = {
   counter: { initialSeconds: 43_200, resumeOnStartup: true },
-  rewards: { sub: { tier1: 180, tier2: 240 }, bits: { mode: 'linear' } },
+  rewards: {
+    sub: { tier1: 180, tier2: 240 },
+    bits: { mode: 'linear' },
+    chatCommand: { overlayText: 'Temps ajouté' },
+  },
   overlay: { color: '#FFFFFF', fontFamily: 'Inter', letterSpacing: 0 },
 };
 
@@ -44,6 +48,7 @@ const FIELDS: readonly FieldDescriptor[] = [
   { selector: '#font', path: 'overlay.fontFamily', kind: 'text' },
   { selector: '#spacing', path: 'overlay.letterSpacing', kind: 'number' },
   { selector: '#mode', path: 'rewards.bits.mode', kind: 'enum', options: ['linear', 'tiers'] },
+  { selector: '#label', path: 'rewards.chatCommand.overlayText', kind: 'text', allowEmpty: true },
 ];
 
 /** Valeurs de départ, telles que `valuesFrom` les produirait. */
@@ -251,6 +256,25 @@ describe('patchFrom', () => {
 
     expect(errors).toEqual([]);
     expect(patch).toEqual({ rewards: { sub: { tier1: 240 } } });
+  });
+
+  it('refuse un champ texte vidé', () => {
+    // Une police vide n'a pas de sens : le refuser ici l'explique sous le
+    // champ, là où l'utilisateur peut encore le corriger.
+    const { errors, patch } = patchFrom(FIELDS, { ...pristine(), '#font': '' }, CONFIG);
+
+    expect(errors).toHaveLength(1);
+    expect(patch).toEqual({});
+  });
+
+  it('accepte un champ texte vidé lorsqu’il l’autorise', () => {
+    // Le libellé de la bulle est le cas : vide vaut « pas de libellé », et
+    // c'est un réglage légitime. Sans cette échappatoire, il n'y aurait aucun
+    // moyen d'éteindre l'annonce depuis le panneau.
+    const { errors, patch } = patchFrom(FIELDS, { ...pristine(), '#label': '' }, CONFIG);
+
+    expect(errors).toEqual([]);
+    expect(patch).toEqual({ rewards: { chatCommand: { overlayText: '' } } });
   });
 
   it('conserve un texte contenant du HTML sans le transformer', () => {

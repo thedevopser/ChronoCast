@@ -246,6 +246,21 @@ body {
   display: none;
 }
 
+/*
+ * Libellé de la bulle, renseigné pour les commandes de chat.
+ *
+ * Il annonce la nature de l'ajout avant de dire qui en est l'auteur, et se
+ * distingue du pseudo par un léger retrait d'opacité — le même que la
+ * récompense, dont il partage le rôle d'annotation.
+ */
+.toast__label {
+  opacity: 0.85;
+}
+
+.toast__label[hidden] {
+  display: none;
+}
+
 .toast__user {
   /*
    * Garde-fou de mise en page contre un pseudonyme démesuré.

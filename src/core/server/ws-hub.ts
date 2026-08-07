@@ -286,12 +286,26 @@ export function createWsHub(options: WsHubOptions): WsHub {
 
       subscriptions.push(
         bus.on('counter:event-applied', (payload) => {
-          broadcast({
+          const base = {
             type: 'event',
             event: payload.event,
             rewardSeconds: payload.reward.seconds,
             applied: payload.reward.applied,
-          });
+          } as const;
+
+          // Le libellé vit dans le barème, que l'overlay ne reçoit pas : il ne
+          // pourrait donc pas aller le chercher lui-même. Il n'accompagne que
+          // les commandes de chat — l'attacher partout ferait apparaître
+          // « Temps ajouté » au-dessus de chaque abonnement.
+          //
+          // Vidé, il est **omis** plutôt qu'envoyé vide : une chaîne vide
+          // ferait réserver la place d'une ligne que rien ne remplirait.
+          const label = getConfig().rewards.chatCommand.overlayText;
+          broadcast(
+            payload.event.type === 'command' && label !== ''
+              ? { ...base, label }
+              : base,
+          );
         }),
 
         // Filtré par le canal `update`, auquel l'overlay ne s'abonne pas : une

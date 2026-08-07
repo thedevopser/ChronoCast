@@ -54,7 +54,13 @@
         <div class="countdown" id="countdown">--:--:--</div>
       </div>
 
+      <!--
+        Libellé de la bulle : renseigné pour les commandes de chat, masqué
+        partout ailleurs. Il précède le pseudo parce qu'il annonce la nature de
+        l'ajout — « Temps ajouté » — avant de dire qui en est l'auteur.
+      -->
       <div class="toast" id="toast" hidden>
+        <span class="toast__label" id="toast-label" hidden></span>
         <span class="toast__user" id="toast-user"></span>
         <span class="toast__reward" id="toast-reward"></span>
       </div>
