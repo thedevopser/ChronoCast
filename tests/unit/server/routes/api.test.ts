@@ -361,56 +361,47 @@ describe('createApiRoutes', () => {
     });
   });
 
-  describe('mise à jour', () => {
-    /** Place le service dans l'état où une version vérifiée attend un clic. */
-    function makeReady(): void {
-      doubles.updateStatus = {
-        phase: 'ready',
-        currentVersion: '0.1.0',
-        availableVersion: '0.5.1',
-        notesUrl: 'https://github.com/thedevopser/ChronoCast/releases/tag/v0.5.1',
-        message: null,
-        checkedAt: 1_700_000_000_000,
-      };
-    }
-
-    it('renvoie l’état courant', async () => {
-      const response = await call('GET', '/api/update');
-
-      expect(response.status).toBe(200);
-      expect(body(response)).toMatchObject({ phase: 'idle', currentVersion: '0.1.0' });
-    });
-
-    it('déclenche une vérification à la demande', async () => {
-      const response = await call('POST', '/api/update/check');
-
-      expect(response.status).toBe(200);
-      expect(doubles.calls).toContain('update.check');
-    });
-
-    it('lance l’installation quand une version est prête', async () => {
-      makeReady();
-
-      const response = await call('POST', '/api/update/install');
+  /**
+   * Ouverture des paramètres de démarrage de Windows.
+   *
+   * `app.launchAtStartup` a disparu du schéma avec le passage au Microsoft
+   * Store : `setLoginItemSettings` écrit dans `HKCU\…\Run`, que MSIX
+   * virtualise. La case aurait coché sans que rien ne démarre, et rien ne
+   * l'aurait dit. C'est désormais Windows qui détient l'état, dans
+   * Paramètres → Applications → Démarrage, et le panneau n'a plus qu'à y mener.
+   *
+   * **Aucune URL ne traverse cette route.** Elle ne porte pas de paramètre :
+   * la destination est une constante de la coquille. Faire passer l'adresse
+   * par le réseau, même sur la boucle locale, transformerait un renvoi en une
+   * capacité d'ouvrir ce qu'on veut — ce que la garde `https:` de
+   * `BrowserOpener` refuse précisément ailleurs.
+   */
+  describe('POST /api/system/startup-settings', () => {
+    it('demande à la coquille d’ouvrir les paramètres de démarrage', async () => {
+      const response = await call('POST', '/api/system/startup-settings');
 
       expect(response.status).toBe(204);
-      expect(doubles.calls).toContain('update.install');
+      expect(doubles.calls).toContain('system.openStartupSettings');
     });
 
-    it('refuse l’installation quand rien n’est prêt, en 409', async () => {
-      // Un `500` dirait « le serveur est cassé » là où la vérité est « il n'y
-      // a rien à installer ». La distinction se lit dans le panneau.
-      const response = await call('POST', '/api/update/install');
+    it('répond 501 quand le point d’entrée n’a pas de coquille', async () => {
+      // Le cas du point d'entrée headless, qui n'est pas une application
+      // installée. `501` et non `500` : rien n'est cassé, la capacité n'existe
+      // simplement pas ici.
+      const withoutShell = createApiDoubles();
+      const routesWithoutShell = createApiRoutes({
+        ...withoutShell.context,
+        system: undefined,
+      });
+      const route = routesWithoutShell.find(
+        (entry) => entry.method === 'POST' && entry.path === '/api/system/startup-settings',
+      );
 
-      expect(response.status).toBe(409);
-    });
+      const response = await route?.handler(
+        makeRequest({ method: 'POST', path: '/api/system/startup-settings' }),
+      );
 
-    it('n’installe rien tant que le service n’est pas prêt', async () => {
-      await call('POST', '/api/update/install');
-
-      // L'appel est bien transmis — c'est le service qui décide, pas la route —
-      // mais rien ne s'installe, et l'utilisateur reçoit un refus explicite.
-      expect(body(await call('GET', '/api/update'))['phase']).toBe('idle');
+      expect(response?.status).toBe(501);
     });
   });
 });

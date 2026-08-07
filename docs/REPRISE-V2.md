@@ -2,7 +2,7 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il est **vivant** : il est mis à jour à chaque lot, et il fait foi.
 
-**Dernière mise à jour :** 7 août 2026, après la fusion de la PR #24. Le chantier 1 — la mise à jour automatique — est livré et éprouvé sur un vrai poste Windows. Le chantier 2 a livré son **premier lot, réduit** : la commande de chat `!addtime`. La version passe à **`0.6.0`** ; le tag `v0.6.0` est poussé par l'utilisateur, et c'est le workflow `Release` qui produit l'installeur.
+**Dernière mise à jour :** 8 août 2026, chantier 3 écrit et vert en conteneur, **non encore éprouvé sur poste Windows**. ChronoCast passe au **Microsoft Store**, seul canal de distribution : plus aucune release GitHub, plus aucun `.exe` publié. **Le chantier 1 — la mise à jour automatique — est retiré**, le Store s'en chargeant. La version passe à **`0.7.0`**.
 
 **La V1 est terminée et publiée.** Son document de reprise, [REPRISE.md](REPRISE.md), est **clos** : il reste l'archive complète des huit phases, de la release `v0.4.0` et de tout ce qui a été décidé en chemin. On y va pour comprendre pourquoi une chose est construite comme elle l'est — les trois pièges du protocole EventSub, les quatre tentatives du cadre de l'overlay, la leçon de la Phase 7. Rien de tout cela n'est répété ici.
 
@@ -62,13 +62,19 @@ Ces décisions ont été validées par l'utilisateur. **Ne pas les rouvrir.** Le
 | Cadence | Au lancement, différée de 30 s, puis toutes les 6 h | Un subathon dure des jours : une application lancée le lundi ne verrait jamais un correctif publié le mercredi |
 | Réglage | **Un seul** : `app.checkForUpdates`, activé par défaut | Chaque réglage de plus est une question de support de plus — le même argument qui a fait retirer le mode `separate` en V1 |
 | Source | Constante, jamais configurable | Rendre la source réglable transformerait un réglage en exécution de code arbitraire |
-| Signature de code | **Toujours aucune** | Non tranché pour la suite : voir section 9 |
+| Signature de code | **Celle du Microsoft Store**, apposée par Microsoft à la certification | Voir le chantier 3. La ligne précédente disait « toujours aucune » : elle n'est plus vraie |
 | Plateformes | **Windows seul**, comme la V1 | Linux et macOS restent hors périmètre |
 | **Commandes de chat** | Une commande unique, **`!addtime <secondes>`**, plutôt que le catalogue nommé conçu au chantier 2 | Le besoin réel est de créditer une durée qu'aucun barème ne pouvait prévoir. Un catalogue de commandes à durée fixe ne l'aurait pas couvert |
 | Qui déclenche | **Modérateurs et diffuseur seuls**, sur le badge porté par la charge utile. Jamais sur le pseudo | Le badge est une donnée que Twitch pose lui-même ; le pseudo est une chaîne qu'on peut imiter |
 | Juge des secondes | **Le message**, et non le barème. Le schéma garde le **plafond** | Écart assumé au principe « aucune valeur métier hors du schéma » : voir le chantier 2 ci-dessous |
 | Bot de chat tiers | **Aucun.** ChronoCast n'écrit jamais dans le chat, et rien n'annonce la commande aux spectateurs | La bulle de l'overlay est le seul retour visible. Il n'y a donc **aucun réglage à accorder à la main** avec un tiers |
 | Portées OAuth | **Aucune nouvelle** | `channel.chat.message` réclame exactement ce que réclame déjà `channel.chat.notification`, active par défaut |
+| **Distribution** | **Microsoft Store seul.** Plus aucune release GitHub, plus aucun `.exe` publié | SmartScreen faisait renoncer, des antivirus mettaient l'installeur en quarantaine, et la découvrabilité était nulle. Le Store règle les trois |
+| Mise à jour automatique | **Retirée.** Le chantier 1 est supprimé | Un paquet MSIX ne peut pas s'installer un `.exe` par-dessus lui-même. C'est le Store qui met à jour |
+| Répertoire de données | **`%USERPROFILE%\ChronoCast`**, hors du conteneur MSIX | Ce que MSIX écrit dans `%APPDATA%` part avec la désinstallation. Un subathon en cours doit y survivre |
+| Reprise des données | **Écrite et testée**, décidée sur la présence de `config.json`, copié en dernier | Sans elle, chaque utilisateur déjà installé perdrait compteur, configuration et jetons |
+| Lancement au démarrage | **Retiré du schéma.** Extension `windows.startupTask` du manifeste, état détenu par Windows | `setLoginItemSettings` écrit dans un registre virtualisé : la case aurait coché sans que rien ne démarre, **et rien ne l'aurait dit** |
+| Soumission au Store | **Manuelle depuis Partner Center.** La CI produit l'artefact | Automatiser demanderait trois secrets Azure AD dans le dépôt : qui en dispose publie sous l'identité du projet |
 
 ### Pourquoi pas `electron-updater`
 
@@ -159,6 +165,8 @@ L'application interroge GitHub au lancement puis toutes les six heures, téléch
 
 **Ce que cela règle :** tout ce que le conteneur ne pouvait pas montrer a tourné pour de vrai — le `spawn` détaché, l'écriture d'une centaine de mégaoctets dans `%APPDATA%`, l'extinction propre, l'assistant NSIS écrasant une installation existante, et la relance. Le pari du chantier se vérifie une fois de plus : la seule pièce non couverte par les tests tenait en cinq lignes, et rien n'a dû y être corrigé après coup.
 
+> **Le chantier 1 a été retiré au chantier 3.** Tout ce qui suit reste vrai de ce qui a été construit, et la section est conservée pour cela : elle explique *pourquoi* le code était fait ainsi, et ce que sa suppression a fait disparaître de la surface d'attaque. `src/core/update/**`, `src/main/update-installer.ts`, le bandeau du panneau et le réglage `app.checkForUpdates` n'existent plus. C'est le Microsoft Store qui met à jour.
+
 ### Chantier 2 — Commandes de chat Twitch — **premier lot livré, sous une forme réduite**
 
 Un modérateur ou le diffuseur tape `!addtime 300` dans le chat, et le compteur monte de cinq minutes. Une bulle l'annonce sur l'overlay, l'historique en garde la trace avec le pseudo de son auteur.
@@ -211,54 +219,102 @@ La cause est dans [application.ts](../src/core/app/application.ts) : `configServ
 
 **Non corrigé à ce jour.** Deux voies, à trancher : relancer EventSub lorsqu'un réglage *affectant les souscriptions* change — et lui seul, une couleur d'overlay ne doit pas faire tomber la connexion Twitch en plein direct — ou se contenter d'annoncer dans le panneau qu'un redémarrage est nécessaire. La première est la bonne, la seconde coûte une ligne.
 
+### Chantier 3 — Distribution par le Microsoft Store — **écrit, non éprouvé sur poste**
+
+ChronoCast n'est plus distribué que par le Microsoft Store. Le point de départ n'est pas une envie de format : trois symptômes constatés par l'utilisateur. **SmartScreen faisait renoncer des gens** au premier lancement, **des antivirus mettaient l'installeur en quarantaine**, et **la découvrabilité était nulle** — un streamer ne cherche pas un logiciel sur GitHub. Microsoft signe le paquet à la certification, ce qui règle les trois d'un coup, pour ~19 $ une fois et sans abonnement.
+
+**Azure Trusted Signing a été examiné et écarté.** Il aurait réglé SmartScreen et les antivirus sans rien casser — ni MSIX, ni redirection de `%APPDATA%`, ni délai de certification, l'updater intact — mais il n'apporte **rien à la découvrabilité**, qui est le troisième symptôme, et il coûte ~120 $ par an contre ~19 $ une fois.
+
+| Fichier | Rôle |
+| --- | --- |
+| `core/app/data-migration.ts` | Reprise des données de l'ancienne installation. Le seul module du projet qui puisse détruire quelque chose |
+| `core/app/ports.ts` | Nouveau port `SystemSettingsOpener`. `UpdateInstaller` disparaît |
+| `core/server/routes/api.ts` | `POST /api/system/startup-settings`. Les trois routes `/api/update` disparaissent |
+| `main/system-settings.ts` | `ms-settings:startupapps`, en constante |
+| `main/main.ts` | `dataDirectory` passe à `%USERPROFILE%\ChronoCast` ; `legacyDataDirectory` pointe l'ancien |
+| `assets/appx/extensions.xml` | Extension `windows.startupTask` du manifeste |
+| `assets/appx/*.png` | Sept formats engendrés par `prepare-icons.mjs` |
+| `electron-builder.yml` | Cible `appx`, identité Partner Center. Le bloc `nsis` disparaît |
+| `.github/workflows/release.yml` | Produit un artefact, ne publie plus rien |
+| `docs/PRIVACY.md` | Exigé par la certification |
+
+**Décisions prises pendant ce chantier, à connaître avant d'y toucher :**
+
+- **Les données quittent `%APPDATA%` pour `%USERPROFILE%\ChronoCast`.** MSIX virtualise ce qu'une application packagée écrit dans `%APPDATA%`, dans un conteneur que **la désinstallation emporte**. Y laisser le compteur contredirait la décision « un subathon en cours survit à une réinstallation ». `Documents` a été écarté aussi : fréquemment synchronisé par OneDrive, qui poserait des verrous sur le fichier d'état réécrit chaque seconde.
+- **La reprise se décide sur la présence de `config.json`, pas sur la vacuité du répertoire cible.** Un fichier de journal écrit à la milliseconde précédente suffirait à faire conclure qu'il y a déjà une installation. Et `config.json` est **copié en dernier** : sa présence vaut validation, si bien qu'une reprise interrompue n'a pas eu lieu et se rejoue au lancement suivant.
+- **La reprise copie, ne déplace jamais, et n'écrase rien.** `COPYFILE_EXCL` fait porter l'exclusion au système de fichiers. Si le passage au Store devait être annulé, la version NSIS retrouverait ses données là où elle les a laissées.
+- **La reprise ne lève jamais.** Un échec est décrit dans le journal, et l'application démarre sur une configuration neuve : refuser de se lancer pendant un direct coûte plus cher que redemander une autorisation Twitch.
+- **`app.launchAtStartup` est retiré du schéma.** `setLoginItemSettings` écrit dans `HKCU\…\Run`, que MSIX virtualise : la case aurait coché et **rien n'aurait démarré**, sans erreur ni journal. C'est le pire mode de défaillance possible. Le manifeste déclare la tâche, Windows en détient l'état.
+- **Le renvoi vers les paramètres passe par un port dédié, pas par `BrowserOpener`.** Ce dernier refuse tout schéma autre que `https:`, et élargir cette garde pour laisser passer `ms-settings:` aurait été une régression. Le nouveau port est **sans paramètre** : aucune adresse ne traverse la frontière.
+- **`PROTOCOL_VERSION` passe à 2.** Le canal `update` et son message disparaissent : ce n'est pas additif, et une page ancienne dans une Browser Source OBS doit pouvoir s'en apercevoir.
+- **Le refus des identités en attente vit dans le workflow, pas dans la suite.** Un paquet bâti sur une identité marqueuse reste parfaitement utile pour éprouver le packaging par chargement latéral ; il n'est simplement pas soumettable. Le contrôle ne vaut donc que sur un tag. Un test tient le marqueur accordé entre les deux fichiers — et il porte sur les **lignes de valeur**, jamais sur le fichier entier, le marqueur étant cité dans les commentaires qui l'expliquent.
+- **La soumission reste manuelle.** L'automatiser demanderait une inscription Azure AD et trois secrets dans le dépôt : qui en dispose publie sous l'identité du projet. Le modèle de menace n'a pas à s'élargir pour économiser un glisser-déposer par version.
+
+**Ce que le retrait de l'updater fait gagner :** la promesse « la seule communication sortante va vers Twitch » **redevient vraie**, et disparaissent avec le code le téléchargement d'un exécutable, sa vérification par condensat, le contrôle d'URL et le lancement d'un processus détaché. Le code qui n'existe plus n'a pas de faille.
+
+**Ce que cela coûte, en connaissance de cause :** tout correctif attend **un à trois jours** de certification, sans retour arrière possible, et les postes sans Store n'ont plus aucun chemin. C'est la raison pour laquelle l'essai en audience privée n'est pas facultatif.
+
+**Cinq garde-fous ont rougi tout seuls**, et c'est leur raison d'être : le compilateur sur `ApiContext` et `ApplicationOptions`, le test d'assignabilité mutuelle des deux protocoles, `fields.test.ts` sur les réglages retirés, `packaging.test.ts` sur la cible et l'identité, et `icons.test.ts` sur les sept formats AppX.
+
+#### Validation sur poste Windows — **à faire**
+
+Rien de ce chantier n'est éprouvé sur Windows, et il touche précisément ce que le conteneur ne peut pas voir. Voir la section 7 et [RELEASE.md](RELEASE.md) § 5.
+
+**Deux incertitudes en particulier, à lever sur poste :**
+
+1. **La lecture de `%APPDATA%\ChronoCast` depuis un paquet MSIX.** La documentation dit que les lectures d'AppData tombent sur le vrai répertoire quand le conteneur n'a rien écrit. Le choix de `%USERPROFILE%` contourne la question **en écriture**, mais la reprise, elle, doit bien **lire** l'ancien emplacement. Si cela ne fonctionne pas, le repli est de lire le chemin non redirigé explicitement.
+2. **La tâche de démarrage.** Elle n'existe qu'une fois le paquet installé, et rien avant ne dit qu'elle apparaîtra dans les paramètres.
+
 ### Chantiers suivants
 
 Aucun autre n'est décidé. Voir la section 9 pour ce qui a été évoqué sans être tranché.
-
-**Ce que la `0.5.0` rend possible, et qui n'était pas vrai avant :** à partir d'elle, un poste installé se met à jour tout seul. Les chantiers suivants parviendront donc aux utilisateurs sans qu'ils aient à faire quoi que ce soit — mais **seulement à ceux qui seront passés par la `0.5.0`**. Un poste resté en `0.4.0` ou antérieur ne bougera jamais de lui-même : cette version-là ne sait pas se mettre à jour. Il faut le savoir avant de compter sur la boucle pour diffuser un correctif urgent.
 
 ---
 
 ## 7. Ce que le conteneur ne vérifie pas
 
-**Un `verify` vert en conteneur ne dit rien de Windows.** C'est la leçon de la Phase 7 — 33 tests tombés sur le runner Windows alors que la suite était verte en conteneur Linux depuis des mois — et le chantier 1 l'élargit. **Il a été éprouvé sur poste et rien n'a dû être corrigé**, mais la méthode reste ici parce qu'elle resservira au chantier suivant :
+**Un `verify` vert en conteneur ne dit rien de Windows.** C'est la leçon de la Phase 7 — 33 tests tombés sur le runner Windows alors que la suite était verte en conteneur Linux depuis des mois — et le chantier 3 la rend plus vraie que jamais : il touche l'emplacement des données, le démarrage de session et le format du paquet, c'est-à-dire trois choses qui n'existent qu'une fois installées.
 
-- il **lance un processus** : `spawn` détaché, `unref`, puis extinction. Rien de tout cela ne s'observe ici ;
-- il **écrit dans `%APPDATA%`** un fichier d'une centaine de mégaoctets, puis le rend exécutable par Windows ;
-- il dépend de la façon dont **l'installeur NSIS se comporte quand il écrase une installation existante**, et de `runAfterFinish`, qui relance l'application.
+Restent hors de portée de la suite :
 
-### Comment éprouver la mise à jour sous Windows sans rien publier
+- l'ouverture réelle de la fenêtre et son durcissement, l'icône et le menu du tray ;
+- DPAPI, donc le chiffrement réel des secrets ;
+- **la lecture de `%APPDATA%\ChronoCast` à travers la virtualisation MSIX**, dont dépend toute la reprise des données ;
+- **la tâche `windows.startupTask`**, qui n'existe qu'une fois le paquet installé ;
+- le paquet lui-même : installation, raccourcis, **désinstallation puis réinstallation**.
 
-Le parcours complet se teste en s'appuyant sur la release `v0.4.0`, déjà en ligne :
+### Comment éprouver tout cela sans publier
 
-1. Poser temporairement `0.3.9` dans [package.json](../package.json) **et** dans [version.ts](../src/core/app/version.ts) — les deux ensemble, le test de cohérence y veille.
-2. Déclencher le workflow `Release` en mode manuel (*Actions* → *Release* → *Run workflow*) : il produit `ChronoCast-Setup-0.3.9.exe` sans rien publier.
-3. L'installer. L'application se croit en `0.3.9`, voit la `0.4.0` sur GitHub, la télécharge, vérifie son empreinte et propose son installation.
-4. Observer : le bandeau du panneau, l'entrée du tray, la confirmation en deux temps quand le compteur tourne, la fermeture propre, l'assistant NSIS, la relance, et surtout **le temps restant du compteur, identique avant et après**.
-5. Vérifier que `%APPDATA%\ChronoCast\updates\` est vide au lancement suivant.
-6. Revenir à la vraie version dans les deux fichiers.
+La route est l'**audience privée** de Partner Center : soumettre le paquet à une audience restreinte à son propre compte, puis l'installer depuis le Store. On éprouve alors exactement ce que recevront les utilisateurs — paquet **réellement signé par Microsoft** — sans installer le SDK Windows ni manipuler de certificat auto-signé. Cela coûte un cycle de certification, et c'est un cycle bien dépensé.
 
-Un test de plus, à ne pas oublier parce qu'il ne se voit pas : **décocher le réglage et confirmer qu'aucune requête ne part**. Le journal du panneau le dit.
+La liste d'essai complète est en section 5 de [RELEASE.md](RELEASE.md). Deux points y comptent plus que les autres :
+
+1. **Installer par-dessus une installation GitHub existante**, et confirmer que le compteur, la configuration et les jetons sont repris. Le journal du panneau le dit explicitement — c'est pour cela qu'il le dit.
+2. **Désinstaller, réinstaller, et confirmer que les données sont toujours là.** C'est l'invariant que le choix de `%USERPROFILE%` protège, et le seul moyen de savoir s'il tient.
 
 ---
 
 ## 8. Modèle de menace — amendements de la V2
 
-Le modèle de la V1 tient intégralement : voir la section 8 de [REPRISE.md](REPRISE.md) et [SECURITY.md](SECURITY.md). La V2 y ajoute deux choses, et retire une promesse.
+Le modèle de la V1 tient intégralement : voir la section 8 de [REPRISE.md](REPRISE.md) et [SECURITY.md](SECURITY.md).
 
-### La promesse « la seule communication sortante va vers Twitch » n'est plus vraie
+### La promesse « la seule communication sortante va vers Twitch » est rétablie
 
-`api.github.com` et `objects.githubusercontent.com` s'y ajoutent, en HTTPS, **sans jeton ni identifiant** — l'API publique des releases ne demande rien, et n'apprend donc rien de l'utilisateur au-delà de son adresse IP et de la version qu'il exécute, portée par le `User-Agent`. Quatre requêtes par jour. Le réglage `app.checkForUpdates` coupe entièrement ce trafic.
+Le chantier 1 l'avait retirée en ajoutant `api.github.com` et `objects.githubusercontent.com`. **Le chantier 3 la rend de nouveau vraie** : ces deux hôtes disparaissent avec l'updater, et le réglage qui permettait de les couper disparaît avec eux, n'ayant plus d'objet.
 
-### SmartScreen ne protège pas le chemin de mise à jour
+Disparaissent également, et ce sont les parties les plus délicates de l'ancien chantier : le téléchargement d'un exécutable par l'application, sa vérification par condensat, le contrôle d'URL qui empêchait une réponse d'API contrefaite d'envoyer le téléchargement ailleurs, et le lancement d'un processus détaché. **Le code qui n'existe plus n'a pas de faille.**
 
-C'est le point le plus contre-intuitif du chantier, et la raison d'être de la moitié de son code.
+*Ce qui suit reste utile à connaître, parce que c'est le raisonnement qui a justifié la moitié du code retiré :* le fichier téléchargé par le `fetch` de Node ne portait **aucune Mark of the Web** — Windows n'écrit ce flux `Zone.Identifier` que lorsqu'un navigateur ou un client de messagerie dépose le fichier. SmartScreen ne se déclenchait donc **jamais** sur ce que l'application téléchargeait, altéré ou non. La vérification SHA-256 était par conséquent le seul contrôle d'intégrité de ce chemin. Le Store supprime le chemin entier.
 
-L'installeur **n'est pas signé** : `forceCodeSigning: false`, aucun certificat, `signtool` jamais appelé. Mais surtout, **le fichier téléchargé par le `fetch` de Node ne porte aucune *Mark of the Web*** — Windows n'écrit ce flux alternatif `Zone.Identifier` que lorsqu'un navigateur ou un client de messagerie dépose le fichier. SmartScreen ne se déclenchera donc **jamais** sur ce que l'application télécharge, altéré ou non.
+### Le conteneur MSIX ajoute deux surfaces à connaître
 
-**La vérification SHA-256 est par conséquent le seul contrôle d'intégrité de ce chemin.** Elle n'est pas négociable, et elle est doublée par le contrôle d'URL, qui empêche une réponse d'API contrefaite d'envoyer le téléchargement ailleurs. Faire reposer toute la sécurité sur un contrôle unique, c'est n'en avoir aucun le jour où il se révèle faux.
+**La virtualisation de `%APPDATA%`.** Ce qu'une application packagée y écrit va dans un conteneur que la désinstallation emporte. Les données vivent donc hors de là, et la reprise depuis l'ancien emplacement est le seul endroit du code qui lise ce répertoire — en lecture seule, sans jamais écraser quoi que ce soit à destination.
 
-*À toutes fins utiles :* l'absence d'invite SmartScreen au lancement manuel d'un installeur téléchargé depuis la page des releases ne prouve pas qu'il est signé. Elle s'explique par une vérification par réputation désactivée dans Sécurité Windows, un antivirus tiers ayant repris la main sur Defender, ou une marque perdue — elle ne survit ni à un volume exFAT, ni à une extraction 7-Zip.
+**La virtualisation du registre.** Elle a coûté le réglage `app.launchAtStartup`, dont l'écriture n'atteignait plus rien. Le remplacement passe par un port **sans paramètre** : aucune adresse ne traverse la frontière entre le panneau et la coquille, ce qui aurait transformé un renvoi en capacité d'ouvrir un schéma arbitraire.
+
+### Ce que la signature du Store apporte
+
+Le paquet est signé par Microsoft à la certification. Plus d'avertissement SmartScreen au premier lancement, moins de mises en quarantaine par les antivirus, et une provenance vérifiable qui ne repose plus sur un condensat que personne ne comparait.
 
 ---
 
@@ -266,9 +322,7 @@ L'installeur **n'est pas signé** : `forceCodeSigning: false`, aucun certificat,
 
 **Rien de ce qui suit n'est décidé.** Cette section existe pour que ces sujets ne soient ni oubliés ni pris pour un plan.
 
-- **Signature de code.** Un certificat OV classique coûte 300 à 500 € par an, ce qui l'avait fait écarter en V1. **Azure Trusted Signing** est à environ 10 $ par mois et accepte désormais les personnes physiques. Cela ferait disparaître l'avertissement SmartScreen au premier lancement, et rendrait possible une vérification de signature sur le chemin de mise à jour, en plus du condensat. Non évalué, non chiffré, non décidé.
 - **Linux et macOS.** Toujours hors périmètre. À noter pour la suite : macOS est hors de portée sans certificat de toute façon, sa mise à jour automatique exigeant signature **et** notarisation — aucune bibliothèque n'y change rien.
-- **Notes de version dans le bandeau.** Le lien vers la page de la release est posé ; afficher le corps des notes demanderait de rendre du Markdown venu du réseau dans une page à CSP stricte. Ce n'est pas un petit sujet.
 - **Purge de l'historique et rotation des journaux sur de très longs subathons.** Évoqué en V1, jamais mesuré.
 
 ---
@@ -285,8 +339,9 @@ L'installeur **n'est pas signé** : `forceCodeSigning: false`, aucun certificat,
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Le développeur : couches, flux, décisions à ne pas rouvrir |
 | [DEVELOPER.md](DEVELOPER.md) | Le développeur : environnement, règles, points d'extension |
 | [SECURITY.md](SECURITY.md) | Le développeur : modèle de menace et contrôles |
-| [BUILD.md](BUILD.md) | Compilation en conteneur, packaging en CI |
-| [RELEASE.md](RELEASE.md) | Publier une version |
+| [PRIVACY.md](PRIVACY.md) | Le streamer, et la certification du Store : ce qui est collecté, et ce qui ne l'est pas |
+| [BUILD.md](BUILD.md) | Compilation en conteneur, paquet MSIX en CI |
+| [RELEASE.md](RELEASE.md) | Publier une version au Microsoft Store |
 | [TESTING-TWITCH-CLI.md](TESTING-TWITCH-CLI.md) | Simuler des événements sans attendre un vrai sub |
 
 **Un garde-fou tient cette liste** : [tests/unit/assets/documentation.test.ts](../tests/unit/assets/documentation.test.ts) vérifie que tout lien relatif mène quelque part et qu'aucun document ne cite une commande que `dc.sh` ne connaît plus.

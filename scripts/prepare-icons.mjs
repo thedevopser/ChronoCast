@@ -3,12 +3,18 @@
  *
  *   node scripts/prepare-icons.mjs
  *
- * Deux visuels entrent, `assets/logo.png` et `assets/tray-icon.png`, et deux
- * artefacts en sortent :
+ * Deux visuels entrent, `assets/logo.png` et `assets/tray-icon.png`, et
+ * plusieurs artefacts en sortent :
  *
  *   - `assets/tray.png`, carré, 32 × 32, pour la zone de notification ;
- *   - `assets/icon.ico`, sept tailles de 16 à 256, pour l'application, la
- *     fenêtre et l'installeur NSIS.
+ *   - `assets/icon.ico`, sept tailles de 16 à 256, pour l'application et la
+ *     fenêtre ;
+ *   - `assets/appx/*.png`, les sept formats que réclame le manifeste MSIX.
+ *
+ * **Les ressources AppX ne sont pas facultatives.** Sans elles, electron-builder
+ * embarque ses propres images de remplacement, sans avertissement : le paquet
+ * serait accepté par le Store, publié, installé — et porterait le logo d'un
+ * autre.
  *
  * **Pourquoi engendrer plutôt que redimensionner à la main ?** Parce que
  * l'opération devra être refaite — au premier retouchage du logo, au premier
@@ -29,7 +35,7 @@
  */
 
 import { deflateSync, inflateSync } from 'node:zlib';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +55,24 @@ const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
 
 /** Taille de l'icône de la zone de notification. */
 const TRAY_SIZE = 32;
+
+/**
+ * Formats réclamés par le manifeste MSIX.
+ *
+ * Les deux derniers ne sont **pas carrés**, et c'est là toute la difficulté :
+ * le logo source l'est. Les étirer se verrait au premier coup d'œil dans le
+ * menu Démarrer, sans qu'un aperçu dans un éditeur d'images ne le montre. Ils
+ * sont donc composés sur un canevas au bon format, le visuel centré.
+ */
+const APPX_LOGOS = [
+  { name: 'Square44x44Logo.png', width: 44, height: 44 },
+  { name: 'Square71x71Logo.png', width: 71, height: 71 },
+  { name: 'Square150x150Logo.png', width: 150, height: 150 },
+  { name: 'Square310x310Logo.png', width: 310, height: 310 },
+  { name: 'StoreLogo.png', width: 50, height: 50 },
+  { name: 'Wide310x150Logo.png', width: 310, height: 150 },
+  { name: 'SplashScreen.png', width: 620, height: 300 },
+];
 
 /**
  * Taille du logo servi aux pages web.
@@ -273,6 +297,39 @@ function resize(image, size) {
   return { width: size, height: size, pixels };
 }
 
+/**
+ * Compose l'image carrée sur un canevas rectangulaire transparent, centrée.
+ *
+ * Le visuel est d'abord ramené au plus petit des deux côtés — c'est ce qui le
+ * fait tenir entièrement — puis posé au milieu. Le fond reste **transparent**
+ * plutôt que rempli : la couleur des tuiles vient d'`appx.backgroundColor` dans
+ * la configuration de packaging, et un aplat opaque poserait un rectangle
+ * par-dessus, visible dès que le thème de Windows change.
+ */
+function letterbox(image, width, height) {
+  const side = Math.min(width, height);
+  const scaled = resize(image, side);
+
+  if (width === height) {
+    return scaled;
+  }
+
+  const pixels = Buffer.alloc(width * height * 4);
+  const offsetX = Math.floor((width - side) / 2);
+  const offsetY = Math.floor((height - side) / 2);
+
+  for (let y = 0; y < side; y += 1) {
+    scaled.pixels.copy(
+      pixels,
+      ((y + offsetY) * width + offsetX) * 4,
+      y * side * 4,
+      (y + 1) * side * 4,
+    );
+  }
+
+  return { width, height, pixels };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Encodage                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -373,6 +430,18 @@ const logo = load('logo.png');
 const icoTarget = resolve(ASSETS, 'icon.ico');
 writeFileSync(icoTarget, encodeIco(ICO_SIZES.map((size) => resize(logo, size))));
 console.log(`[icons] assets/icon.ico engendrée : ${ICO_SIZES.join(', ')}.`);
+
+const appxDirectory = resolve(ASSETS, 'appx');
+mkdirSync(appxDirectory, { recursive: true });
+for (const format of APPX_LOGOS) {
+  writeFileSync(
+    resolve(appxDirectory, format.name),
+    encodePng(letterbox(logo, format.width, format.height)),
+  );
+  console.log(
+    `[icons] assets/appx/${format.name} engendrée en ${String(format.width)}×${String(format.height)}.`,
+  );
+}
 
 const webLogoTarget = resolve(WEB_SHARED, 'logo.png');
 writeFileSync(webLogoTarget, encodePng(resize(logo, WEB_LOGO_SIZE)));

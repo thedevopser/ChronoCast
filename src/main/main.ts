@@ -4,7 +4,7 @@
  * Il compose exactement la même application que `src/headless/index.ts`, avec
  * les mêmes briques Node — c'est `core/app/node-runtime.ts` qui les fournit aux
  * deux — et ne diffère que par les trois ports qui touchent réellement à la
- * plateforme : les chemins, qui pointent vers `%APPDATA%\ChronoCast` ; les
+ * plateforme : les chemins, qui pointent vers `%USERPROFILE%\ChronoCast` ; les
  * secrets, protégés par DPAPI via `safeStorage` ; et l'ouverture du navigateur,
  * confiée au système.
  *
@@ -20,16 +20,15 @@
  *      Le processus principal en ESM se charge de façon asynchrone : une
  *      attente placée trop tôt ferait manquer l'événement `ready`.
  *   2. **`app.setName` avant toute lecture de chemin.** `app.getPath('userData')`
- *      en dérive ; sans lui, les données atterriraient dans un répertoire qui
- *      changerait le jour où electron-builder posera `productName`. Un
- *      répertoire de données qui se déplace entre deux versions, c'est un
- *      compteur perdu.
+ *      en dérive, et c'est de lui que la reprise des données tire l'ancien
+ *      emplacement `%APPDATA%\ChronoCast`. Sans lui, la reprise chercherait
+ *      dans un répertoire qui changerait le jour où electron-builder posera
+ *      `productName` — et ne trouverait rien, sans la moindre erreur.
  *   3. **`safeStorage` n'est utilisable qu'après `whenReady`.** Le magasin ne
  *      l'interroge donc jamais à la construction.
  */
 
-import { spawn } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { app, clipboard, dialog, safeStorage, shell, Notification, type BrowserWindow } from 'electron';
@@ -45,15 +44,16 @@ import type { OAuthOutcome } from '../core/server/oauth-callback.js';
 import { createExternalBrowserOpener } from './browser-opener.js';
 import { oauthReturnUrl } from './oauth-return.js';
 import { createSafeStorageSecretStore } from './safe-storage-secret-store.js';
-import { createUpdateInstaller } from './update-installer.js';
+import { createSystemSettingsOpener } from './system-settings.js';
 import { createAppTray, type AppTray } from './tray.js';
 import { createMainWindow } from './windows.js';
 
 /**
  * Nom du produit, posé avant tout le reste.
  *
- * Il détermine `%APPDATA%\ChronoCast`, et doit rester identique à celui
- * qu'electron-builder inscrira dans l'installeur.
+ * Il détermine `%APPDATA%\ChronoCast`, d'où les données de l'ancienne
+ * installation sont reprises, et doit rester identique à celui
+ * qu'electron-builder inscrira dans le paquet.
  */
 app.setName('ChronoCast');
 
@@ -129,9 +129,21 @@ if (!app.requestSingleInstanceLock()) {
 
 function start(): void {
   const paths = createFsPathProvider({
-    // `%APPDATA%\ChronoCast` sous Windows. C'est le seul endroit du code où
-    // l'emplacement des données de l'utilisateur est décidé.
-    dataDirectory: app.getPath('userData'),
+    // `%USERPROFILE%\ChronoCast`, et **délibérément hors de `%APPDATA%`**.
+    //
+    // MSIX virtualise ce qu'une application packagée écrit dans `%APPDATA%`,
+    // dans un conteneur que la désinstallation emporte. Le compteur, la
+    // configuration et les jetons y disparaîtraient, alors que la promesse
+    // faite au streamer est qu'un subathon en cours survit à une
+    // réinstallation — c'est précisément ce qu'on fait quand quelque chose ne
+    // va pas.
+    //
+    // `Documents` a été écarté pour une raison tout aussi concrète : ce
+    // répertoire est fréquemment synchronisé par OneDrive, qui poserait des
+    // verrous sur le fichier d'état réécrit à chaque seconde.
+    //
+    // C'est le seul endroit du code où l'emplacement des données est décidé.
+    dataDirectory: join(app.getPath('home'), 'ChronoCast'),
     webRootDirectory: defaultWebRoot(import.meta.url),
   });
 
@@ -139,6 +151,11 @@ function start(): void {
 
   application = createApplication({
     paths,
+    // `%APPDATA%\ChronoCast`, l'emplacement d'avant le passage au Store. Les
+    // données y sont reprises une fois, sans jamais rien écraser, et l'ancienne
+    // installation reste intacte — si le passage au Store devait être annulé,
+    // la version NSIS retrouverait ses données là où elle les a laissées.
+    legacyDataDirectory: app.getPath('userData'),
     secrets: createSafeStorageSecretStore({
       directory: paths.dataDirectory,
       // `safeStorage` est prêt : nous sommes après `whenReady`.
@@ -147,20 +164,13 @@ function start(): void {
     }),
     clock: createSystemClock(),
     browser: createExternalBrowserOpener({ openExternal: (url) => shell.openExternal(url) }),
+    // Le lancement à l'ouverture de session n'est plus un réglage de
+    // ChronoCast : `setLoginItemSettings` écrirait dans un registre que MSIX
+    // virtualise. Le manifeste déclare la tâche, Windows en détient l'état, et
+    // le panneau n'a plus qu'à y mener.
+    system: createSystemSettingsOpener({ openExternal: (url) => shell.openExternal(url) }),
     ticker: createSystemTicker(),
     appVersion: app.getVersion(),
-    // `app.quit` et non `app.exit` : il traverse `before-quit`, donc l'arrêt
-    // propre, donc l'écriture du dernier état du compteur. Sortir en force
-    // ferait redémarrer la nouvelle version sur un compteur en retard de
-    // quelques secondes — au détriment du streamer, ce que le projet refuse
-    // partout ailleurs.
-    updateInstaller: createUpdateInstaller({
-      spawn,
-      quit: () => {
-        app.quit();
-      },
-      logger,
-    }),
     ...createNodeRuntime(),
   });
 
@@ -197,15 +207,10 @@ function onStarted(port: number): void {
     iconPath: iconPath('tray.png'),
     getState: () => {
       const state = current.counter.getState();
-      const update = current.update.getStatus();
       return {
         status: state.status,
         remainingMs: state.remainingMs,
         overlayUrl: `${appOrigin}/overlay`,
-        // `null` hors de l'état « prêt » : le modèle du menu fait alors
-        // disparaître l'entrée, plutôt que de proposer d'installer ce qui n'a
-        // pas encore été vérifié.
-        updateVersion: update.phase === 'ready' ? update.availableVersion : null,
       };
     },
     onCommand: (id) => {
@@ -215,13 +220,6 @@ function onStarted(port: number): void {
           break;
         case 'copy-overlay-url':
           clipboard.writeText(`${appOrigin}/overlay`);
-          break;
-        case 'install-update':
-          // Le service refuse lui-même si rien n'est prêt : la garde vit là, et
-          // non ici. L'échec est journalisé, jamais silencieux.
-          void current.update.install().catch((error: unknown) => {
-            console.error('installation de la mise à jour impossible :', error);
-          });
           break;
         case 'quit':
           app.quit();
@@ -245,10 +243,6 @@ function onStarted(port: number): void {
     returnFromOAuth(appOrigin, outcome);
   });
 
-  applyLaunchAtStartup(config.app.launchAtStartup);
-  current.config.onChange((updated) => {
-    applyLaunchAtStartup(updated.app.launchAtStartup);
-  });
 }
 
 /**
@@ -270,21 +264,6 @@ function returnFromOAuth(appOrigin: string, outcome: OAuthOutcome): void {
     .catch((error: unknown) => {
       console.error('retour dans la fenêtre impossible :', error);
     });
-}
-
-/**
- * Applique le lancement à l'ouverture de session.
- *
- * Relu avant d'écrire : `setLoginItemSettings` touche au registre, et le
- * réappliquer à chaque changement de configuration — c'est-à-dire à chaque
- * enregistrement depuis le panneau — écrirait pour rien.
- */
-function applyLaunchAtStartup(enabled: boolean): void {
-  if (app.getLoginItemSettings().openAtLogin === enabled) {
-    return;
-  }
-
-  app.setLoginItemSettings({ openAtLogin: enabled });
 }
 
 /** Prévient, une seule fois, que fermer la fenêtre n'a rien arrêté. */

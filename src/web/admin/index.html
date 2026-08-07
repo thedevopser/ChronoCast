@@ -59,24 +59,6 @@
       </aside>
 
       <main class="content">
-        <!--
-          Mise à jour disponible. Distinct de `#banner`, qui porte les messages
-          transitoires d'enregistrement : les faire cohabiter dans le même
-          élément ferait effacer l'annonce de mise à jour au premier réglage
-          modifié. Il vit dans la coquille et non dans une vue, parce qu'une
-          mise à jour n'appartient à aucune et doit se voir depuis toutes.
-          Peuplé par `main.ts` via `safe-dom`, jamais écrit ici.
-        -->
-        <aside class="update" id="update" hidden>
-          <p class="update__text" id="update-text"></p>
-          <div class="update__actions">
-            <a class="update__notes" id="update-notes" target="_blank" rel="noreferrer noopener" hidden
-              >Notes de version</a
-            >
-            <button class="button" id="update-action" type="button"></button>
-          </div>
-        </aside>
-
         <p class="banner" id="banner" hidden></p>
 
         <!-- Tableau de bord -->
@@ -445,6 +427,26 @@
           <div class="actions">
             <button class="button button--primary" type="button" id="save-settings">
               Enregistrer les paramètres
+            </button>
+          </div>
+
+          <!--
+            Lancement à l'ouverture de session. Ce n'est plus un réglage de
+            ChronoCast : sous MSIX, `setLoginItemSettings` écrit dans un
+            registre virtualisé par le conteneur du paquet, et la case aurait
+            coché sans que rien ne démarre au redémarrage suivant. C'est le
+            manifeste qui déclare la tâche et Windows qui en détient l'état ;
+            le panneau n'a plus qu'à y mener. L'adresse n'est pas écrite ici :
+            elle est une constante de la coquille.
+          -->
+          <div class="card">
+            <p class="card__label">Lancer ChronoCast à l’ouverture de la session</p>
+            <p class="card__hint">
+              Ce réglage appartient à Windows, dans Paramètres → Applications → Démarrage.
+              ChronoCast y figure sous son propre nom.
+            </p>
+            <button class="button button--ghost" type="button" id="open-startup-settings">
+              Ouvrir les paramètres de démarrage
             </button>
           </div>
         </section>

@@ -593,9 +593,6 @@ const setupSchema = z
  */
 const appSchema = z
   .object({
-    /** Lancement automatique à l'ouverture de la session Windows. */
-    launchAtStartup: z.boolean().default(false),
-
     /**
      * Démarrage fenêtre masquée, dans le tray.
      *
@@ -604,22 +601,6 @@ const appSchema = z
      * qui n'a pas démarré.
      */
     startMinimized: z.boolean().default(false),
-
-    /**
-     * Vérification périodique des mises à jour auprès de GitHub.
-     *
-     * **Seul réglage du produit qui autorise une communication sortante autre
-     * que Twitch.** Il doit donc être refusable, et le rester : c'est ce que
-     * promet le modèle de menace.
-     *
-     * Activé par défaut, parce qu'un compteur de subathon tourne pendant des
-     * jours chez quelqu'un qui n'ouvre pas la page des releases : l'éteindre
-     * par défaut reviendrait à ne jamais corriger personne. Cela ne met rien
-     * en danger — **la vérification et le téléchargement sont automatiques,
-     * l'installation ne l'est jamais.** C'est le clic qui protège le direct,
-     * pas l'ignorance de la mise à jour.
-     */
-    checkForUpdates: z.boolean().default(true),
   })
   .strip();
 

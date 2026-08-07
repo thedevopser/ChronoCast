@@ -415,26 +415,10 @@ const MAX_INITIAL_SECONDS = 2_592_000;
 
 const SETTINGS_FIELDS: readonly AdminField[] = [
   {
-    selector: '#app-launch-at-startup',
-    path: 'app.launchAtStartup',
-    label: 'Lancer ChronoCast à l’ouverture de la session',
-    hint: 'Sans effet hors de l’application Windows.',
-    view: 'settings',
-    kind: 'boolean',
-  },
-  {
     selector: '#app-start-minimized',
     path: 'app.startMinimized',
     label: 'Démarrer dans la zone de notification',
     hint: 'La fenêtre reste accessible par un clic sur l’icône. Fermer la fenêtre n’arrête jamais le compteur.',
-    view: 'settings',
-    kind: 'boolean',
-  },
-  {
-    selector: '#app-check-for-updates',
-    path: 'app.checkForUpdates',
-    label: 'Vérifier les mises à jour',
-    hint: 'Interroge GitHub au lancement puis toutes les six heures. Rien ne s’installe sans votre clic. Décocher coupe la seule communication sortante autre que Twitch.',
     view: 'settings',
     kind: 'boolean',
   },

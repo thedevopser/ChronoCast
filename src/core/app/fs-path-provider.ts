@@ -3,10 +3,10 @@
  *
  * Elle vit ici, et non dans un point d'entrée, pour la même raison que
  * `system-clock.ts` et `system-ticker.ts` : elle a deux appelants. La coquille
- * Electron lui impose `app.getPath('userData')` — soit `%APPDATA%\ChronoCast`
- * sous Windows, seule cible de la V1 — et le point d'entrée headless la laisse
- * choisir sa racine, sous le répertoire personnel ou là où
- * `CHRONOCAST_DATA_DIR` la place. C'est ce que fait `docker/compose.yml`, qui
+ * Electron lui impose `%USERPROFILE%\ChronoCast` — délibérément hors de
+ * `%APPDATA%`, que MSIX virtualise dans un conteneur emporté par la
+ * désinstallation — et le point d'entrée headless la laisse choisir sa racine,
+ * sous le répertoire personnel ou là où `CHRONOCAST_DATA_DIR` la place. C'est ce que fait `docker/compose.yml`, qui
  * la met hors du volume projet pour qu'aucun test ne puisse écrire dans les
  * sources.
  *

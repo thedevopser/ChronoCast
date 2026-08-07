@@ -1,22 +1,23 @@
-# Construction de l'installeur Windows, et publication d'une release.
+# Construction du paquet MSIX destiné au Microsoft Store.
 #
-# Deux façons de le déclencher, et c'est la principale décision de ce fichier :
+# **Ce workflow ne publie plus rien.** Il produit un artefact, et c'est
+# l'utilisateur qui le dépose dans Partner Center. Deux raisons : automatiser la
+# soumission demanderait une inscription d'application Azure AD et trois secrets
+# dans le dépôt — qui en dispose publie sous l'identité du projet — et c'est
+# l'utilisateur qui publie, ici comme pour les PR.
 #
-#   - **Un tag `vX.Y.Z` poussé** produit l'installeur *et* crée la GitHub
-#     Release, l'installeur et son SHA-256 attachés.
+# Deux façons de le déclencher :
+#
+#   - **Un tag `vX.Y.Z` poussé** produit le paquet destiné à la soumission, et
+#     vérifie au préalable que l'identité de Partner Center est renseignée.
 #   - **Un déclenchement manuel** (onglet Actions → « Release » → « Run
-#     workflow ») produit l'installeur **sans rien publier**. Il est alors
-#     téléchargeable comme artefact de l'exécution, pendant trente jours.
+#     workflow ») produit le paquet **sans ce contrôle**. Il reste installable
+#     par chargement latéral pour éprouver le packaging, ce qui est précisément
+#     son usage — une identité marqueuse n'empêche rien de fonctionner en local.
 #
-# Le second mode existe pour éprouver le packaging sans polluer les releases.
-# Sans lui, la seule façon de savoir si le build aboutit serait de créer une
-# release — c'est-à-dire de publier avant d'avoir vérifié, ou de supprimer des
-# tags après coup.
-#
-# Le build tourne sur un runner **Windows**, nativement, et c'est le seul chemin
-# de packaging qui existe. Un service Docker sous Wine a servi jusqu'à la 0.2.0 :
-# il pesait plusieurs gigaoctets et construisait en croisé ce que GitHub
-# construit nativement. Voir docs/BUILD.md.
+# Le build tourne sur un runner **Windows**, nativement : la cible AppX réclame
+# `makeappx.exe` du SDK Windows, présent sur les runners `windows-latest` et
+# nulle part dans le conteneur de développement. Voir docs/BUILD.md.
 
 name: Release
 
@@ -27,7 +28,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -47,10 +48,10 @@ jobs:
       - name: Installer les dépendances
         run: npm ci --ignore-scripts
 
-      # Le tag fait foi, mais `package.json` est ce qui finit dans l'installeur
-      # et dans le nom du fichier produit. Les laisser diverger publierait une
-      # release `v1.2.0` contenant un `ChronoCast-Setup-1.1.0.exe` : personne ne
-      # saurait plus quelle version est installée.
+      # Le tag fait foi, mais `package.json` est ce qui finit dans le paquet et
+      # dans la version que lit le Store. Les laisser diverger publierait une
+      # release `v1.2.0` contenant un paquet en `1.1.0` : le Store refuserait la
+      # soumission suivante, la version devant croître à chaque fois.
       - name: Vérifier la cohérence du tag et de package.json
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -63,62 +64,65 @@ jobs:
           fi
           echo "version : $manifest"
 
+      # Une identité de paquet fausse produit un `.appx` en tout point valide,
+      # que **rien ne distingue** d'un paquet soumettable — jusqu'au rejet de
+      # certification, un à trois jours plus tard. Le contrôle ne vaut que sur un
+      # tag : un build manuel avec une identité marqueuse reste utile pour
+      # éprouver le packaging par chargement latéral.
+      #
+      # Le marqueur cherché ici est celui qu'un test tient accordé à
+      # `electron-builder.yml` : voir `tests/unit/assets/packaging.test.ts`.
+      - name: Vérifier l’identité du paquet
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          if grep -qE '^[[:space:]]*(identityName|publisher|publisherDisplayName):.*IDENTITE-PARTNER-CENTER' electron-builder.yml; then
+            echo "::error::l'identité du paquet n'est pas renseignée dans electron-builder.yml"
+            echo "::error::relevez identityName, publisher et publisherDisplayName dans Partner Center → Identité du produit"
+            exit 1
+          fi
+          echo "identité du paquet renseignée"
+
       # La même vérification qu'en CI, avant de produire quoi que ce soit : un
-      # installeur bâti sur une suite rouge n'a aucune raison d'exister.
+      # paquet bâti sur une suite rouge n'a aucune raison d'exister.
       - name: Vérifier
         run: npm run verify
 
       - name: Compiler
         run: npm run build
 
-      - name: Construire l'installeur
+      - name: Construire le paquet MSIX
         run: npx electron-builder --windows --publish never
 
-      # Le condensat remplace la signature que ce projet n'achète pas : il est
-      # publié avec la release pour que l'utilisateur puisse vérifier ce qu'il
-      # exécute, malgré l'avertissement SmartScreen.
-      - name: Calculer le SHA-256
-        shell: bash
+      # Meilleur effort, et jamais bloquant. Le kit de certification attrape une
+      # bonne part des motifs de rejet — ressources graphiques incomplètes,
+      # capacités mal déclarées — mais il lui arrive d'échouer pour des raisons
+      # qui lui appartiennent, et faire échouer la release là-dessus coûterait
+      # plus que ça ne rapporte. Son rapport est joint à l'artefact : il se lit
+      # avant de soumettre, pas après le rejet.
+      - name: Passer le Windows App Certification Kit
+        continue-on-error: true
+        shell: pwsh
         run: |
-          cd release
-          installer="$(ls *.exe)"
-          sha256sum "$installer" > "$installer.sha256"
-          cat "$installer.sha256"
+          $appcert = "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit\appcert.exe"
+          if (-not (Test-Path $appcert)) {
+            Write-Host "::warning::appcert.exe introuvable, contrôle ignoré"
+            exit 0
+          }
+          $package = Get-ChildItem release\*.appx | Select-Object -First 1
+          & $appcert reset
+          & $appcert test -appxpackagepath $package.FullName -reportoutputpath release\wack-report.xml
 
-      # Toujours produit, y compris en déclenchement manuel : c'est ce qui rend
-      # le mode d'essai utile.
-      - name: Publier l'artefact de l'exécution
+      # Seul livrable du workflow : c'est ce fichier qu'on dépose dans Partner
+      # Center. Partner Center accepte le `.appx` tel quel — le `.msixupload` est
+      # un format d'empaquetage propre à Visual Studio, il n'y a pas à le
+      # produire.
+      - name: Publier l’artefact de l’exécution
         uses: actions/upload-artifact@v4
         with:
-          name: chronocast-windows
+          name: chronocast-msix
           path: |
-            release/*.exe
-            release/*.exe.sha256
+            release/*.appx
+            release/wack-report.xml
           retention-days: 30
-
-      - name: Créer la release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release/*.exe
-            release/*.exe.sha256
-          generate_release_notes: true
-          # Le binaire n'est pas signé : le dire dans la release elle-même, et
-          # non seulement dans la documentation, est le seul endroit où
-          # l'utilisateur le lira au moment où la question se pose.
-          body: |
-            ## Installation
-
-            Téléchargez `ChronoCast-Setup-*.exe` et lancez-le.
-
-            **SmartScreen affichera un avertissement** : le binaire n'est pas signé,
-            un certificat de signature de code coûtant plusieurs centaines d'euros par an.
-            Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
-
-            Pour vérifier le fichier avant de l'exécuter, comparez son empreinte à celle
-            publiée dans `.sha256` :
-
-            ```powershell
-            Get-FileHash .\ChronoCast-Setup-*.exe -Algorithm SHA256
-            ```
+          if-no-files-found: error

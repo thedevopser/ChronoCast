@@ -28,7 +28,6 @@ import {
   type CounterState,
   type DomainEventType,
   type ServerMessage,
-  type UpdateStatus,
 } from '../shared/protocol.js';
 import { createWsClient, type WsClientStatus, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
@@ -43,7 +42,6 @@ import {
   type DashboardModel,
 } from './dashboard-model.js';
 import { fieldsOf, groupsOf } from './fields.js';
-import { updateBannerModel } from './update-banner.js';
 import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
 import {
   filterHistory,
@@ -189,81 +187,6 @@ function start(): void {
   }
 
   /* ---------------------------------------------------------------------- */
-  /* Mise à jour                                                            */
-  /* ---------------------------------------------------------------------- */
-
-  const updateBox = requireElement(document, '#update');
-  const updateText = requireElement(document, '#update-text');
-  const updateNotes = requireElement(document, '#update-notes') as HTMLAnchorElement;
-  const updateAction = button('#update-action');
-
-  let updateStatus: UpdateStatus | null = null;
-  /** Deuxième temps du clic, armé seulement quand le compteur tourne. */
-  let updateConfirming = false;
-
-  /** Le modèle du bandeau pour l'état courant, ou `null` s'il n'y a rien à dire. */
-  function currentUpdateBanner() {
-    return updateStatus === null
-      ? null
-      : updateBannerModel(updateStatus, { counterRunning: model.counter?.status === 'running' });
-  }
-
-  function paintUpdate(): void {
-    const view = currentUpdateBanner();
-
-    if (view === null) {
-      updateBox.hidden = true;
-      updateConfirming = false;
-      return;
-    }
-
-    updateBox.hidden = false;
-    updateBox.className = `update update--${view.tone}`;
-    setText(updateText, updateConfirming ? view.confirmText : view.text, 300);
-    setText(updateAction, updateConfirming ? 'Confirmer et installer' : view.actionLabel, 60);
-
-    // `href` posé seulement sur une URL de release connue, et jamais construit
-    // depuis autre chose : c'est une valeur venue du réseau.
-    if (view.notesUrl === null) {
-      updateNotes.hidden = true;
-      updateNotes.removeAttribute('href');
-    } else {
-      updateNotes.hidden = false;
-      updateNotes.href = view.notesUrl;
-    }
-  }
-
-  updateAction.addEventListener('click', () => {
-    const view = currentUpdateBanner();
-    if (view === null) {
-      return;
-    }
-
-    if (view.action === 'retry') {
-      void guarded(updateAction, async () => {
-        updateStatus = await api.post<UpdateStatus>('/api/update/check');
-        paintUpdate();
-      });
-      return;
-    }
-
-    // Premier clic pendant un direct : on demande confirmation au lieu
-    // d'installer. Installer ferme l'application, et un clic distrait pendant
-    // un subathon coûterait le stream.
-    if (view.requiresConfirmation && !updateConfirming) {
-      updateConfirming = true;
-      paintUpdate();
-      return;
-    }
-
-    void guarded(updateAction, async () => {
-      // L'application se ferme dans la foulée : cette réponse est la dernière
-      // chose que la page recevra.
-      await api.post('/api/update/install');
-    });
-  });
-
-  /* ---------------------------------------------------------------------- */
   /* Navigation                                                             */
   /* ---------------------------------------------------------------------- */
 
@@ -398,11 +321,6 @@ function start(): void {
           paintLogs();
           paintLogState();
         }
-        break;
-
-      case 'update':
-        updateStatus = message.status;
-        paintUpdate();
         break;
 
       case 'hello':
@@ -760,6 +678,17 @@ function start(): void {
     void guarded(refreshSubs, refreshSubscriptions);
   });
 
+  // Renvoi vers Paramètres → Applications → Démarrage. **Aucune adresse ne
+  // part d'ici** : la route ne porte pas de charge utile, et la destination est
+  // une constante de la coquille. En headless elle répond `501`, que `guarded`
+  // affiche dans le bandeau — la seule situation où il n'y a rien à ouvrir.
+  const startupSettings = button('#open-startup-settings');
+  startupSettings.addEventListener('click', () => {
+    void guarded(startupSettings, async () => {
+      await api.post('/api/system/startup-settings');
+    });
+  });
+
   /* ---------------------------------------------------------------------- */
   /* Vue Historique                                                         */
   /* ---------------------------------------------------------------------- */
@@ -1096,20 +1025,6 @@ function start(): void {
     // Sans jeton, cette route répond 502 : l'annoncer sur chaque ouverture du
     // panneau d'une installation neuve n'apprendrait rien à personne.
   });
-
-  // L'état de la mise à jour arrive ensuite au fil de l'eau par le WebSocket ;
-  // cette lecture couvre le cas où la vérification a eu lieu avant l'ouverture
-  // du panneau, c'est-à-dire le cas courant.
-  void api
-    .get<UpdateStatus>('/api/update')
-    .then((status) => {
-      updateStatus = status;
-      paintUpdate();
-    })
-    .catch(() => {
-      // Silencieux : ne pas savoir s'il existe une mise à jour n'est pas une
-      // panne dont il faille avertir quelqu'un qui vient d'ouvrir son panneau.
-    });
 
   client.start();
   window.requestAnimationFrame(render);

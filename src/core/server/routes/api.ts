@@ -21,13 +21,13 @@
 import { z } from 'zod';
 
 import type { TwitchStatusPayload } from '../../app/app-events.js';
+import type { SystemSettingsOpener } from '../../app/ports.js';
 import type { ConfigService } from '../../config/config-service.js';
 import type { CounterEventOutcome, CounterService } from '../../counter/counter-service.js';
 import type { DomainEvent, DomainEventType } from '../../events/domain-event.js';
 import type { EventHistoryService } from '../../history/event-history-service.js';
 import type { Logger, LogLevel } from '../../logging/logger.js';
 import type { RingBufferSink } from '../../logging/sinks/ring-buffer-sink.js';
-import type { UpdateStatus } from '../../update/update-service.js';
 import {
   errorResponse,
   jsonResponse,
@@ -68,24 +68,18 @@ export interface TwitchApiPort {
   setClientSecret(secret: string): Promise<void>;
 }
 
-/**
- * Vue du service de mise à jour réduite à ce que l'API expose.
- *
- * Trois verbes et rien de plus. Le panneau ne peut ni choisir la version, ni
- * désigner un fichier, ni pointer une autre source : la seule chose qu'il
- * commande est « installe ce que tu as déjà vérifié ».
- */
-export interface UpdateApiPort {
-  getStatus(): UpdateStatus;
-  check(): Promise<UpdateStatus>;
-  install(): Promise<void>;
-}
-
 export interface ApiContext {
   readonly config: ConfigService;
   readonly counter: CounterService;
   readonly history: EventHistoryService;
-  readonly update: UpdateApiPort;
+
+  /**
+   * Ouverture des réglages système, quand le point d'entrée en est capable.
+   *
+   * Absent en headless, qui n'est pas une application installée. La route
+   * répond alors `501` : il n'y a rien de cassé, la capacité n'existe pas.
+   */
+  readonly system?: SystemSettingsOpener | undefined;
   /** Journaux en mémoire : réponse immédiate, sans lecture disque. */
   readonly logs: RingBufferSink;
   readonly twitch: TwitchApiPort;
@@ -247,7 +241,7 @@ export function createApiRoutes(context: ApiContext): Route[] {
     history,
     logs,
     twitch,
-    update,
+    system,
     getPort,
     appVersion,
     applyManualEvent,
@@ -550,38 +544,21 @@ export function createApiRoutes(context: ApiContext): Route[] {
     },
 
     {
-      method: 'GET',
-      path: '/api/update',
-      handler: () => jsonResponse(200, update.getStatus()),
-    },
-
-    {
       method: 'POST',
-      path: '/api/update/check',
-      handler: async () => jsonResponse(200, await update.check()),
-    },
-
-    {
-      method: 'POST',
-      path: '/api/update/install',
+      path: '/api/system/startup-settings',
       handler: async () => {
-        try {
-          await update.install();
-        } catch (error: unknown) {
-          // `409` et non `500` : il n'y a rien de cassé, il n'y a rien à
-          // installer. Le panneau n'affiche le bouton que sur l'état `ready`,
-          // mais l'API est atteignable directement, et un `500` ferait
-          // chercher une panne qui n'existe pas.
-          scoped.warning('installation de mise à jour refusée', { cause: error });
+        if (system === undefined) {
+          // `501` et non `500` : le point d'entrée headless n'est pas une
+          // application installée, il n'y a donc rien à ouvrir. Rien n'est
+          // cassé, et un `500` ferait chercher une panne qui n'existe pas.
           return errorResponse(
-            409,
-            'update_not_ready',
-            'Aucune mise à jour vérifiée n’est prête à être installée.',
+            501,
+            'shell_unavailable',
+            'Ce point d’entrée ne peut pas ouvrir les paramètres de Windows.',
           );
         }
 
-        // L'application se ferme dans la foulée : cette réponse est la
-        // dernière chose que la page recevra.
+        await system.openStartupSettings();
         return noContentResponse();
       },
     },

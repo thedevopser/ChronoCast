@@ -1,6 +1,6 @@
 {
   "name": "chronocast",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Compteur subathon Twitch pour OBS : overlay temps réel et panneau d'administration, entièrement local.",
   "private": true,
   "license": "MIT",

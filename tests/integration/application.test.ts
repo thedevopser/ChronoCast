@@ -16,7 +16,6 @@ import { createSystemClock } from '../../src/core/app/system-clock.js';
 import type { Ticker } from '../../src/core/counter/counter-service.js';
 import type { Router } from '../../src/core/server/router.js';
 import { CSRF_HEADER } from '../../src/core/server/security/csrf.js';
-import { sha256Hex } from '../../src/core/update/digest.js';
 import { makeRequest } from '../helpers/http-request.js';
 import {
   channelCheer,
@@ -140,14 +139,19 @@ describe('application complète', () => {
   /** Routeur du rappel, capturé au passage : il est piloté directement. */
   let oauthRouter: Router | null = null;
   /**
-   * `fetch` de la mise à jour, remplacé par les seuls tests qui en ont besoin.
+   * `fetch` de l'application, remplacé par les seuls tests qui en ont besoin.
    *
    * Partout ailleurs il refuse : aucun test ne doit toucher au réseau, et un
-   * appel non prévu doit se voir plutôt que de partir vers GitHub.
+   * appel non prévu doit se voir plutôt que de partir vers Twitch.
    */
-  let updateFetch: typeof fetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
-  /** Chemins passés au port d'installation. Vide signifie « rien n'a été lancé ». */
-  let installerLaunches: string[] = [];
+  let appFetch: typeof fetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
+  /**
+   * Ancien répertoire de données, quand le test en met un en scène.
+   *
+   * `undefined` partout ailleurs : c'est le cas du point d'entrée headless, qui
+   * n'a jamais rien à reprendre.
+   */
+  let legacyDataDirectory: string | undefined;
 
   /** Construit une application sur le répertoire de données courant. */
   function build(): Application {
@@ -161,14 +165,14 @@ describe('application complète', () => {
         webRootDirectory: join(dataDirectory, 'public'),
         resolveDataFile: (...segments) => join(dataDirectory, ...segments),
       },
+      // Étalé conditionnellement : `exactOptionalPropertyTypes` distingue
+      // « propriété absente » de « propriété à `undefined` », et seule la
+      // première décrit une application qui n'a rien à reprendre.
+      ...(legacyDataDirectory === undefined ? {} : { legacyDataDirectory }),
       secrets: createMemorySecretStore(),
       clock: createSystemClock(),
       browser: { open: () => Promise.resolve() },
       ticker,
-      // Une version réellement bien formée, et non un `0.1.0-test` : la
-      // sélection de mise à jour refuse par construction tout ce qui n'est pas
-      // un `X.Y.Z` strict — ne pas comprendre sa propre version et mettre à
-      // jour quand même reviendrait à accepter n'importe quel artefact.
       appVersion: '0.1.0',
       hubTimers: {
         // Aucun battement réel : la vivacité est testée dans `ws-hub.test.ts`.
@@ -198,14 +202,8 @@ describe('application complète', () => {
       createSocket: () => {
         throw new Error('aucune socket EventSub ne doit être ouverte dans ces tests');
       },
-      fetch: (input, init) => updateFetch(input, init),
+      fetch: (input, init) => appFetch(input, init),
       sleep: () => Promise.resolve(),
-      updateInstaller: {
-        run: (path) => {
-          installerLaunches.push(path);
-          return Promise.resolve();
-        },
-      },
     });
   }
 
@@ -237,9 +235,9 @@ describe('application complète', () => {
 
   beforeEach(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-'));
+    legacyDataDirectory = undefined;
     oauthEvents = [];
-    installerLaunches = [];
-    updateFetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
+    appFetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
     oauthRouter = null;
     application = build();
     port = await application.start();
@@ -254,6 +252,9 @@ describe('application complète', () => {
     }
     await application.stop();
     await rm(dataDirectory, { recursive: true, force: true });
+    if (legacyDataDirectory !== undefined) {
+      await rm(legacyDataDirectory, { recursive: true, force: true });
+    }
   });
 
   function connectOverlay(): WebSocket {
@@ -570,6 +571,71 @@ describe('application complète', () => {
     });
   });
 
+  /**
+   * Le passage au Microsoft Store déplace le répertoire de données hors du
+   * conteneur MSIX, qui part avec la désinstallation. La reprise est ce qui
+   * évite que chaque utilisateur déjà installé perde son subathon en cours et
+   * doive refaire l'OAuth Twitch.
+   *
+   * Les cas unitaires sont dans `tests/unit/app/data-migration.test.ts`. Ce
+   * qu'on éprouve ici est ce que les tests unitaires ne peuvent pas voir :
+   * qu'un vrai répertoire, écrit par une vraie application, soit relu par une
+   * autre application démarrée ailleurs.
+   */
+  describe('reprise d’une installation précédente', () => {
+    it('retrouve compteur et historique écrits à l’ancien emplacement', async () => {
+      await notify('channel.subscribe', channelSubscribe);
+      const before = (await readPersistedCounter()).remainingMs;
+      await application.stop();
+
+      // Ce que la première application a écrit devient l'installation NSIS
+      // qu'on laisse derrière soi, et la nouvelle démarre sur un répertoire
+      // vierge — exactement la situation d'un poste qui installe depuis le Store.
+      legacyDataDirectory = dataDirectory;
+      dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-store-'));
+
+      application = build();
+      port = await application.start();
+
+      const state = (await (await api('/api/state')).json()) as {
+        counter: { remainingMs: number };
+      };
+      expect(state.counter.remainingMs).toBe(before);
+
+      const history = (await (await api('/api/history')).json()) as { entries: unknown[] };
+      expect(history.entries).toHaveLength(1);
+    });
+
+    it('ne réimpose pas l’ancien compteur à une installation qui a déjà tourné', async () => {
+      await notify('channel.subscribe', channelSubscribe);
+      const legacyRemaining = (await readPersistedCounter()).remainingMs;
+      await application.stop();
+
+      // L'ancienne installation, et une nouvelle qui démarre à côté sans rien
+      // savoir d'elle : elle écrit sa propre configuration et son propre compteur.
+      const previous = dataDirectory;
+      dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-store-'));
+      application = build();
+      port = await application.start();
+      const ownRemaining = (await readPersistedCounter()).remainingMs;
+      await application.stop();
+
+      // C'est le deuxième lancement après migration. Rejouer la reprise
+      // écraserait le compteur du direct en cours par celui, périmé, de
+      // l'installation qu'on a quittée — exactement ce que le marqueur
+      // `config.json` empêche.
+      expect(ownRemaining).not.toBe(legacyRemaining);
+      legacyDataDirectory = previous;
+      application = build();
+      port = await application.start();
+
+      const state = (await (await api('/api/state')).json()) as {
+        counter: { remainingMs: number };
+      };
+      expect(state.counter.remainingMs).toBe(ownRemaining);
+    });
+  });
+
   describe('actions manuelles', () => {
     it('met en pause puis reprend', async () => {
       await mutate('/api/counter/resume');
@@ -757,117 +823,6 @@ describe('application complète', () => {
       // travaille sur une instance vivante.
       application = build();
       port = await application.start();
-    });
-  });
-  describe('mise à jour automatique', () => {
-    const INSTALLER = 'ChronoCast-Setup-9.9.9.exe';
-    const BYTES = new TextEncoder().encode('MZ ceci est un installeur');
-
-    /**
-     * `fetch` scénarisé sur les trois appels du service.
-     *
-     * `digest` est passé en paramètre pour que le scénario de l'empreinte
-     * discordante ne diffère du scénario nominal que par cette seule valeur —
-     * c'est exactement la différence qu'on veut voir.
-     */
-    function serveRelease(digest: string): typeof fetch {
-      const base = 'https://github.com/thedevopser/ChronoCast/releases/download/v9.9.9';
-
-      return ((input: RequestInfo | URL) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-
-        if (url.startsWith('https://api.github.com/')) {
-          return Promise.resolve(
-            Response.json({
-              tag_name: 'v9.9.9',
-              html_url: 'https://github.com/thedevopser/ChronoCast/releases/tag/v9.9.9',
-              draft: false,
-              prerelease: false,
-              assets: [
-                {
-                  name: INSTALLER,
-                  size: 100_663_296,
-                  browser_download_url: `${base}/${INSTALLER}`,
-                },
-                {
-                  name: `${INSTALLER}.sha256`,
-                  size: 91,
-                  browser_download_url: `${base}/${INSTALLER}.sha256`,
-                },
-              ],
-            }),
-          );
-        }
-
-        if (url.endsWith('.sha256')) {
-          return Promise.resolve(new Response(`${digest}  ${INSTALLER}\n`));
-        }
-
-        return Promise.resolve(new Response(BYTES));
-      });
-    }
-
-    it('télécharge, vérifie et propose la version publiée', async () => {
-      updateFetch = serveRelease(sha256Hex(BYTES));
-
-      const status = (await (await mutate('/api/update/check')).json()) as { phase: string };
-
-      expect(status.phase).toBe('ready');
-      expect((await (await api('/api/update')).json())).toMatchObject({
-        phase: 'ready',
-        availableVersion: '9.9.9',
-      });
-    });
-
-    it('écrit l’installeur vérifié dans le répertoire de données', async () => {
-      updateFetch = serveRelease(sha256Hex(BYTES));
-
-      await mutate('/api/update/check');
-
-      const written = await readFile(join(dataDirectory, 'updates', INSTALLER));
-      expect(new Uint8Array(written)).toStrictEqual(BYTES);
-    });
-
-    it('lance l’installeur vérifié à la demande', async () => {
-      updateFetch = serveRelease(sha256Hex(BYTES));
-      await mutate('/api/update/check');
-
-      const response = await mutate('/api/update/install');
-
-      expect(response.status).toBe(204);
-      expect(installerLaunches).toStrictEqual([join(dataDirectory, 'updates', INSTALLER)]);
-    });
-
-    it('ne lance rien et n’écrit rien quand l’empreinte ne correspond pas', async () => {
-      // Le scénario central du lot. L'installeur n'est pas signé et le fichier
-      // téléchargé ne portera aucune *Mark of the Web* : Windows le lancerait
-      // sans la moindre invite. Cette vérification est le seul contrôle qui
-      // existe sur ce chemin.
-      updateFetch = serveRelease('ab'.repeat(32));
-
-      await mutate('/api/update/check');
-
-      expect((await (await api('/api/update')).json())).toMatchObject({ phase: 'error' });
-      await expect(readFile(join(dataDirectory, 'updates', INSTALLER))).rejects.toThrow();
-
-      expect((await mutate('/api/update/install')).status).toBe(409);
-      expect(installerLaunches).toStrictEqual([]);
-    });
-
-    it('n’émet aucune requête quand le réglage est décoché', async () => {
-      updateFetch = () => {
-        throw new Error('aucune requête ne doit partir quand le réglage est décoché');
-      };
-
-      await api('/api/config', {
-        method: 'PATCH',
-        headers: { [CSRF_HEADER]: application.getCsrfToken(), 'content-type': 'application/json' },
-        body: JSON.stringify({ config: { app: { checkForUpdates: false } } }),
-      });
-
-      const status = (await (await mutate('/api/update/check')).json()) as { phase: string };
-
-      expect(status.phase).toBe('disabled');
     });
   });
 });

@@ -161,18 +161,26 @@ describe('ressources', () => {
       expect(link.getAttribute('href')?.startsWith('https://')).toBe(true);
     }
   });
+});
 
-  it('neutralise d’avance le lien des notes de version', () => {
-    // Ce lien est le seul du panneau dont le `href` vient du **réseau** : il
-    // est posé à l'exécution depuis la charge utile de GitHub. Le gabarit ne
-    // porte donc aucune adresse, mais il porte déjà les attributs qui
-    // protègent — les poser dans le code aurait mis à un endroit de plus une
-    // garantie qu'on veut voir d'un coup d'œil.
-    const notes = parsed.querySelector('#update-notes');
+describe('renvoi vers les paramètres de Windows', () => {
+  it('offre un bouton inerte, câblé par `main.ts`', () => {
+    // Le lancement à l'ouverture de session n'est plus un réglage de
+    // ChronoCast : sous MSIX, `setLoginItemSettings` écrit dans un registre
+    // virtualisé, et la case aurait coché sans que rien ne démarre. Le panneau
+    // n'a plus qu'à mener là où Windows détient l'état.
+    const button = parsed.querySelector('#open-startup-settings');
 
-    expect(notes).not.toBeNull();
-    expect(notes?.hasAttribute('href')).toBe(false);
-    expect(notes?.getAttribute('rel')).toContain('noreferrer');
-    expect(notes?.getAttribute('rel')).toContain('noopener');
+    expect(button).not.toBeNull();
+    // `type="button"` comme partout ailleurs : la CSP interdit `form-action`,
+    // et un bouton par défaut soumettrait.
+    expect(button?.getAttribute('type')).toBe('button');
+  });
+
+  it('ne code en dur aucune adresse `ms-settings:`', () => {
+    // L'adresse est une constante de la coquille, jamais une valeur qui
+    // voyage. L'écrire dans la page en ferait un paramètre, c'est-à-dire une
+    // capacité d'ouvrir n'importe quel schéma.
+    expect(ADMIN_HTML).not.toContain('ms-settings:');
   });
 });

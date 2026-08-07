@@ -1,0 +1,37 @@
+<!--
+  Extensions fusionnées dans l'`AppxManifest.xml` par electron-builder, via
+  `appx.customExtensionsPath` dans `electron-builder.yml`.
+
+  Une seule extension, et elle remplace un réglage disparu. Sous MSIX,
+  `app.setLoginItemSettings` écrit dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
+  que le conteneur du paquet **virtualise** : la valeur n'atteint jamais le vrai
+  registre, la case du panneau aurait coché, et rien n'aurait démarré au
+  redémarrage suivant — sans erreur et sans journal. C'est donc le manifeste qui
+  déclare la tâche, et Windows qui en détient l'état, dans
+  Paramètres → Applications → Démarrage.
+
+  `Enabled="false"` reprend le défaut qu'avait `app.launchAtStartup` : une
+  application qui s'installe au démarrage sans rien dire est une application
+  qu'on désinstalle. C'est l'utilisateur qui l'active, depuis les paramètres où
+  le bouton du panneau le mène.
+
+  `EntryPoint="Windows.FullTrustApplication"` est ce qui vaut à ChronoCast de
+  tourner en pleine confiance plutôt qu'en AppContainer : sans lui, le serveur
+  HTTP sur la boucle locale serait soumis aux restrictions de bouclage d'UWP, et
+  OBS ne pourrait pas atteindre l'overlay.
+
+  `electron-builder` propose aussi `appx.addAutoLaunchExtension`, écarté
+  volontairement : il dépend du paquet `electron-winstore-auto-launch`, et ce
+  projet n'a que `ws` et `zod` en production.
+-->
+<Extensions xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5">
+  <uap5:Extension
+    Category="windows.startupTask"
+    Executable="ChronoCast.exe"
+    EntryPoint="Windows.FullTrustApplication">
+    <uap5:StartupTask
+      TaskId="ChronoCastStartupTask"
+      Enabled="false"
+      DisplayName="ChronoCast" />
+  </uap5:Extension>
+</Extensions>

@@ -35,26 +35,32 @@ rien crédité.
 
 ## Installation
 
-Téléchargez le dernier installeur `.exe` depuis la page des
-[releases](https://github.com/TheDevOpser/ChronoCast/releases), lancez-le, puis
-suivez l'assistant de première configuration.
+ChronoCast s'installe depuis le **Microsoft Store** :
+
+**[Installer ChronoCast](https://apps.microsoft.com/detail/9MT0NZV7KXGV)**
 
 Aucune dépendance à installer : Node.js, le serveur HTTP et le serveur WebSocket
-sont embarqués dans l'application.
+sont embarqués dans l'application. Lancez-la, puis suivez l'assistant de
+première configuration.
 
-> L'exécutable n'est pas signé numériquement (un certificat coûte plusieurs
-> centaines d'euros par an). Windows SmartScreen affichera donc « Éditeur
-> inconnu » au premier lancement : cliquez sur **Informations complémentaires**
-> puis **Exécuter quand même**. Chaque release publie l'empreinte SHA-256 de
-> l'installeur pour vérifier son intégrité.
+Le Store est le **seul** canal de distribution, et aucun `.exe` n'est plus
+publié sur GitHub. C'est un choix, pour une raison simple : un binaire non signé
+faisait afficher un avertissement SmartScreen au premier lancement, se faisait
+mettre en quarantaine par certains antivirus, et n'était trouvable que par qui
+savait déjà où chercher. Le paquet du Store est **signé par Microsoft**, ce qui
+règle les trois d'un coup.
 
-Plateforme prise en charge en V1 : **Windows**. Linux et macOS sont envisagés
-pour une version ultérieure.
+Les mises à jour sont **automatiques**, gérées par le Store, et s'appliquent
+quand l'application n'est pas en cours d'exécution : aucune fermeture surprise
+en plein direct.
 
-Une fois installé, ChronoCast **vérifie lui-même** s'il existe une version plus
-récente, la télécharge et vérifie son empreinte SHA-256. **Rien ne s'installe
-sans votre clic** : aucune fermeture surprise en plein direct. La vérification
-se coupe dans les paramètres.
+Plateforme prise en charge : **Windows**. Linux et macOS sont envisagés pour une
+version ultérieure.
+
+> **Vous veniez d'une version installée depuis GitHub ?** Vos données —
+> compteur en cours, configuration, jetons Twitch — sont **reprises
+> automatiquement** au premier lancement de la version du Store. L'ancienne
+> installation reste intacte ; vous pouvez la désinstaller ensuite.
 
 ## Documentation
 
@@ -69,6 +75,7 @@ se coupe dans les paramètres.
 | [docs/TESTING-TWITCH-CLI.md](docs/TESTING-TWITCH-CLI.md) | Tests avec la Twitch CLI |
 | [docs/CRASH-RECOVERY.md](docs/CRASH-RECOVERY.md) | Récupération après crash |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modèle de menace et contrôles de sécurité |
+| [docs/PRIVACY.md](docs/PRIVACY.md) | Politique de confidentialité |
 | [docs/REPRISE-V2.md](docs/REPRISE-V2.md) | Document de reprise : état d'avancement et décisions en vigueur |
 | [docs/REPRISE.md](docs/REPRISE.md) | Archive de la V1 : les huit phases et leurs décisions |
 
@@ -85,9 +92,9 @@ besoin d'être installé sur la machine.
 ./scripts/dc.sh help        # toutes les commandes
 ```
 
-L'installeur Windows, lui, n'est pas construit en local : il l'est par le
-workflow `Release`, nativement sur un runner Windows. Voir
-[docs/BUILD.md](docs/BUILD.md).
+Le paquet MSIX, lui, n'est pas construit en local : il l'est par le workflow
+`Release`, nativement sur un runner Windows — la cible AppX réclame le SDK
+Windows. Voir [docs/BUILD.md](docs/BUILD.md).
 
 Le développement suit un TDD strict : aucune ligne de code de production n'est
 écrite sans un test qui a d'abord échoué. Voir [docs/DEVELOPER.md](docs/DEVELOPER.md).

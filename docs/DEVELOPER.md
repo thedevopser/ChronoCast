@@ -33,7 +33,7 @@ Lire [ARCHITECTURE.md](ARCHITECTURE.md) d'abord si le découpage du code n'est p
 
 **`install` passe `--ignore-scripts`**, ce qui ferme une voie d'attaque classique de la chaîne d'approvisionnement : aucun script post-install de dépendance tierce ne s'exécute. Aucune dépendance de production n'en a besoin.
 
-**Il n'y a pas de commande de packaging local.** L'installeur Windows est construit par la CI, nativement. Voir [BUILD.md](BUILD.md).
+**Il n'y a pas de commande de packaging local.** Le paquet MSIX est construit par la CI, nativement : la cible AppX réclame `makeappx.exe` du SDK Windows, absent du conteneur. Voir [BUILD.md](BUILD.md).
 
 ## 2. Les règles qui ne se négocient pas
 
@@ -132,7 +132,7 @@ Ce que la suite cherche à prouver, dans l'ordre d'importance :
 
 Doit être **intégralement vert** : lint, les trois typechecks, toute la suite, et l'audit. La CI exécute exactement cela sur `ubuntu-latest`.
 
-Ce que la CI ne peut pas voir : la fenêtre Electron, le tray, DPAPI, l'installeur. Si votre changement les touche, il faut un build Windows et un essai à la main — voir [BUILD.md](BUILD.md).
+Ce que la CI ne peut pas voir : la fenêtre Electron, le tray, DPAPI, la tâche de démarrage déclarée par le manifeste, la reprise des données à travers la virtualisation MSIX, et le paquet lui-même. Si votre changement les touche, il faut un build Windows et un essai à la main — voir [BUILD.md](BUILD.md).
 
 ## 8. Le point d'entrée headless
 

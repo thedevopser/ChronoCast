@@ -95,22 +95,26 @@ export interface BrowserOpener {
   open(url: string): Promise<void>;
 }
 
+
 /**
- * Lancement de l'installeur d'une mise à jour déjà téléchargée et vérifiée.
+ * Ouverture des réglages système que ChronoCast ne détient pas lui-même.
  *
- * Le seul geste de la mise à jour que le noyau ne peut pas faire lui-même, et
- * il est irréductible : NSIS ne peut pas écraser un exécutable en cours
- * d'exécution. L'implémentation doit donc lancer un processus **détaché** — un
- * enfant ordinaire mourrait avec son parent — puis terminer l'application, et
- * la terminer **proprement**, faute de quoi le dernier état du compteur ne
- * serait pas sur le disque au moment où la nouvelle version le relira.
+ * Un seul verbe pour l'instant, et il est délibérément **sans paramètre** : la
+ * destination est une constante de la coquille, jamais une valeur qui remonte
+ * du panneau. Faire voyager l'adresse transformerait un renvoi en capacité
+ * d'ouvrir n'importe quoi — exactement ce que la garde `https:` de
+ * {@link BrowserOpener} refuse par ailleurs.
  *
- * Ce port est **facultatif**. Le point d'entrée headless n'en fournit aucun : il
- * n'est ni packagé ni installé, et proposer une mise à jour qu'il ne saurait
- * pas appliquer serait une promesse en l'air. Son absence désarme le service
- * entier plutôt que de lui faire afficher un bouton sans effet.
+ * Le lancement à l'ouverture de session a cessé d'être un réglage de
+ * ChronoCast avec le passage au Microsoft Store. `setLoginItemSettings` écrit
+ * dans `HKCU\…\Run`, que **MSIX virtualise** : la case aurait coché sans que
+ * rien ne démarre, et rien ne l'aurait dit. C'est le manifeste du paquet qui
+ * déclare la tâche, et Windows qui en détient l'état.
+ *
+ * Port **facultatif**. Le point d'entrée headless n'en fournit aucun : il n'est
+ * pas une application installée, et il n'y a donc rien à ouvrir.
  */
-export interface UpdateInstaller {
-  /** Lance l'installeur désigné, puis termine l'application. */
-  run(installerPath: string): Promise<void>;
+export interface SystemSettingsOpener {
+  /** Ouvre Paramètres → Applications → Démarrage. */
+  openStartupSettings(): Promise<void>;
 }

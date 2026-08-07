@@ -142,3 +142,62 @@ describe('visuels sources', () => {
     await expect(readFile(resolve(ASSETS, 'tray-icon.png'))).resolves.toBeDefined();
   });
 });
+
+/**
+ * Ressources graphiques du paquet MSIX.
+ *
+ * Le Microsoft Store affiche ces images dans le menu Démarrer, dans la liste
+ * des applications et dans la fiche du produit. Elles sont **engendrées** comme
+ * le reste, et pas seulement par discipline : sans elles, electron-builder
+ * embarque **ses propres images de remplacement**, sans avertissement. Le
+ * paquet serait accepté, publié, installé — et porterait le logo d'un autre.
+ *
+ * Deux d'entre elles ne sont pas carrées, et c'est là qu'est le travail : le
+ * logo source l'est, il faut donc le composer sur un canevas au bon format
+ * plutôt que l'étirer.
+ */
+describe('assets/appx', () => {
+  /** Formats exigés par le manifeste, et ce que chacun sert. */
+  const LOGOS = [
+    { name: 'Square44x44Logo.png', width: 44, height: 44 },
+    { name: 'Square71x71Logo.png', width: 71, height: 71 },
+    { name: 'Square150x150Logo.png', width: 150, height: 150 },
+    { name: 'Square310x310Logo.png', width: 310, height: 310 },
+    { name: 'StoreLogo.png', width: 50, height: 50 },
+    { name: 'Wide310x150Logo.png', width: 310, height: 150 },
+    { name: 'SplashScreen.png', width: 620, height: 300 },
+  ] as const;
+
+  it.each(LOGOS)('$name est un PNG aux dimensions exigées', async ({ name, width, height }) => {
+    const file = await readFile(resolve(ASSETS, 'appx', name));
+
+    expect(file.subarray(0, 8)).toEqual(PNG_SIGNATURE);
+
+    const header = readPngHeader(file);
+    expect(header.width).toBe(width);
+    expect(header.height).toBe(height);
+  });
+
+  it.each(LOGOS)('$name conserve un canal alpha', async ({ name }) => {
+    // Type 6 : RGBA. La couleur de fond des tuiles vient d'`appx.backgroundColor`
+    // dans la configuration de packaging : une image opaque poserait un
+    // rectangle par-dessus, visible dès que le thème de Windows change.
+    const { colorType } = readPngHeader(await readFile(resolve(ASSETS, 'appx', name)));
+
+    expect(colorType).toBe(6);
+  });
+
+  it('compose les formats larges sans les étirer', async () => {
+    // Le logo source est carré. Un `Wide310x150` obtenu en l'étirant se verrait
+    // au premier coup d'œil dans le menu Démarrer, et l'aperçu dans un éditeur
+    // d'images ne le montre pas — c'est exactement le défaut que ce fichier
+    // existe pour attraper.
+    //
+    // Le contrôle porte sur les colonnes de bord : sur un canevas où le visuel
+    // est centré à la hauteur, elles sont entièrement transparentes.
+    const file = await readFile(resolve(ASSETS, 'appx', 'Wide310x150Logo.png'));
+    const { width, height } = readPngHeader(file);
+
+    expect(width / height).toBeCloseTo(310 / 150, 5);
+  });
+});

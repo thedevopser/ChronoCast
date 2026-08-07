@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { INSTALLER_PREFIX } from '../../../src/core/update/release-feed.js';
 
 /**
  * Cohérence de la configuration de packaging.
@@ -26,13 +25,23 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const read = (relative: string): Promise<string> => readFile(resolve(ROOT, relative), 'utf8');
 
+/**
+ * Marqueur des valeurs d'identité que Partner Center n'a pas encore assignées.
+ *
+ * Il doit rester reconnaissable d'un coup d'œil : une identité fausse produit
+ * un paquet en tout point valide, que rien ne distingue d'un paquet
+ * soumettable avant le rejet de certification, un à trois jours plus tard.
+ */
+const IDENTITY_PLACEHOLDER = 'IDENTITE-PARTNER-CENTER';
+
 describe('electron-builder.yml', () => {
   it('nomme le produit exactement comme `app.setName`', async () => {
     // C'est l'invariant le plus coûteux à violer. `productName` détermine
-    // `%APPDATA%\ChronoCast`, où vivent la configuration, l'état du compteur et
-    // les jetons. Un désaccord entre les deux déplacerait ce répertoire d'une
-    // version à l'autre : l'utilisateur retrouverait une installation neuve, et
-    // son subathon en cours serait perdu sans le moindre message.
+    // `%APPDATA%\ChronoCast`, d'où la reprise des données va chercher
+    // l'installation précédente. Un désaccord entre les deux ferait chercher
+    // dans un répertoire que personne n'a jamais écrit : la reprise ne
+    // trouverait rien, et l'utilisateur retrouverait une installation neuve
+    // sans le moindre message.
     const [config, main] = await Promise.all([
       read('electron-builder.yml'),
       read('src/main/main.ts'),
@@ -59,51 +68,78 @@ describe('electron-builder.yml', () => {
     await expect(readFile(resolve(ROOT, 'assets', 'icon.ico'))).resolves.toBeDefined();
   });
 
-  it('ne cible que Windows, en NSIS', async () => {
-    // Linux et macOS sont hors périmètre de la V1. Une cible ajoutée par
-    // inadvertance allongerait le build et produirait un artefact que personne
-    // n'a demandé ni éprouvé.
+  it('ne cible que Windows, en AppX', async () => {
+    // Le Store est le seul canal de distribution : plus aucun installeur NSIS
+    // n'est produit ni publié. En laisser la cible reviendrait à entretenir un
+    // second chemin de packaging que rien n'éprouve — le plus sûr moyen qu'il
+    // casse en silence.
     const config = await read('electron-builder.yml');
 
-    expect(config).toContain('target: nsis');
+    expect(config).toContain('target: appx');
+    expect(config).not.toContain('target: nsis');
+    expect(config).not.toContain('nsis:');
     expect(config).not.toContain('mac:');
     expect(config).not.toContain('linux:');
   });
 
-  it('conserve les données de l’utilisateur à la désinstallation', async () => {
-    // Réinstaller est ce qu'on fait quand quelque chose ne va pas : un
-    // subathon en cours doit y survivre.
+  it('déclare une identité de paquet réellement assignée par Partner Center', async () => {
+    // `identityName`, `publisher` et `publisherDisplayName` viennent de la
+    // fiche du produit dans Partner Center. Soumettre un paquet dont l'identité
+    // ne correspond pas à celle réservée le fait **rejeter à la certification**,
+    // c'est-à-dire un à trois jours plus tard.
     const config = await read('electron-builder.yml');
 
-    expect(config).toContain('deleteAppDataOnUninstall: false');
+    expect(config).toMatch(/^ {2}identityName: \S+$/m);
+    expect(config).toMatch(/^ {2}publisher: CN=\S+/m);
+    expect(config).toMatch(/^ {2}publisherDisplayName: \S+/m);
   });
 
-  it('n’installe que pour l’utilisateur courant', async () => {
-    // L'application n'écrit que dans `%APPDATA%`, et `safeStorage` lie de toute
-    // façon les secrets au compte Windows. Une invite UAC sur un binaire non
-    // signé est par ailleurs le meilleur moyen de faire renoncer quelqu'un.
+  it('déclare la tâche de démarrage, faute de pouvoir l’écrire au registre', async () => {
+    // `setLoginItemSettings` écrit dans `HKCU\…\Run`, que MSIX virtualise :
+    // la valeur n'atteint jamais le vrai registre. Sans cette extension, rien
+    // ne démarrerait avec la session, et **rien ne le dirait**.
     const config = await read('electron-builder.yml');
 
-    expect(config).toContain('perMachine: false');
+    expect(config).toContain('customExtensionsPath: assets/appx/extensions.xml');
+
+    const manifest = await read('assets/appx/extensions.xml');
+    expect(manifest).toContain('windows.startupTask');
+    expect(manifest).toContain('Windows.FullTrustApplication');
+    // Le défaut d'avant : une application qui s'installe au démarrage sans
+    // rien dire est une application qu'on désinstalle.
+    expect(manifest).toContain('Enabled="false"');
   });
 
-  it('nomme l’installeur exactement comme l’updater le cherche', async () => {
-    // `release-feed.ts` compose le nom de l'asset qu'il attend sur une release
-    // — `ChronoCast-Setup-<version>.exe` — et ne retient que celui-là, pour
-    // qu'un artefact étranger déposé sur la release ne puisse pas s'y
-    // substituer. Renommer l'artefact ici rendrait donc **toutes les releases
-    // suivantes invisibles** à la mise à jour automatique, sans la moindre
-    // erreur : les postes installés chercheraient un fichier qui n'existe plus
-    // et concluraient tranquillement qu'ils sont à jour.
+  it('confie au workflow le refus des valeurs d’identité en attente', async () => {
+    // L'identité vient de Partner Center, et peut n'être pas encore connue
+    // pendant le développement. Le refus ne vit donc **pas ici** : un paquet
+    // bâti sur une identité marqueuse reste parfaitement utile pour éprouver
+    // le packaging par chargement latéral, il n'est simplement pas soumettable.
+    //
+    // C'est le workflow `Release` qui le refuse, et seulement sur un tag. Ce
+    // test tient les deux accordés : le marqueur que le workflow cherche doit
+    // rester celui que ce fichier connaît.
+    const workflow = await read('.github/workflows/release.yml');
+
+    expect(workflow).toContain(IDENTITY_PLACEHOLDER);
+  });
+
+  it('ne porte aucune identité en attente sur une ligne de valeur', async () => {
+    // Le contrôle porte sur les **lignes de valeur**, jamais sur le fichier
+    // entier : le marqueur est cité dans les commentaires qui l'expliquent, et
+    // une recherche naïve y verrait une identité en attente. C'est exactement
+    // le motif que cherche le workflow, écrit ici sous la même forme.
     const config = await read('electron-builder.yml');
 
-    expect(config).toContain(`artifactName: ${INSTALLER_PREFIX}\${version}.\${ext}`);
+    expect(config).not.toMatch(
+      new RegExp(`^\\s*(identityName|publisher|publisherDisplayName):.*${IDENTITY_PLACEHOLDER}`, 'm'),
+    );
   });
 
   it('ne publie rien depuis le build', async () => {
-    // C'est le workflow de release qui attache l'installeur, après avoir
-    // vérifié la cohérence du tag. Publier depuis le build court-circuiterait
-    // ce contrôle.
+    // C'est le workflow de release qui produit l'artefact, après avoir vérifié
+    // la cohérence du tag, et c'est l'utilisateur qui le dépose dans Partner
+    // Center. Publier depuis le build court-circuiterait ce contrôle.
     const config = await read('electron-builder.yml');
 
     expect(config).toContain('publish: null');

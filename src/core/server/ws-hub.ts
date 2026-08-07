@@ -307,12 +307,6 @@ export function createWsHub(options: WsHubOptions): WsHub {
               : base,
           );
         }),
-
-        // Filtré par le canal `update`, auquel l'overlay ne s'abonne pas : une
-        // mise à jour disponible s'affiche dans le panneau, pas sur la scène.
-        bus.on('update:status', (status) => {
-          broadcast({ type: 'update', status });
-        }),
       );
 
       heartbeatId = timers.setInterval(

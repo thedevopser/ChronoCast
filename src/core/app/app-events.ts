@@ -12,7 +12,6 @@ import type { CounterState } from '../counter/counter-state.js';
 import type { RewardComputation } from '../counter/reward-engine.js';
 import type { DomainEvent } from '../events/domain-event.js';
 import type { OAuthOutcome } from '../server/oauth-callback.js';
-import type { UpdateStatus } from '../update/update-service.js';
 
 /** Origine d'une modification du compteur, pour l'historique et l'affichage. */
 export type CounterChangeOrigin = 'tick' | 'manual' | 'twitch' | 'restore';
@@ -114,17 +113,4 @@ export interface AppEvents extends Record<string, unknown> {
    * plan à ce moment-là passerait par-dessus OBS.
    */
   readonly 'oauth:settled': { readonly outcome: OAuthOutcome };
-
-  /**
-   * L'état de la mise à jour automatique a changé.
-   *
-   * Émis à chaque transition — vérification, téléchargement, prêt, échec — et
-   * consommé par deux abonnés qui n'ont rien à voir l'un avec l'autre : le hub
-   * WebSocket, qui en fait le bandeau du panneau, et la coquille Electron, qui
-   * en fait une entrée du menu du tray.
-   *
-   * Il n'annonce jamais qu'une installation a eu lieu : elle n'a lieu que sur
-   * un clic, et l'application se ferme dans la foulée.
-   */
-  readonly 'update:status': UpdateStatus;
 }
