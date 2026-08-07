@@ -1,46 +1,28 @@
 <!--
-  Extensions fusionnées dans l'`AppxManifest.xml` par electron-builder, via
-  `appx.customExtensionsPath` dans `electron-builder.yml`.
+  Fragment fusionné dans l'`AppxManifest.xml` par electron-builder, via
+  `appx.customExtensionsPath`.
 
-  **Ce fichier est un fragment, pas un document.** electron-builder écrit
-  `<Extensions>` lui-même et y concatène ce contenu : une balise racine ici
-  produirait un `<Extensions><Extensions>` que `makeappx.exe` refuse — et il le
-  refuse sur le runner Windows, c'est-à-dire au seul endroit où le conteneur ne
-  voit rien. Deux tests tiennent désormais ce point.
+  Trois contraintes, chacune tenue par un test :
 
-  **Le préfixe est `desktop:`, et il ne se choisit pas.** Le gabarit de
-  manifeste d'electron-builder ne déclare que `uap`, `desktop` et `rescap` ;
-  un `uap5:` y serait un préfixe non lié, et le manifeste invalide. C'est aussi
-  le préfixe qu'emploie electron-builder pour sa propre extension de démarrage.
+    - **pas de balise `<Extensions>` racine** : electron-builder l'écrit lui-même
+      et concatène ce fichier à l'intérieur ;
+    - **préfixe `desktop:`** : le gabarit ne déclare que `uap`, `desktop` et
+      `rescap` ;
+    - **`Executable` préfixé par `app\`** : le chemin est relatif à la racine du
+      paquet, où electron-builder place l'application.
 
-  Une seule extension, et elle remplace un réglage disparu. Sous MSIX,
-  `app.setLoginItemSettings` écrit dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
-  que le conteneur du paquet **virtualise** : la valeur n'atteint jamais le vrai
-  registre, la case du panneau aurait coché, et rien n'aurait démarré au
-  redémarrage suivant — sans erreur et sans journal. C'est donc le manifeste qui
-  déclare la tâche, et Windows qui en détient l'état, dans
-  Paramètres → Applications → Démarrage.
+  La tâche remplace `app.launchAtStartup`, retiré : sous MSIX,
+  `setLoginItemSettings` écrit dans un registre virtualisé, et la case aurait
+  coché sans que rien ne démarre. `Enabled="false"` reprend l'ancien défaut ;
+  c'est l'utilisateur qui active la tâche depuis les paramètres de Windows.
 
-  `Enabled="false"` reprend le défaut qu'avait `app.launchAtStartup` : une
-  application qui s'installe au démarrage sans rien dire est une application
-  qu'on désinstalle. C'est l'utilisateur qui l'active, depuis les paramètres où
-  le bouton du panneau le mène.
-
-  `EntryPoint="Windows.FullTrustApplication"` est ce qui vaut à ChronoCast de
-  tourner en pleine confiance plutôt qu'en AppContainer : sans lui, le serveur
-  HTTP sur la boucle locale serait soumis aux restrictions de bouclage d'UWP, et
-  OBS ne pourrait pas atteindre l'overlay.
-
-  `Executable` doit rester accordé au `productName` d'`electron-builder.yml`,
-  dont dérive le nom de l'exécutable empaqueté.
-
-  `appx.addAutoLaunchExtension` ferait la même chose, mais dépend du paquet
-  `electron-winstore-auto-launch` : ce projet n'a que `ws` et `zod` en
-  production, et cela ne changera pas pour une extension de quatre lignes.
+  `EntryPoint="Windows.FullTrustApplication"` fait tourner l'application en
+  pleine confiance et non en AppContainer, dont les restrictions de bouclage
+  empêcheraient OBS d'atteindre l'overlay.
 -->
 <desktop:Extension
   Category="windows.startupTask"
-  Executable="ChronoCast.exe"
+  Executable="app\ChronoCast.exe"
   EntryPoint="Windows.FullTrustApplication">
   <desktop:StartupTask
     TaskId="ChronoCastStartupTask"

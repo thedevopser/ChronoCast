@@ -195,12 +195,11 @@ describe('electron-builder.yml', () => {
       }
     });
 
-    it('nomme l’exécutable exactement comme le `productName` l’engendre', async () => {
-      // electron-builder dérive le nom de l'exécutable empaqueté du
-      // `productName`. Les désaccorder déclarerait une tâche de démarrage
-      // pointant sur un fichier absent du paquet : Windows l'accepterait, et
-      // rien ne démarrerait — le même échec silencieux que le réglage qu'elle
-      // remplace.
+    it('nomme l’exécutable exactement comme electron-builder l’empaquette', async () => {
+      // Le chemin est relatif à la racine du paquet, et electron-builder place
+      // l'application sous `app\` — voir `AppxTarget.js`, qui compose
+      // `app\${productFilename}.exe`. Sans ce préfixe, `makeappx` refuse le
+      // manifeste : le fichier déclaré n'existe pas dans le paquet.
       const [fragment, config] = await Promise.all([
         markup(),
         read('electron-builder.yml'),
@@ -208,7 +207,7 @@ describe('electron-builder.yml', () => {
 
       const productName = /^productName: (\S+)$/m.exec(config)?.[1];
       expect(productName).toBeDefined();
-      expect(fragment).toContain(`Executable="${String(productName)}.exe"`);
+      expect(fragment).toContain(`Executable="app\\${String(productName)}.exe"`);
     });
   });
 
