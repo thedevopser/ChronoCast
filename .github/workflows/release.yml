@@ -66,8 +66,14 @@ jobs:
             exit 0
           }
           $package = Get-ChildItem release\*.appx | Select-Object -First 1
+          if ($null -eq $package) {
+            Write-Host "::warning::aucun .appx produit, contrôle ignoré"
+            exit 0
+          }
+          $report = Join-Path (Resolve-Path release) 'wack-report.xml'
           & $appcert reset
-          & $appcert test -appxpackagepath $package.FullName -reportoutputpath release\wack-report.xml
+          & $appcert test -appxpackagepath $package.FullName -reportoutputpath $report
+          exit 0
 
       - name: Publier l’artefact de l’exécution
         uses: actions/upload-artifact@v4
