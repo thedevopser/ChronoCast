@@ -1,39 +1,3 @@
-/**
- * Prépare les icônes livrées avec l'application, depuis les visuels sources.
- *
- *   node scripts/prepare-icons.mjs
- *
- * Deux visuels entrent, `assets/logo.png` et `assets/tray-icon.png`, et
- * plusieurs artefacts en sortent :
- *
- *   - `assets/tray.png`, carré, 32 × 32, pour la zone de notification ;
- *   - `assets/icon.ico`, sept tailles de 16 à 256, pour l'application et la
- *     fenêtre ;
- *   - `assets/appx/*.png`, les sept formats que réclame le manifeste MSIX.
- *
- * **Les ressources AppX ne sont pas facultatives.** Sans elles, electron-builder
- * embarque ses propres images de remplacement, sans avertissement : le paquet
- * serait accepté par le Store, publié, installé — et porterait le logo d'un
- * autre.
- *
- * **Pourquoi engendrer plutôt que redimensionner à la main ?** Parce que
- * l'opération devra être refaite — au premier retouchage du logo, au premier
- * format réclamé par electron-builder — et qu'une manipulation faite une fois
- * dans un éditeur d'images ne se refait jamais à l'identique. C'est la même
- * discipline que le condensat d'Open Props ou le placeholder qu'il remplace :
- * un binaire versionné doit avoir une provenance vérifiable.
- *
- * **Pourquoi sans dépendance ?** `npm audit --audit-level=high` est bloquant en
- * CI et garde un droit de veto sur chaque PR. Une bibliothèque de traitement
- * d'images, avec son arbre transitif et souvent ses binaires natifs, élargirait
- * cette surface durablement — pour un travail qu'on fait trois fois dans la vie
- * du projet. Le PNG en 8 bits RGBA non entrelacé se décode en une centaine de
- * lignes, et le format ICO n'est qu'un index suivi de PNG concaténés.
- *
- * Le décodeur ne couvre délibérément que ce cas-là, et **lève franchement**
- * sinon : un décodeur partiel qui devine vaut moins qu'un message clair.
- */
-
 import { deflateSync, inflateSync } from 'node:zlib';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -42,51 +6,25 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = resolve(REPO_ROOT, 'assets');
 
-/**
- * Le logo web va dans les sources, et non dans `assets/`.
- *
- * `copy-web-assets.mjs` ne recopie que `src/web/**` : un fichier laissé dans
- * `assets/` ne serait jamais servi, et la page afficherait un cadre vide.
- */
 const WEB_SHARED = resolve(REPO_ROOT, 'src', 'web', 'shared');
 
-/** Tailles attendues par Windows : barre des tâches, bureau, explorateur. */
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
 
-/** Taille de l'icône de la zone de notification. */
 const TRAY_SIZE = 32;
 
-/**
- * Formats réclamés par le manifeste MSIX.
- *
- * Les deux derniers ne sont **pas carrés**, et c'est là toute la difficulté :
- * le logo source l'est. Les étirer se verrait au premier coup d'œil dans le
- * menu Démarrer, sans qu'un aperçu dans un éditeur d'images ne le montre. Ils
- * sont donc composés sur un canevas au bon format, le visuel centré.
- */
 const APPX_LOGOS = [
   { name: 'Square44x44Logo.png', width: 44, height: 44 },
-  { name: 'Square71x71Logo.png', width: 71, height: 71 },
   { name: 'Square150x150Logo.png', width: 150, height: 150 },
-  { name: 'Square310x310Logo.png', width: 310, height: 310 },
   { name: 'StoreLogo.png', width: 50, height: 50 },
   { name: 'Wide310x150Logo.png', width: 310, height: 150 },
+  { name: 'SmallTile.png', width: 71, height: 71 },
+  { name: 'LargeTile.png', width: 300, height: 300 },
   { name: 'SplashScreen.png', width: 620, height: 300 },
 ];
 
-/**
- * Taille du logo servi aux pages web.
- *
- * Affiché autour de trente pixels dans le panneau : le double couvre les
- * écrans à forte densité sans qu'on ait à livrer deux fichiers.
- */
 const WEB_LOGO_SIZE = 128;
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-/* -------------------------------------------------------------------------- */
-/* CRC-32, tel que la spécification PNG le décrit                              */
-/* -------------------------------------------------------------------------- */
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
   let value = index;
@@ -104,11 +42,6 @@ function crc32(buffer) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Décodage                                                                    */
-/* -------------------------------------------------------------------------- */
-
-/** Prédicteur de Paeth : le voisin dont la valeur est la plus proche de a+b-c. */
 function paeth(a, b, c) {
   const p = a + b - c;
   const pa = Math.abs(p - a);
@@ -121,13 +54,6 @@ function paeth(a, b, c) {
   return pb <= pc ? b : c;
 }
 
-/**
- * Décode un PNG 8 bits RGBA non entrelacé en pixels bruts.
- *
- * Les chunks IDAT sont concaténés avant décompression : rien n'oblige un
- * encodeur à n'en produire qu'un, et les traiter séparément casserait le flux
- * deflate au milieu.
- */
 function decodePng(file) {
   if (!file.subarray(0, 8).equals(PNG_SIGNATURE)) {
     throw new Error('ce fichier n’est pas un PNG');
@@ -210,17 +136,6 @@ function decodePng(file) {
   return { width, height, pixels };
 }
 
-/* -------------------------------------------------------------------------- */
-/* Transformations                                                             */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Centre l'image sur un canevas carré transparent.
- *
- * Étirer une image de 202 × 223 vers un carré la déformerait ; la recadrer lui
- * couperait une part du visuel. Le remplissage transparent préserve les deux,
- * et c'est ce que fait n'importe quel jeu d'icônes correct.
- */
 function toSquare(image) {
   const side = Math.max(image.width, image.height);
   if (side === image.width && side === image.height) {
@@ -243,14 +158,6 @@ function toSquare(image) {
   return { width: side, height: side, pixels };
 }
 
-/**
- * Rééchantillonne par moyenne de zone.
- *
- * L'alpha est **prémultiplié** avant la moyenne, puis retiré ensuite. Sans
- * cela, la couleur des pixels transparents — souvent du noir — se mélangerait
- * à celle des pixels visibles, et le contour de l'icône se cernerait d'un halo
- * sombre, d'autant plus visible que la taille est petite.
- */
 function resize(image, size) {
   const pixels = Buffer.alloc(size * size * 4);
   const ratio = image.width / size;
@@ -285,8 +192,6 @@ function resize(image, size) {
       const target = (y * size + x) * 4;
       const meanAlpha = a / count;
 
-      // Une zone entièrement transparente n'a pas de couleur à restituer, et la
-      // division par un alpha nul donnerait `NaN`.
       pixels[target] = a === 0 ? 0 : Math.round(r / a);
       pixels[target + 1] = a === 0 ? 0 : Math.round(g / a);
       pixels[target + 2] = a === 0 ? 0 : Math.round(b / a);
@@ -297,15 +202,6 @@ function resize(image, size) {
   return { width: size, height: size, pixels };
 }
 
-/**
- * Compose l'image carrée sur un canevas rectangulaire transparent, centrée.
- *
- * Le visuel est d'abord ramené au plus petit des deux côtés — c'est ce qui le
- * fait tenir entièrement — puis posé au milieu. Le fond reste **transparent**
- * plutôt que rempli : la couleur des tuiles vient d'`appx.backgroundColor` dans
- * la configuration de packaging, et un aplat opaque poserait un rectangle
- * par-dessus, visible dès que le thème de Windows change.
- */
 function letterbox(image, width, height) {
   const side = Math.min(width, height);
   const scaled = resize(image, side);
@@ -330,10 +226,6 @@ function letterbox(image, width, height) {
   return { width, height, pixels };
 }
 
-/* -------------------------------------------------------------------------- */
-/* Encodage                                                                    */
-/* -------------------------------------------------------------------------- */
-
 function chunk(type, data) {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
@@ -351,8 +243,6 @@ function encodePng(image) {
   const raw = Buffer.alloc(image.height * (stride + 1));
 
   for (let y = 0; y < image.height; y += 1) {
-    // Filtre 0 : aucun. Les icônes sont petites, et un filtrage adaptatif ne
-    // gagnerait que quelques kilooctets sur un fichier embarqué une fois.
     raw[y * (stride + 1)] = 0;
     image.pixels.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
   }
@@ -374,14 +264,6 @@ function encodePng(image) {
   ]);
 }
 
-/**
- * Assemble un `.ico` : un index, puis les images.
- *
- * Les images sont enfermées telles quelles au format PNG, ce que Windows
- * accepte depuis Vista. L'alternative — le format DIB historique — imposerait
- * un masque de transparence en plus des pixels, pour un gain nul sur les cibles
- * du projet.
- */
 function encodeIco(images) {
   const encoded = images.map((image) => encodePng(image));
 
@@ -395,7 +277,6 @@ function encodeIco(images) {
 
   images.forEach((image, index) => {
     const start = index * 16;
-    // 256 s'encode par 0 : le champ ne tient que sur un octet.
     directory[start] = image.width === 256 ? 0 : image.width;
     directory[start + 1] = image.height === 256 ? 0 : image.height;
     directory[start + 2] = 0; // palette : sans objet en couleurs vraies
@@ -410,10 +291,6 @@ function encodeIco(images) {
 
   return Buffer.concat([header, directory, ...encoded]);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Exécution                                                                   */
-/* -------------------------------------------------------------------------- */
 
 function load(name) {
   const image = toSquare(decodePng(readFileSync(resolve(ASSETS, name))));
