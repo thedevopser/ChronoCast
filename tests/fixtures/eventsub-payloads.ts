@@ -271,3 +271,60 @@ export const chatNotificationAnnouncement: unknown = {
   notice_type: 'announcement',
   announcement: { color: 'PRIMARY' },
 };
+
+/* -------------------------------------------------------------------------- */
+/* Messages de chat                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `channel.chat.message` v1.
+ *
+ * Deux champs seuls décident ici, et ce sont les deux pièges du flux :
+ *
+ *   1. **`badges`** porte l'habilitation, `set_id` valant `broadcaster` ou
+ *      `moderator`. C'est une donnée que Twitch pose lui-même ; le pseudo, lui,
+ *      s'imite. L'autorisation ne se lit jamais ailleurs.
+ *   2. **`message.text`** est le texte affiché, fragments recomposés. Twitch y
+ *      appose `U+E0000` lorsqu'un compte répète la même ligne, pour contourner
+ *      sa propre détection de doublon.
+ *
+ * Le reste de la charge utile réelle — `message.fragments`, `color`,
+ * `message_type`, `cheer`, `reply` — n'est jamais lu et n'est pas reproduit :
+ * l'y ajouter laisserait croire qu'il compte.
+ */
+function chatMessage(text: string, badges: unknown[]): unknown {
+  return {
+    broadcaster_user_id: '1337',
+    broadcaster_user_login: 'cooler_user',
+    broadcaster_user_name: 'Cooler_User',
+    chatter_user_id: '4321',
+    chatter_user_login: 'modo_utile',
+    chatter_user_name: 'Modo_Utile',
+    message_id: 'b1f4c9de-0000-4000-8000-000000000000',
+    message: { text },
+    badges,
+  };
+}
+
+const MODERATOR_BADGES: unknown[] = [{ set_id: 'moderator', id: '1', info: '' }];
+
+/** Un modérateur crédite cinq minutes. */
+export const chatMessageModeratorAddTime: unknown = chatMessage('!addtime 300', MODERATOR_BADGES);
+
+/** Le même geste par un spectateur ordinaire : rien ne doit se produire. */
+export const chatMessageViewerAddTime: unknown = chatMessage('!addtime 300', []);
+
+/** Un modérateur qui bavarde. La quasi-totalité du flux ressemble à ceci. */
+export const chatMessageSmallTalk: unknown = chatMessage('bonne chance !', MODERATOR_BADGES);
+
+/** Valeur au-delà du plafond : refusée, jamais écrêtée. */
+export const chatMessageModeratorTooMuch: unknown = chatMessage(
+  '!addtime 99999',
+  MODERATOR_BADGES,
+);
+
+/** Valeur qui n'est pas un entier. */
+export const chatMessageModeratorNotANumber: unknown = chatMessage(
+  '!addtime beaucoup',
+  MODERATOR_BADGES,
+);

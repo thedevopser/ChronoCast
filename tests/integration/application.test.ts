@@ -23,6 +23,11 @@ import {
   channelSubscribe,
   channelSubscribeGifted,
   channelSubscriptionGift,
+  chatMessageModeratorAddTime,
+  chatMessageModeratorNotANumber,
+  chatMessageModeratorTooMuch,
+  chatMessageSmallTalk,
+  chatMessageViewerAddTime,
   chatNotificationSubPrime,
 } from '../fixtures/eventsub-payloads.js';
 
@@ -389,6 +394,132 @@ describe('application complète', () => {
       await notify('channel.subscribe', { n_importe: 'quoi' });
 
       // Aucun crédit, mais surtout : le serveur répond encore.
+      expect((await api('/api/state')).status).toBe(200);
+    });
+  });
+
+  /**
+   * Commandes de chat.
+   *
+   * C'est la première source d'événements de ChronoCast qui ne vient pas d'un
+   * soutien financier, et la première dont le déclencheur est une intention
+   * humaine plutôt qu'une action de plateforme. Deux conséquences se vérifient
+   * ici, et pas ailleurs : le **filtrage précoce** — rien n'entre dans
+   * l'historique de ce qui n'aboutit pas — et le fait que deux commandes
+   * identiques soient **deux crédits**, contrairement à tout le reste.
+   */
+  describe('commandes de chat', () => {
+    /** Active la lecture du chat, comme le ferait la case du panneau. */
+    async function enableChatCommands(patch: unknown = {}): Promise<void> {
+      const response = await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({
+          config: { twitch: { enableChatCommands: true }, ...(patch as object) },
+        }),
+      });
+      expect(response.status).toBe(200);
+    }
+
+    async function remainingMs(): Promise<number> {
+      const state = (await (await api('/api/state')).json()) as {
+        counter: { remainingMs: number };
+      };
+      return state.counter.remainingMs;
+    }
+
+    async function historyEntries(): Promise<Record<string, unknown>[]> {
+      const history = (await (await api('/api/history')).json()) as {
+        entries: Record<string, unknown>[];
+      };
+      return history.entries;
+    }
+
+    it('crédite le temps tapé par un modérateur, et l’annonce', async () => {
+      await enableChatCommands();
+      const overlay = collect(connectOverlay());
+      await overlay.waitFor(() => overlay.ofType('state').length > 0, 'instantané initial');
+
+      await notify('channel.chat.message', chatMessageModeratorAddTime);
+
+      expect(await remainingMs()).toBe(43_200_000 + 300_000);
+      expect((await historyEntries())[0]).toMatchObject({
+        type: 'command',
+        detail: 'addtime',
+        source: 'chat-command',
+        rewardSeconds: 300,
+        applied: true,
+      });
+
+      await overlay.waitFor(() => overlay.ofType('event').length > 0, 'annonce de la commande');
+      expect(overlay.ofType('event')[0]).toMatchObject({ label: 'Temps ajouté' });
+    });
+
+    it('ne fait rien pour un spectateur ordinaire', async () => {
+      await enableChatCommands();
+
+      await notify('channel.chat.message', chatMessageViewerAddTime);
+
+      expect(await remainingMs()).toBe(43_200_000);
+      // Rien dans l'historique non plus : sans ce filtrage précoce, un
+      // spectateur martelant la commande le remplirait une ligne à la fois.
+      expect(await historyEntries()).toHaveLength(0);
+    });
+
+    it('n’écrit rien pour un message ordinaire', async () => {
+      await enableChatCommands();
+
+      await notify('channel.chat.message', chatMessageSmallTalk);
+
+      expect(await historyEntries()).toHaveLength(0);
+    });
+
+    it('refuse au-delà du plafond, et une valeur qui n’est pas un nombre', async () => {
+      await enableChatCommands({ rewards: { chatCommand: { maxSeconds: 600 } } });
+
+      await notify('channel.chat.message', chatMessageModeratorTooMuch);
+      await notify('channel.chat.message', chatMessageModeratorNotANumber);
+
+      expect(await remainingMs()).toBe(43_200_000);
+      expect(await historyEntries()).toHaveLength(0);
+    });
+
+    it('reste inerte tant que les commandes ne sont pas activées', async () => {
+      // Le réglage est éteint par défaut : lire tout le chat d'une chaîne ne
+      // s'active pas dans le dos de qui met simplement à jour.
+      await notify('channel.chat.message', chatMessageModeratorAddTime);
+
+      expect(await remainingMs()).toBe(43_200_000);
+      expect(await historyEntries()).toHaveLength(0);
+    });
+
+    it('ignore le rejeu du même message par Twitch', async () => {
+      await enableChatCommands();
+
+      await notify('channel.chat.message', chatMessageModeratorAddTime, 'msg-rejoue');
+      await notify('channel.chat.message', chatMessageModeratorAddTime, 'msg-rejoue');
+
+      expect(await remainingMs()).toBe(43_200_000 + 300_000);
+    });
+
+    it('crédite deux fois deux commandes identiques', async () => {
+      // **Le cas qui distingue une commande de tout le reste.** La
+      // déduplication sémantique reconnaît un même fait de plateforme annoncé
+      // par deux flux ; deux `!addtime 300` à trois secondes d'écart sont deux
+      // intentions, et les confondre volerait cinq minutes au streamer.
+      await enableChatCommands();
+
+      await notify('channel.chat.message', chatMessageModeratorAddTime, 'msg-a');
+      await notify('channel.chat.message', chatMessageModeratorAddTime, 'msg-b');
+
+      expect(await remainingMs()).toBe(43_200_000 + 600_000);
+    });
+
+    it('reste debout sur une charge utile de chat non conforme', async () => {
+      await enableChatCommands();
+
+      await notify('channel.chat.message', { n_importe: 'quoi' });
+
       expect((await api('/api/state')).status).toBe(200);
     });
   });

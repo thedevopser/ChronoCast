@@ -51,6 +51,7 @@ describe('SUBSCRIPTION_PLAN', () => {
         'channel.chat.notification',
         'channel.raid',
         'channel.follow',
+        'channel.chat.message',
       ]),
     );
   });
@@ -104,6 +105,24 @@ describe('resolveSubscriptions', () => {
     expect(types).toContain('channel.follow');
   });
 
+  it('écarte la lecture du chat tant que les commandes sont désactivées', () => {
+    // Lire tout le chat d'une chaîne ne s'active pas dans le dos de quelqu'un
+    // qui met simplement à jour : c'est la règle de raid et de follow.
+    const types = resolveSubscriptions(DEFAULT_CONFIG.twitch, CONTEXT).map(
+      (resolved) => resolved.type,
+    );
+
+    expect(types).not.toContain('channel.chat.message');
+  });
+
+  it('retient la lecture du chat une fois les commandes activées', () => {
+    const types = resolveSubscriptions(twitchConfig({ enableChatCommands: true }), CONTEXT).map(
+      (resolved) => resolved.type,
+    );
+
+    expect(types).toContain('channel.chat.message');
+  });
+
   it('écarte les notifications de chat lorsqu\'elles sont désactivées', () => {
     const types = resolveSubscriptions(
       twitchConfig({ enableChatNotifications: false }),
@@ -126,6 +145,16 @@ describe('resolveSubscriptions', () => {
       // Twitch exige de savoir au nom de quel compte le chat est lu.
       const resolved = resolveSubscriptions(DEFAULT_CONFIG.twitch, CONTEXT).find(
         (item) => item.type === 'channel.chat.notification',
+      );
+
+      expect(resolved?.condition).toEqual({ broadcaster_user_id: '1337', user_id: '1337' });
+    });
+
+    it('ajoute l\'utilisateur lecteur pour les messages de chat', () => {
+      // Même exigence que pour les notifications : Twitch veut savoir au nom de
+      // quel compte le chat est lu.
+      const resolved = resolveSubscriptions(twitchConfig({ enableChatCommands: true }), CONTEXT).find(
+        (item) => item.type === 'channel.chat.message',
       );
 
       expect(resolved?.condition).toEqual({ broadcaster_user_id: '1337', user_id: '1337' });
@@ -160,6 +189,16 @@ describe('resolveSubscriptions', () => {
       expect(resolved?.required).toBe(true);
     });
 
+    it('marque la lecture du chat comme facultative', () => {
+      // Une commande qui ne se souscrit pas ne doit pas arrêter le subathon :
+      // seuls les abonnements et les bits sont vitaux.
+      const resolved = resolveSubscriptions(twitchConfig({ enableChatCommands: true }), CONTEXT).find(
+        (item) => item.type === 'channel.chat.message',
+      );
+
+      expect(resolved?.required).toBe(false);
+    });
+
     it('marque le raid comme facultatif', () => {
       // Un raid qui ne se souscrit pas ne doit pas empêcher le subathon de
       // tourner : seuls les abonnements et les bits sont vitaux.
@@ -191,6 +230,26 @@ describe('requiredScopes', () => {
     const scopes = requiredScopes(twitchConfig({ enableChatNotifications: false }));
 
     expect(scopes).not.toContain('user:read:chat');
+  });
+
+  it('ajoute les portées de chat lorsque seules les commandes sont activées', () => {
+    // Le cas qui compte : quelqu'un ayant désactivé la détection Prime et
+    // activé les commandes doit malgré tout obtenir de quoi lire le chat.
+    const scopes = requiredScopes(
+      twitchConfig({ enableChatNotifications: false, enableChatCommands: true }),
+    );
+
+    expect(scopes).toEqual(expect.arrayContaining(['user:read:chat', 'user:bot']));
+  });
+
+  it('ne demande aucune portée supplémentaire pour les commandes', () => {
+    // `channel.chat.message` réclame exactement ce que réclame déjà
+    // `channel.chat.notification`, active par défaut : activer les commandes
+    // n'oblige donc personne à se réauthentifier.
+    const sans = requiredScopes(DEFAULT_CONFIG.twitch);
+    const avec = requiredScopes(twitchConfig({ enableChatCommands: true }));
+
+    expect(new Set(avec)).toEqual(new Set(sans));
   });
 
   it('ajoute la lecture des suiveurs lorsque le follow est activé', () => {

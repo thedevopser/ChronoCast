@@ -179,6 +179,36 @@ const REWARD_FIELDS: readonly AdminField[] = [
     kind: 'integer',
     min: 1,
   },
+
+  {
+    selector: '#reward-command-name',
+    path: 'rewards.chatCommand.name',
+    label: 'Nom de la commande',
+    hint: 'Sans le « ! », qui est toujours le préfixe. Un modérateur tape « !addtime 300 » pour créditer cinq minutes.',
+    view: 'rewards',
+    kind: 'text',
+  },
+  {
+    selector: '#reward-command-max',
+    path: 'rewards.chatCommand.maxSeconds',
+    label: 'Plafond par commande',
+    hint: 'Au-delà, la commande est refusée : une valeur démesurée est une faute de frappe bien plus souvent qu’une intention.',
+    view: 'rewards',
+    kind: 'integer',
+    min: 1,
+    max: DAY,
+  },
+  {
+    selector: '#reward-command-label',
+    path: 'rewards.chatCommand.overlayText',
+    label: 'Libellé sur l’overlay',
+    hint: 'Affiché au-dessus du pseudo dans la bulle. Laisser vide pour n’annoncer que le pseudo et le temps.',
+    view: 'rewards',
+    kind: 'text',
+    // Vide vaut « pas de libellé » : c'est un réglage, pas un oubli.
+    allowEmpty: true,
+    max: 40,
+  },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -346,6 +376,14 @@ const TWITCH_FIELDS: readonly AdminField[] = [
   },
   { selector: '#twitch-enable-raid', path: 'twitch.enableRaid', label: 'S’abonner aux raids', view: 'twitch', kind: 'boolean' },
   { selector: '#twitch-enable-follow', path: 'twitch.enableFollow', label: 'S’abonner aux follows', view: 'twitch', kind: 'boolean' },
+  {
+    selector: '#twitch-enable-chat-commands',
+    path: 'twitch.enableChatCommands',
+    label: 'Lire le chat pour les commandes',
+    hint: 'Nécessaire à « !addtime ». N’exige aucune autorisation de plus que la détection Prime, et ChronoCast n’écrit jamais dans le chat.',
+    view: 'twitch',
+    kind: 'boolean',
+  },
   {
     selector: '#twitch-keepalive',
     path: 'twitch.keepaliveTimeoutSeconds',
@@ -627,6 +665,7 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.bits.', 'Bits'],
   ['rewards.raid.', 'Raids'],
   ['rewards.follow.', 'Follows'],
+  ['rewards.chatCommand.', 'Commande de chat'],
 
   ['overlay.gradient.', 'Dégradé'],
   ['overlay.frame.', 'Cadre'],

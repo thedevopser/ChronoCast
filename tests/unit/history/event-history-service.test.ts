@@ -131,6 +131,30 @@ describe('createEventHistoryService', () => {
     expect((await service.list(1))[0]).toMatchObject({ type: 'bits', detail: 500 });
   });
 
+  it('consigne une commande de chat, son nom et sa provenance', async () => {
+    // L'historique est le seul endroit où le streamer peut voir *qui* a tapé
+    // la commande, et donc arbitrer un abus a posteriori. La provenance
+    // `chat-command` l'y distingue d'un ajout manuel qu'il aurait fait lui-même.
+    await service.record(
+      makeEvent({
+        id: 'evt-cmd',
+        type: 'command',
+        command: 'addtime',
+        seconds: 300,
+        source: 'chat-command',
+      }),
+      { seconds: 300, applied: true, reason: 'commande !addtime' },
+      state,
+    );
+
+    expect((await service.list(1))[0]).toMatchObject({
+      type: 'command',
+      detail: 'addtime',
+      source: 'chat-command',
+      rewardSeconds: 300,
+    });
+  });
+
   it('ignore une ligne corrompue sans perdre les autres', async () => {
     // Une coupure d'alimentation en pleine écriture laisse une ligne tronquée :
     // elle ne doit pas emporter tout l'historique avec elle.

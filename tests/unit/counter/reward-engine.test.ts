@@ -5,6 +5,7 @@ import { configSchema, type RewardsConfig } from '../../../src/core/config/schem
 import { computeReward } from '../../../src/core/counter/reward-engine.js';
 import type {
   BitsEvent,
+  CommandEvent,
   FollowEvent,
   GiftEvent,
   RaidEvent,
@@ -303,5 +304,45 @@ describe('computeReward', () => {
 
       expect(computeReward(event, REWARDS).reason).not.toBe('');
     });
+  });
+});
+
+/**
+ * Commande de chat.
+ *
+ * Seul cas où les secondes viennent de l'événement et non du barème : c'est un
+ * modérateur qui les a tapées. Le moteur reste néanmoins la seule réponse à la
+ * question « combien de secondes », et il y applique le plafond du schéma.
+ */
+describe('commande de chat', () => {
+  function commandEvent(seconds: number): CommandEvent {
+    return { ...baseEvent(), source: 'chat-command', type: 'command', command: 'addtime', seconds };
+  }
+
+  it('crédite les secondes portées par la commande', () => {
+    expect(computeReward(commandEvent(300), REWARDS).seconds).toBe(300);
+    expect(computeReward(commandEvent(300), REWARDS).applied).toBe(true);
+  });
+
+  it('écrête au plafond configuré', () => {
+    // Écrêtage défensif : le service refuse déjà une valeur hors bornes avant
+    // de produire l'événement. Cette borne-ci tient les chemins qui ne passent
+    // pas par lui — le bouton de test de l'overlay, un historique relu.
+    const rewards = rewardsWith({ chatCommand: { maxSeconds: 600 } });
+
+    expect(computeReward(commandEvent(99_999), rewards).seconds).toBe(600);
+  });
+
+  it('refuse une durée nulle ou négative', () => {
+    // `applyAdd` ignore silencieusement un delta négatif ou nul : sans ce
+    // refus, l'historique dirait l'événement appliqué alors que le compteur
+    // n'aurait pas bougé, et le streamer chercherait la panne longtemps.
+    expect(computeReward(commandEvent(0), REWARDS).applied).toBe(false);
+    expect(computeReward(commandEvent(-60), REWARDS).applied).toBe(false);
+    expect(computeReward(commandEvent(-60), REWARDS).seconds).toBe(0);
+  });
+
+  it('nomme la commande dans le motif, pour l’historique', () => {
+    expect(computeReward(commandEvent(300), REWARDS).reason).toContain('addtime');
   });
 });

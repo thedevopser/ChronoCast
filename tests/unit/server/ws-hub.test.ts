@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppEvents } from '../../../src/core/app/app-events.js';
 import { createEventBus, type EventBus } from '../../../src/core/app/event-bus.js';
 import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
-import type { ChronoCastConfig } from '../../../src/core/config/schema.js';
+import { configSchema, type ChronoCastConfig } from '../../../src/core/config/schema.js';
 import { createInitialState, type CounterState } from '../../../src/core/counter/counter-state.js';
 import { createLogger, type LogSink } from '../../../src/core/logging/logger.js';
 import { PROTOCOL_VERSION } from '../../../src/core/server/protocol.js';
@@ -270,6 +270,74 @@ describe('createWsHub', () => {
         rewardSeconds: 180,
         applied: true,
       });
+    });
+
+    it('n’attache aucun libellé à un événement de plateforme', () => {
+      // Le libellé est propre aux commandes de chat. L'attacher partout ferait
+      // apparaître « Temps ajouté » au-dessus de chaque abonnement.
+      bus.emit('counter:event-applied', {
+        event: {
+          id: 'evt-1',
+          type: 'sub',
+          tier: 'tier1',
+          occurredAt: 1_000,
+          userId: '42',
+          userName: 'Viewer',
+          source: 'eventsub',
+        },
+        reward: { seconds: 180, applied: true, reason: 'sub tier1' },
+        state: counter,
+      });
+
+      expect(messagesOfType(client, 'event')[0]).not.toHaveProperty('label');
+    });
+
+    it('attache le libellé configuré à une commande de chat', () => {
+      // Le libellé vit dans le barème et non dans le sous-arbre `overlay` :
+      // l'overlay ne reçoit que ce dernier, il ne pourrait donc pas aller le
+      // chercher lui-même. C'est au hub de le joindre au message.
+      bus.emit('counter:event-applied', {
+        event: {
+          id: 'evt-cmd',
+          type: 'command',
+          command: 'addtime',
+          seconds: 300,
+          occurredAt: 1_000,
+          userId: '42',
+          userName: 'ModoUtile',
+          source: 'chat-command',
+        },
+        reward: { seconds: 300, applied: true, reason: 'commande !addtime' },
+        state: counter,
+      });
+
+      expect(messagesOfType(client, 'event')[0]).toMatchObject({
+        rewardSeconds: 300,
+        label: 'Temps ajouté',
+      });
+    });
+
+    it('omet le libellé lorsqu’il a été vidé', () => {
+      // Vider le champ vaut « pas de libellé » : envoyer une chaîne vide
+      // ferait réserver la place d'une ligne que rien ne remplirait.
+      config = configSchema.parse({ rewards: { chatCommand: { overlayText: '' } } });
+
+      bus.emit('counter:event-applied', {
+        event: {
+          id: 'evt-cmd',
+          type: 'command',
+          command: 'addtime',
+          seconds: 300,
+          occurredAt: 1_000,
+          userId: '42',
+          userName: 'ModoUtile',
+          source: 'chat-command',
+        },
+        reward: { seconds: 300, applied: true, reason: 'commande !addtime' },
+        state: counter,
+      });
+
+      expect(messagesOfType(client, 'event')[0]).not.toHaveProperty('label');
     });
 
     it('diffuse une ligne de journal', () => {

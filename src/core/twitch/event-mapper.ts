@@ -428,5 +428,14 @@ export function semanticKey(event: DomainEvent): string {
       return `raid:${event.userId}:${String(event.viewers)}`;
     case 'follow':
       return `follow:${event.userId}`;
+    case 'command':
+      // Clé **jamais collidante**, et c'est voulu. La déduplication croisée
+      // existe pour reconnaître un même fait de plateforme annoncé par deux
+      // flux ; une commande n'est pas un fait de plateforme mais une intention
+      // humaine. Deux `!addtime 60` à trois secondes d'écart sont deux
+      // intentions, et les confondre volerait une minute au streamer. La
+      // retransmission du même message, elle, reste écartée en amont par le
+      // `message_id`.
+      return `command:${event.id}`;
   }
 }

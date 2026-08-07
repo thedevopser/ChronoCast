@@ -207,5 +207,23 @@ export function computeReward(
 
       return granted(rewards.follow.seconds, 'follow');
     }
+
+    case 'command': {
+      // Le seul cas où les secondes viennent de l'événement : c'est un
+      // modérateur qui les a tapées. Le moteur reste malgré tout la seule
+      // réponse à « combien de secondes », et il y applique le plafond.
+      if (!Number.isFinite(event.seconds) || event.seconds <= 0) {
+        // `applyAdd` refuse tout delta négatif ou nul **sans rien signaler** :
+        // sans ce refus, le compteur ne bougerait pas alors que l'historique
+        // dirait l'événement appliqué, et la panne serait introuvable.
+        return refused(`durée invalide pour !${event.command}`);
+      }
+
+      return capped(
+        Math.trunc(event.seconds),
+        rewards.chatCommand.maxSeconds,
+        `commande !${event.command}`,
+      );
+    }
   }
 }

@@ -30,12 +30,12 @@ const BASE_NAME = 'events';
 const historyEntrySchema = z
   .object({
     id: z.string(),
-    type: z.enum(['sub', 'resub', 'gift', 'bits', 'raid', 'follow']),
+    type: z.enum(['sub', 'resub', 'gift', 'bits', 'raid', 'follow', 'command']),
     occurredAt: z.number(),
     recordedAt: z.number(),
     userId: z.string(),
     userName: z.string(),
-    source: z.enum(['eventsub', 'chat-notification', 'manual']),
+    source: z.enum(['eventsub', 'chat-notification', 'manual', 'chat-command']),
     /** Palier, nombre de bits, de spectateurs ou de dons, selon le type. */
     detail: z.union([z.string(), z.number()]).nullable(),
     rewardSeconds: z.number(),
@@ -87,6 +87,11 @@ function detailOf(event: DomainEvent): string | number | null {
       return event.viewers;
     case 'follow':
       return null;
+    case 'command':
+      // Le nom, et non les secondes : celles-ci sont déjà dans `rewardSeconds`,
+      // et les répéter ici laisserait croire à deux grandeurs différentes le
+      // jour où le plafond en écrête une.
+      return event.command;
   }
 }
 

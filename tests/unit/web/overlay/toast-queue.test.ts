@@ -153,3 +153,26 @@ describe('createToastQueue', () => {
     });
   });
 });
+
+describe('libellé', () => {
+  it('transporte le libellé jusqu’à l’affichage', () => {
+    // La file ne l'interprète pas : elle le porte. Le libellé vient de la
+    // configuration locale, pas du réseau, et l'overlay l'écrira par `setText`
+    // comme tout le reste.
+    const queue = createToastQueue();
+
+    queue.push({ ...toast('a'), type: 'command', label: 'Temps ajouté' }, 0, DURATION);
+
+    expect(queue.current(0)?.label).toBe('Temps ajouté');
+  });
+
+  it('accepte une bulle sans libellé', () => {
+    // C'est le cas de tous les événements de plateforme : il n'y a rien à
+    // annoncer au-dessus du pseudo.
+    const queue = createToastQueue();
+
+    queue.push(toast('a'), 0, DURATION);
+
+    expect(queue.current(0)?.label).toBeUndefined();
+  });
+});

@@ -98,6 +98,19 @@ export interface EventMessage {
   readonly event: DomainEvent;
   readonly rewardSeconds: number;
   readonly applied: boolean;
+
+  /**
+   * Libellé à afficher au-dessus de la bulle, ou absent.
+   *
+   * Aujourd'hui renseigné pour les seules commandes de chat, depuis
+   * `rewards.chatCommand.overlayText`. Il voyage dans le message plutôt que
+   * d'être lu par l'overlay : celui-ci ne reçoit que le sous-arbre `overlay`
+   * de la configuration, et le libellé vit dans le barème.
+   *
+   * **Ce texte ne vient pas du réseau** — il est saisi dans le panneau, borné
+   * par le schéma. `safe-dom` s'y applique malgré tout, comme partout.
+   */
+  readonly label?: string;
 }
 
 export interface LogMessage {

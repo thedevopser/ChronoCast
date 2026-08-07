@@ -266,6 +266,69 @@ describe('app', () => {
   });
 });
 
+/**
+ * Commande de chat.
+ *
+ * C'est le seul endroit du produit où une valeur métier est **tapée par un
+ * tiers** plutôt que lue dans le schéma : `!addtime 300` porte ses secondes. Ce
+ * qui reste dans le schéma, et qui redevient le juge, c'est le plafond.
+ */
+describe('rewards.chatCommand', () => {
+  it('reste éteinte par défaut', () => {
+    // Même règle que raid et follow : une nouveauté qui écoute le chat ne
+    // s'active pas dans le dos de qui met simplement à jour.
+    expect(configSchema.parse({}).twitch.enableChatCommands).toBe(false);
+  });
+
+  it('se nomme addtime, et le nom se règle', () => {
+    // Le nom doit s'accorder à la main avec le bot de chat qui répond : le
+    // figer dans le code imposerait une release pour changer un mot.
+    expect(configSchema.parse({}).rewards.chatCommand.name).toBe('addtime');
+    expect(
+      configSchema.parse({ rewards: { chatCommand: { name: 'temps' } } }).rewards.chatCommand.name,
+    ).toBe('temps');
+  });
+
+  it('plafonne une commande à une heure', () => {
+    // Même rôle que `maxPerEvent` des gifts et des bits : une faute de frappe
+    // ne doit pas porter le compteur au plafond d'un seul message.
+    expect(configSchema.parse({}).rewards.chatCommand.maxSeconds).toBe(3_600);
+  });
+
+  it('annonce le temps ajouté sur l’overlay', () => {
+    expect(configSchema.parse({}).rewards.chatCommand.overlayText).toBe('Temps ajouté');
+  });
+
+  it('accepte un libellé vide, qui vaut « pas de libellé »', () => {
+    expect(
+      configSchema.parse({ rewards: { chatCommand: { overlayText: '' } } }).rewards.chatCommand
+        .overlayText,
+    ).toBe('');
+  });
+
+  it('refuse un nom vide ou non alphanumérique', () => {
+    // Un nom porteur d'espace ou de ponctuation ne serait jamais reconnu par
+    // l'analyseur : mieux vaut le refuser là où on peut encore l'expliquer.
+    expect(() => configSchema.parse({ rewards: { chatCommand: { name: '' } } })).toThrow();
+    expect(() => configSchema.parse({ rewards: { chatCommand: { name: 'add time' } } })).toThrow();
+    expect(() => configSchema.parse({ rewards: { chatCommand: { name: '!addtime' } } })).toThrow();
+  });
+
+  it('refuse un plafond nul ou négatif', () => {
+    // Un plafond à zéro rendrait la commande inerte sans que rien ne le dise.
+    expect(() => configSchema.parse({ rewards: { chatCommand: { maxSeconds: 0 } } })).toThrow();
+    expect(() => configSchema.parse({ rewards: { chatCommand: { maxSeconds: -60 } } })).toThrow();
+  });
+
+  it('borne la longueur du libellé', () => {
+    // Le libellé traverse jusqu'à l'overlay : une chaîne kilométrique y
+    // débordrait de la scène, là où personne ne peut la corriger en direct.
+    expect(() =>
+      configSchema.parse({ rewards: { chatCommand: { overlayText: 'x'.repeat(200) } } }),
+    ).toThrow();
+  });
+});
+
 describe('setup', () => {
   it("part de l'idée que l'assistant n'a jamais été mené à son terme", () => {
     expect(configSchema.parse({}).setup.completed).toBe(false);

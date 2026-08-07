@@ -157,7 +157,7 @@ const importSchema = z.object({ content: z.string().min(1).max(1_048_576) }).str
 
 const overlayTestSchema = z
   .object({
-    type: z.enum(['sub', 'resub', 'gift', 'bits', 'raid', 'follow']),
+    type: z.enum(['sub', 'resub', 'gift', 'bits', 'raid', 'follow', 'command']),
     userName: z.string().min(1).optional(),
   })
   .strip();
@@ -228,6 +228,11 @@ function buildTestEvent(type: DomainEventType, userName: string, now: number): D
       return { ...base, type: 'raid', viewers: 42 };
     case 'follow':
       return { ...base, type: 'follow' };
+    case 'command':
+      // Le nom est celui du défaut et non celui de la configuration : ce
+      // bouton teste l'**apparence** de la bulle, pas la résolution de la
+      // commande. Les secondes, elles, traversent le barème comme les autres.
+      return { ...base, type: 'command', command: 'addtime', seconds: 300 };
   }
 }
 

@@ -15,7 +15,7 @@
  */
 
 /** Nature de l'événement. */
-export type DomainEventType = 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow';
+export type DomainEventType = 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow' | 'command';
 
 /**
  * Palier d'abonnement.
@@ -34,8 +34,12 @@ export type GiftTier = Exclude<SubscriptionTier, 'prime'>;
  *
  * Sert à la déduplication croisée : le même abonnement peut arriver à la fois
  * par `channel.subscribe` et par `channel.chat.notification`.
+ *
+ * `chat-command` s'en distingue par nature : ce n'est pas une seconde façon
+ * d'apprendre un même fait de plateforme, c'est une **intention humaine**. Deux
+ * commandes identiques sont deux intentions, jamais un doublon.
  */
-export type DomainEventSource = 'eventsub' | 'chat-notification' | 'manual';
+export type DomainEventSource = 'eventsub' | 'chat-notification' | 'manual' | 'chat-command';
 
 interface BaseDomainEvent {
   /**
@@ -88,10 +92,33 @@ export interface FollowEvent extends BaseDomainEvent {
   readonly type: 'follow';
 }
 
+/**
+ * Commande de chat créditant du temps.
+ *
+ * **Seul événement dont les secondes ne viennent pas du barème** : un
+ * modérateur les a tapées dans son message. C'est un écart assumé au principe
+ * « aucune valeur métier hors du schéma », et c'est le besoin qui l'impose —
+ * une durée qu'aucun barème ne pouvait prévoir, créditée sans lâcher la manette.
+ *
+ * Ce que le schéma garde est le **plafond**, appliqué deux fois : refus dans
+ * `command-service.ts` avant même de produire cet événement, écrêtage défensif
+ * dans `reward-engine.ts` pour les chemins qui ne passent pas par lui.
+ */
+export interface CommandEvent extends BaseDomainEvent {
+  /** Nom de la commande, sans le préfixe. Contenu contraint par le schéma. */
+  readonly command: string;
+
+  readonly type: 'command';
+
+  /** Secondes demandées. Toujours strictement positives à ce stade. */
+  readonly seconds: number;
+}
+
 export type DomainEvent =
   | SubEvent
   | ResubEvent
   | GiftEvent
   | BitsEvent
   | RaidEvent
-  | FollowEvent;
+  | FollowEvent
+  | CommandEvent;

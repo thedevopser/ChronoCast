@@ -46,10 +46,10 @@ export type TwitchConnectionStatus =
   | 'ready'
   | 'reconnecting';
 
-export type DomainEventType = 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow';
+export type DomainEventType = 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow' | 'command';
 export type SubscriptionTier = 'tier1' | 'tier2' | 'tier3' | 'prime';
 export type GiftTier = Exclude<SubscriptionTier, 'prime'>;
-export type DomainEventSource = 'eventsub' | 'chat-notification' | 'manual';
+export type DomainEventSource = 'eventsub' | 'chat-notification' | 'manual' | 'chat-command';
 
 interface BaseDomainEvent {
   readonly id: string;
@@ -98,7 +98,29 @@ export interface FollowEvent extends BaseDomainEvent {
   readonly type: 'follow';
 }
 
-export type DomainEvent = SubEvent | ResubEvent | GiftEvent | BitsEvent | RaidEvent | FollowEvent;
+/**
+ * Commande de chat créditant du temps.
+ *
+ * Contrairement à `userName`, `command` et `seconds` ne sont **pas** choisis
+ * librement par un tiers : le nom est contraint par le schéma et les secondes
+ * ont traversé le plafond du barème. Cela ne change rien à la règle — tout
+ * passe par `safe-dom` — mais explique pourquoi seul `userName` porte
+ * l'avertissement.
+ */
+export interface CommandEvent extends BaseDomainEvent {
+  readonly command: string;
+  readonly type: 'command';
+  readonly seconds: number;
+}
+
+export type DomainEvent =
+  | SubEvent
+  | ResubEvent
+  | GiftEvent
+  | BitsEvent
+  | RaidEvent
+  | FollowEvent
+  | CommandEvent;
 
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error';
 
@@ -232,6 +254,15 @@ export interface EventMessage {
   readonly event: DomainEvent;
   readonly rewardSeconds: number;
   readonly applied: boolean;
+
+  /**
+   * Libellé à afficher au-dessus de la bulle, ou absent.
+   *
+   * Il voyage dans le message parce que l'overlay ne reçoit que le sous-arbre
+   * `overlay` de la configuration, alors que ce texte vit dans le barème.
+   * Absent vaut « pas de libellé ».
+   */
+  readonly label?: string;
 }
 
 export interface LogMessage {

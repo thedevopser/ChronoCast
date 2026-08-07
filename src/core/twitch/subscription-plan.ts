@@ -83,6 +83,23 @@ export const SUBSCRIPTION_PLAN: readonly SubscriptionDefinition[] = [
     }),
   },
   {
+    type: 'channel.chat.message',
+    version: '1',
+    // Exactement les portées de `channel.chat.notification`, active par
+    // défaut : activer les commandes n'oblige donc personne à se
+    // réauthentifier. Seul quelqu'un ayant désactivé la détection Prime devra
+    // le faire, et `describe()` le lui annonce par `missingScopes`.
+    scopes: ['user:read:chat', 'user:bot'],
+    // Une commande qui ne se souscrit pas ne doit pas arrêter le subathon.
+    required: false,
+    isEnabled: (config) => config.enableChatCommands,
+    buildCondition: (context) => ({
+      broadcaster_user_id: context.broadcasterUserId,
+      // Twitch exige de savoir au nom de quel compte le chat est lu.
+      user_id: context.userId,
+    }),
+  },
+  {
     type: 'channel.subscribe',
     version: '1',
     scopes: ['channel:read:subscriptions'],

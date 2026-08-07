@@ -10,8 +10,10 @@
  * ```
  * EventSubClient.onNotification
  *   → déduplication sur message_id      (Twitch retransmet)
- *   → mapNotification                   (vocabulaire métier)
- *   → déduplication sur semanticKey     (deux flux décrivent le même fait)
+ *   → si channel.chat.message → evaluateChatMessage
+ *   │     (analyse, habilitation, plafond → CommandEvent ou rien)
+ *   → sinon → mapNotification           (vocabulaire métier)
+ *   →         déduplication sur semanticKey (deux flux, un même fait)
  *   → CounterService.applyEvent         (barème, persistance, bus)
  *   → EventHistoryService               (journal)
  *   → WsHub                             (diffusion à l'overlay)
@@ -22,6 +24,12 @@
  * **fait** annoncé par deux flux différents — `channel.subscribe` et
  * `channel.chat.notification` décrivent le même abonnement, et sans elle un
  * Prime serait crédité deux fois.
+ *
+ * **La seconde ne s'applique pas aux commandes de chat, et c'est voulu.** Elle
+ * reconnaît un même fait de plateforme annoncé deux fois ; une commande n'est
+ * pas un fait de plateforme mais une intention humaine. Deux `!addtime 300` à
+ * trois secondes d'écart sont deux intentions, et les confondre volerait cinq
+ * minutes au streamer. La retransmission, elle, reste écartée par la première.
  *
  * L'ordre de démarrage est lui aussi choisi : compteur, hub, serveur HTTP, puis
  * Twitch en dernier et sans bloquer. Une panne côté Twitch ne doit empêcher ni
@@ -36,6 +44,7 @@
 
 import { mkdir } from 'node:fs/promises';
 
+import { evaluateChatMessage } from '../chat/command-service.js';
 import { createConfigService, type ConfigService } from '../config/config-service.js';
 import { configSchema, type ChronoCastConfig } from '../config/schema.js';
 import {
@@ -474,6 +483,32 @@ export function createApplication(options: ApplicationOptions): Application {
     // Premier filtre : la retransmission du même message par Twitch.
     if (!messageDedup.admit(context.messageId, now)) {
       pipeline.debug('notification déjà traitée', { messageId: context.messageId });
+      return;
+    }
+
+    // Branche des commandes de chat, **avant** le convertisseur et non comme un
+    // cas de plus dedans. `channel.chat.message` livre chaque message de la
+    // chaîne, un volume sans commune mesure avec ce que traite le reste : le
+    // faire traverser `mapNotification` puis la déduplication sémantique serait
+    // du gaspillage à chaque ligne et remplirait les journaux. `event-mapper`
+    // reste le convertisseur des événements *comptables* ; il est pur et ne
+    // connaît pas la configuration, ce qui l'empêche de toute façon de trancher.
+    if (context.subscriptionType === 'channel.chat.message') {
+      const outcome = evaluateChatMessage(
+        { messageId: context.messageId, receivedAt: context.receivedAt },
+        payload,
+        configService.get(),
+      );
+
+      if (outcome.kind === 'ignored') {
+        // Fonctionnement nominal, et de très loin le cas majoritaire : la
+        // quasi-totalité du chat n'a rien à voir avec ChronoCast. D'où `debug`,
+        // et non `warning` comme pour une charge utile non conforme.
+        pipeline.debug('message de chat sans effet', { reason: outcome.reason });
+        return;
+      }
+
+      await applyDomainEvent(outcome.event);
       return;
     }
 

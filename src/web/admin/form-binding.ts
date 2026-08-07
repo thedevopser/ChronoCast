@@ -44,6 +44,18 @@ export interface FieldDescriptor {
   readonly max?: number;
   /** Valeurs admises, pour `kind: 'enum'`. */
   readonly options?: readonly string[];
+
+  /**
+   * Autorise un `kind: 'text'` laissé vide.
+   *
+   * Le défaut refuse le vide, et c'est ce qu'il faut presque partout : une
+   * police ou une URL vide n'a pas de sens, et le dire sous le champ vaut mieux
+   * que de laisser Zod le refuser plus tard. Un réglage existe cependant pour
+   * lequel le vide **est** la valeur voulue — le libellé de la bulle, où il
+   * signifie « pas de libellé ». Sans cette échappatoire, il n'y aurait aucun
+   * moyen d'éteindre l'annonce depuis le panneau.
+   */
+  readonly allowEmpty?: boolean;
 }
 
 /** Ce qu'un champ peut rendre : une chaîne, ou l'état d'une case à cocher. */
@@ -246,7 +258,7 @@ function convert(descriptor: FieldDescriptor, raw: RawValue): Converted {
         : { ok: false, message: 'Valeur hors des choix proposés.' };
 
     case 'text':
-      return text === ''
+      return text === '' && descriptor.allowEmpty !== true
         ? { ok: false, message: 'Ce champ ne peut pas rester vide.' }
         : { ok: true, value: text };
   }

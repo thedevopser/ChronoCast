@@ -22,13 +22,13 @@
  */
 export interface HistoryEntry {
   readonly id: string;
-  readonly type: 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow';
+  readonly type: 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow' | 'command';
   readonly occurredAt: number;
   readonly recordedAt: number;
   readonly userId: string;
   /** Non assaini : `safe-dom` s'en charge à l'écriture. */
   readonly userName: string;
-  readonly source: 'eventsub' | 'chat-notification' | 'manual';
+  readonly source: 'eventsub' | 'chat-notification' | 'manual' | 'chat-command';
   /** Palier, nombre de bits, de spectateurs ou de dons, selon le type. */
   readonly detail: string | number | null;
   readonly rewardSeconds: number;
@@ -130,5 +130,10 @@ export function formatDetail(entry: HistoryEntry): string {
       return `${String(entry.detail)} spectateurs`;
     case 'follow':
       return String(entry.detail);
+    case 'command':
+      // Le nom, préfixé, tel que le modérateur l'a tapé. Les secondes sont
+      // déjà dans la colonne de la récompense : les répéter ici laisserait
+      // croire à deux grandeurs différentes le jour où le plafond en écrête une.
+      return `!${String(entry.detail)}`;
   }
 }

@@ -83,6 +83,7 @@ function start(): void {
   const root = document.documentElement;
   const countdownElement = requireElement(document, '#countdown');
   const toastElement = requireElement(document, '#toast');
+  const toastLabelElement = requireElement(document, '#toast-label');
   const toastUserElement = requireElement(document, '#toast-user');
   const toastRewardElement = requireElement(document, '#toast-reward');
 
@@ -158,13 +159,19 @@ function start(): void {
         // Un événement non crédité — plafond atteint, barème à zéro — n'a rien
         // à annoncer : la bulle promettrait un gain qui n'a pas eu lieu.
         if (message.applied && (overlayConfig?.toast.enabled ?? false)) {
+          const toast = {
+            id: message.event.id,
+            userName: message.event.userName,
+            rewardSeconds: message.rewardSeconds,
+            type: message.event.type,
+          };
+
           toasts.push(
-            {
-              id: message.event.id,
-              userName: message.event.userName,
-              rewardSeconds: message.rewardSeconds,
-              type: message.event.type,
-            },
+            // La clé est **omise** et non posée à `undefined` : le projet
+            // compile en `exactOptionalPropertyTypes`, où les deux diffèrent.
+            // Le libellé est absent de tout ce qui n'est pas une commande de
+            // chat, et d'une commande dont le libellé a été vidé au panneau.
+            message.label === undefined ? toast : { ...toast, label: message.label },
             performance.now(),
             overlayConfig?.toast.durationMs ?? 4_000,
           );
@@ -209,6 +216,12 @@ function start(): void {
         renderedToastId = null;
       }
     } else if (toast.id !== renderedToastId) {
+      // Le libellé est masqué plutôt que vidé : un élément vide mais présent
+      // conserverait la gouttière du `gap`, et la bulle paraîtrait décalée.
+      const label = toast.label ?? '';
+      setText(toastLabelElement, label);
+      toastLabelElement.hidden = label === '';
+
       setText(toastUserElement, toast.userName);
       setText(toastRewardElement, formatReward(toast.rewardSeconds));
       toastElement.hidden = false;

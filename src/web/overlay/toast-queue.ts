@@ -27,6 +27,16 @@ export interface Toast {
   readonly userName: string;
   readonly rewardSeconds: number;
   readonly type: DomainEventType;
+
+  /**
+   * Libellé affiché au-dessus du pseudo, ou absent.
+   *
+   * La file ne l'interprète pas : elle le porte. Renseigné pour les seules
+   * commandes de chat, il vient de la configuration locale et non du réseau —
+   * ce qui ne dispense de rien : l'overlay l'écrit par `setText` comme tout le
+   * reste.
+   */
+  readonly label?: string;
 }
 
 export interface ToastQueueOptions {

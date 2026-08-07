@@ -198,8 +198,61 @@ const followRewardSchema = z
   })
   .strip();
 
+/**
+ * Commande de chat créditant du temps.
+ *
+ * **Seul endroit du produit où une valeur métier est tapée par un tiers** et
+ * non lue ici : `!addtime 300` porte ses propres secondes. C'est le prix du
+ * besoin — un modérateur doit pouvoir créditer une durée qu'aucun barème ne
+ * pouvait prévoir, sans lâcher la manette pour ouvrir le panneau.
+ *
+ * Ce que le schéma garde, et qui redevient le juge, c'est le **plafond**. Le
+ * reste du barème plafonne par catégorie pour la même raison : aucune règle ne
+ * doit pouvoir enfermer le streamer dans un engagement qu'il n'a pas choisi.
+ */
+const chatCommandSchema = z
+  .object({
+    /**
+     * Nom de la commande, sans le préfixe `!`, qui n'est pas réglable.
+     *
+     * Alphanumérique strict : un nom porteur d'espace ou de ponctuation ne
+     * serait jamais reconnu par l'analyseur, et le refuser ici est le seul
+     * endroit où on peut encore l'expliquer.
+     *
+     * Réglable parce que le mot tapé en direct appartient au streamer, et
+     * qu'il peut déjà être pris par un autre outil branché sur la même
+     * chaîne : le figer dans le code imposerait une release pour le changer.
+     */
+    name: z
+      .string()
+      .regex(/^[a-zA-Z0-9]{1,20}$/, {
+        message: 'nom alphanumérique de 1 à 20 caractères attendu, par exemple addtime',
+      })
+      .default('addtime'),
+
+    /**
+     * Plafond d'une commande.
+     *
+     * Même rôle que le `maxPerEvent` des gifts et des bits. Au-delà, la
+     * commande est **refusée** et non écrêtée : une valeur hors bornes est une
+     * faute de frappe bien plus souvent qu'une intention, et créditer une heure
+     * à qui en voulait dix obligerait à corriger le compteur à la main.
+     */
+    maxSeconds: positiveSeconds.default(3_600),
+
+    /**
+     * Libellé affiché au-dessus de la bulle, sur l'overlay.
+     *
+     * Vide vaut « pas de libellé ». Borné parce qu'il traverse jusqu'à la
+     * scène OBS, où personne ne peut le corriger en direct.
+     */
+    overlayText: z.string().max(40).default('Temps ajouté'),
+  })
+  .strip();
+
 const rewardsSchema = z
   .object({
+    chatCommand: chatCommandSchema.default({}),
     sub: tieredRewardSchema.default({}),
     resub: tieredRewardSchema.default({}),
     gift: giftRewardSchema.default({}),
@@ -234,6 +287,20 @@ const twitchSchema = z
     /** Souscriptions optionnelles, alignées sur le barème. */
     enableRaid: z.boolean().default(false),
     enableFollow: z.boolean().default(false),
+
+    /**
+     * Active `channel.chat.message`, donc la lecture du chat et la commande
+     * `!addtime`. Exige les mêmes portées que `enableChatNotifications`.
+     *
+     * **Interrupteur unique de la fonction**, et non un premier réglage doublé
+     * d'un second côté barème : sans la souscription, aucun message n'arrive,
+     * si bien qu'un `rewards.chatCommand.enabled` ne pourrait rien éteindre que
+     * celui-ci n'éteigne déjà. Un réglage inerte est pire qu'un réglage absent.
+     *
+     * Éteint par défaut, comme raid et follow : lire tout le chat d'une chaîne
+     * ne s'active pas dans le dos de qui met simplement à jour.
+     */
+    enableChatCommands: z.boolean().default(false),
 
     /**
      * Point d'entrée EventSub.
