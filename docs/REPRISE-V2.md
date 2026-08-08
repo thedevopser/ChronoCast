@@ -102,10 +102,11 @@ L'updater maison tient en quatre modules purs et un port. Toute la décision se 
 
 ## 5. État du dépôt
 
-**Branche courante : `feat/a-propos-et-soutien`**, qui porte le chantier 4 et cette mise à jour. La PR #26 est fusionnée en squash dans `main`.
+**Branche courante : `main`.** La PR #27 — chantier 4 — est fusionnée en squash, la branche `feat/a-propos-et-soutien` est supprimée. Rien n'est en cours.
 
 ```
-aa944f2 feat(store): distribuer ChronoCast par le Microsoft Store (#26)   <- main
+4d1dde7 feat(about): créditer l'auteur et ouvrir un lien de soutien (#27)   <- main, 0.9.0
+aa944f2 feat(store): distribuer ChronoCast par le Microsoft Store (#26)
 19c4654 chore: passer en 0.6.0 (#25)
 9cc12e9 Commande de chat `!addtime` — créditer du temps depuis le direct (#24)
 a75e0a8 Mise à jour automatique — ChronoCast 0.5.0 (#23)              <- v0.5.0
