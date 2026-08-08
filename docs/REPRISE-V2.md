@@ -6,7 +6,7 @@ Ce document permet de reprendre le développement depuis une fenêtre de context
 
 **Rappel du chantier 3**, livré le même jour : ChronoCast passe au **Microsoft Store**, seul canal de distribution — plus aucune release GitHub, plus aucun `.exe` publié. **Le chantier 1 — la mise à jour automatique — est retiré**, le Store s'en chargeant.
 
-**Éprouvé sur poste Windows le 8 août 2026**, par chargement latéral d'un paquet signé pour l'essai : le chiffrement DPAPI des secrets et le rappel OAuth sur `localhost:37771` fonctionnent dans le conteneur MSIX. **La reprise des données et la tâche de démarrage restent à vérifier** — voir la section 7.
+**Éprouvé sur poste Windows le 8 août 2026**, par chargement latéral d'un paquet signé pour l'essai : le chiffrement DPAPI des secrets et le rappel OAuth sur `localhost:37771` fonctionnent dans le conteneur MSIX, et les liens sortants du chantier 4 partent bien au navigateur système. **La reprise des données et la tâche de démarrage restent à vérifier** — voir la section 7.
 
 **La V1 est terminée et publiée.** Son document de reprise, [REPRISE.md](REPRISE.md), est **clos** : il reste l'archive complète des huit phases, de la release `v0.4.0` et de tout ce qui a été décidé en chemin. On y va pour comprendre pourquoi une chose est construite comme elle l'est — les trois pièges du protocole EventSub, les quatre tentatives du cadre de l'overlay, la leçon de la Phase 7. Rien de tout cela n'est répété ici.
 
@@ -83,7 +83,7 @@ Ces décisions ont été validées par l'utilisateur. **Ne pas les rouvrir.** Le
 | Nom affiché | **`TheDevOpser`**, le pseudo seul | Le nom civil n'a rien à faire dans un binaire distribué publiquement, ni dans les captures d'écran du panneau |
 | Plateforme de dons | **PayPal.me**, lien unique | Choix de l'auteur. L'URL est définie au seul endroit `DONATION_URL` dans [about.ts](../src/core/app/about.ts) |
 | Ce qu'un don déverrouille | **Rien.** Aucune fonctionnalité conditionnée, aucun compteur de clics, aucune télémétrie | C'est ce qui garde la promesse « gratuit et local » intacte, et c'est aussi la posture la moins risquée face à la certification du Store |
-| Politique du Store | **Non tranchée, à revérifier avant chaque soumission** | Les politiques encadrent les liens de paiement sortants et changent sans prévenir. Voir [STORE-SUBMISSION.md](STORE-SUBMISSION.md) |
+| Politique du Store | **Contrainte externe, pas une décision à prendre.** Le contrôle se refait à chaque soumission, depuis [STORE-SUBMISSION.md](STORE-SUBMISSION.md) | Les politiques encadrent les liens de paiement sortants et changent sans prévenir. Rien dans le dépôt ne peut clore la question une bonne fois |
 | Liste blanche de navigation | **Dérivée des constantes**, jamais recopiée | Un lien mis à jour sans la liste blanche serait bloqué en silence par `decideNavigation`, sans aucun message |
 | Crédit dans l'overlay | **Aucun** | L'overlay est en direct devant les spectateurs : un crédit permanent y serait retiré par le streamer dès le premier jour |
 
@@ -102,10 +102,11 @@ L'updater maison tient en quatre modules purs et un port. Toute la décision se 
 
 ## 5. État du dépôt
 
-**Branche courante : `feat/a-propos-et-soutien`**, qui porte le chantier 4 et cette mise à jour. La PR #26 est fusionnée en squash dans `main`.
+**Branche courante : `main`.** La PR #27 — chantier 4 — est fusionnée en squash, la branche `feat/a-propos-et-soutien` est supprimée. Rien n'est en cours.
 
 ```
-aa944f2 feat(store): distribuer ChronoCast par le Microsoft Store (#26)   <- main
+4d1dde7 feat(about): créditer l'auteur et ouvrir un lien de soutien (#27)   <- main, 0.9.0
+aa944f2 feat(store): distribuer ChronoCast par le Microsoft Store (#26)
 19c4654 chore: passer en 0.6.0 (#25)
 9cc12e9 Commande de chat `!addtime` — créditer du temps depuis le direct (#24)
 a75e0a8 Mise à jour automatique — ChronoCast 0.5.0 (#23)              <- v0.5.0
@@ -278,7 +279,7 @@ Rien de ce chantier n'est éprouvé sur Windows, et il touche précisément ce q
 1. **La lecture de `%APPDATA%\ChronoCast` depuis un paquet MSIX.** La documentation dit que les lectures d'AppData tombent sur le vrai répertoire quand le conteneur n'a rien écrit. Le choix de `%USERPROFILE%` contourne la question **en écriture**, mais la reprise, elle, doit bien **lire** l'ancien emplacement. Si cela ne fonctionne pas, le repli est de lire le chemin non redirigé explicitement.
 2. **La tâche de démarrage.** Elle n'existe qu'une fois le paquet installé, et rien avant ne dit qu'elle apparaîtra dans les paramètres.
 
-### Chantier 4 — Paternité, licence et soutien — **livré, un point de vérification ouvert**
+### Chantier 4 — Paternité, licence et soutien — **livré et éprouvé**
 
 ChronoCast ne disait nulle part qui l'avait écrit, et `package.json` annonçait une licence MIT dont le texte n'existait pas. Le chantier ajoute une vue « À propos » au panneau, un remerciement en fin d'assistant, un lien de soutien PayPal, et le fichier [LICENSE](../LICENSE).
 
@@ -294,9 +295,9 @@ ChronoCast ne disait nulle part qui l'avait écrit, et `package.json` annonçait
 2. **La version n'est pas répétée dans la carte « À propos ».** L'afficher aurait demandé une ligne dans [src/web/admin/main.ts](../src/web/admin/main.ts) — le seul module admin qu'aucun test n'importe, volontairement gardé sans décision. La barre latérale l'affiche déjà en permanence, à l'écran en même temps que la vue.
 3. **Aucun crédit dans l'overlay.** Il est en direct devant les spectateurs.
 
-**Le point ouvert : la politique du Microsoft Store.** Les politiques de certification encadrent les mécanismes de paiement et les liens sortants, et elles changent sans prévenir. **Aucun numéro de politique n'est cité nulle part dans le dépôt, volontairement.** À revérifier avant chaque soumission — voir [STORE-SUBMISSION.md](STORE-SUBMISSION.md), qui décrit aussi le repli : `DONATION_URL` étant à un seul endroit, retirer le lien des pages est mécanique.
+**Une contrainte externe, et non un point ouvert : la politique du Microsoft Store.** Les politiques de certification encadrent les mécanismes de paiement et les liens sortants, et elles changent sans prévenir. Il n'y a rien à y faire depuis le dépôt : c'est un contrôle qui se refait **à chaque soumission**, et il vit donc dans [STORE-SUBMISSION.md](STORE-SUBMISSION.md), qui est le document ouvert à ce moment-là. **Aucun numéro de politique n'est cité nulle part dans le dépôt, volontairement.** Le repli y est décrit aussi : `DONATION_URL` étant à un seul endroit, retirer le lien des pages est mécanique.
 
-**Reste à faire sur poste Windows :** vérifier qu'un clic sur le lien de soutien ouvre bien le navigateur système **sans rien charger dans la fenêtre de l'application**. C'est le seul comportement du chantier que ni Vitest ni le conteneur ne peuvent constater, puisqu'il traverse `shell.openExternal`.
+**Éprouvé sur poste Windows le 8 août 2026.** Le clic sur le lien de soutien ouvre bien le navigateur système sans rien charger dans la fenêtre de l'application — le seul comportement du chantier que ni Vitest ni le conteneur ne peuvent constater, puisqu'il traverse `shell.openExternal`. **Le chantier 4 est clos : il n'en reste rien à faire.**
 
 ### Chantiers suivants
 
@@ -315,7 +316,7 @@ Restent hors de portée de la suite :
 - **la lecture de `%APPDATA%\ChronoCast` à travers la virtualisation MSIX**, dont dépend toute la reprise des données ;
 - **la tâche `windows.startupTask`**, qui n'existe qu'une fois le paquet installé ;
 - le paquet lui-même : installation, raccourcis, **désinstallation puis réinstallation** ;
-- **`shell.openExternal`**, donc le fait qu'un clic sur le lien du dépôt ou celui du soutien ouvre le navigateur système **sans rien charger dans la fenêtre**. `decideNavigation` est intégralement vérifiée en conteneur, mais ce qu'Electron fait de sa réponse ne l'est pas.
+- **`shell.openExternal`**, donc le fait qu'un clic sur le lien du dépôt ou celui du soutien ouvre le navigateur système **sans rien charger dans la fenêtre**. `decideNavigation` est intégralement vérifiée en conteneur, mais ce qu'Electron fait de sa réponse ne l'est pas. *Éprouvé sur poste le 8 août 2026 — ce qui ne le fait pas rentrer dans la portée de la suite : toute modification de la politique de navigation le remet à vérifier à la main.*
 
 ### Comment éprouver tout cela sans publier
 
