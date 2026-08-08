@@ -83,7 +83,7 @@ Ces décisions ont été validées par l'utilisateur. **Ne pas les rouvrir.** Le
 | Nom affiché | **`TheDevOpser`**, le pseudo seul | Le nom civil n'a rien à faire dans un binaire distribué publiquement, ni dans les captures d'écran du panneau |
 | Plateforme de dons | **PayPal.me**, lien unique | Choix de l'auteur. L'URL est définie au seul endroit `DONATION_URL` dans [about.ts](../src/core/app/about.ts) |
 | Ce qu'un don déverrouille | **Rien.** Aucune fonctionnalité conditionnée, aucun compteur de clics, aucune télémétrie | C'est ce qui garde la promesse « gratuit et local » intacte, et c'est aussi la posture la moins risquée face à la certification du Store |
-| Politique du Store | **Non tranchée, à revérifier avant chaque soumission** | Les politiques encadrent les liens de paiement sortants et changent sans prévenir. Voir [STORE-SUBMISSION.md](STORE-SUBMISSION.md) |
+| Politique du Store | **Contrainte externe, pas une décision à prendre.** Le contrôle se refait à chaque soumission, depuis [STORE-SUBMISSION.md](STORE-SUBMISSION.md) | Les politiques encadrent les liens de paiement sortants et changent sans prévenir. Rien dans le dépôt ne peut clore la question une bonne fois |
 | Liste blanche de navigation | **Dérivée des constantes**, jamais recopiée | Un lien mis à jour sans la liste blanche serait bloqué en silence par `decideNavigation`, sans aucun message |
 | Crédit dans l'overlay | **Aucun** | L'overlay est en direct devant les spectateurs : un crédit permanent y serait retiré par le streamer dès le premier jour |
 
@@ -295,9 +295,9 @@ ChronoCast ne disait nulle part qui l'avait écrit, et `package.json` annonçait
 2. **La version n'est pas répétée dans la carte « À propos ».** L'afficher aurait demandé une ligne dans [src/web/admin/main.ts](../src/web/admin/main.ts) — le seul module admin qu'aucun test n'importe, volontairement gardé sans décision. La barre latérale l'affiche déjà en permanence, à l'écran en même temps que la vue.
 3. **Aucun crédit dans l'overlay.** Il est en direct devant les spectateurs.
 
-**Le point ouvert : la politique du Microsoft Store.** Les politiques de certification encadrent les mécanismes de paiement et les liens sortants, et elles changent sans prévenir. **Aucun numéro de politique n'est cité nulle part dans le dépôt, volontairement.** À revérifier avant chaque soumission — voir [STORE-SUBMISSION.md](STORE-SUBMISSION.md), qui décrit aussi le repli : `DONATION_URL` étant à un seul endroit, retirer le lien des pages est mécanique.
+**Une contrainte externe, et non un point ouvert : la politique du Microsoft Store.** Les politiques de certification encadrent les mécanismes de paiement et les liens sortants, et elles changent sans prévenir. Il n'y a rien à y faire depuis le dépôt : c'est un contrôle qui se refait **à chaque soumission**, et il vit donc dans [STORE-SUBMISSION.md](STORE-SUBMISSION.md), qui est le document ouvert à ce moment-là. **Aucun numéro de politique n'est cité nulle part dans le dépôt, volontairement.** Le repli y est décrit aussi : `DONATION_URL` étant à un seul endroit, retirer le lien des pages est mécanique.
 
-**Éprouvé sur poste Windows le 8 août 2026.** Le clic sur le lien de soutien ouvre bien le navigateur système sans rien charger dans la fenêtre de l'application — le seul comportement du chantier que ni Vitest ni le conteneur ne peuvent constater, puisqu'il traverse `shell.openExternal`. **Il n'y a plus rien d'ouvert sur ce chantier**, hormis la politique du Store, qui ne dépend pas de nous.
+**Éprouvé sur poste Windows le 8 août 2026.** Le clic sur le lien de soutien ouvre bien le navigateur système sans rien charger dans la fenêtre de l'application — le seul comportement du chantier que ni Vitest ni le conteneur ne peuvent constater, puisqu'il traverse `shell.openExternal`. **Le chantier 4 est clos : il n'en reste rien à faire.**
 
 ### Chantiers suivants
 
