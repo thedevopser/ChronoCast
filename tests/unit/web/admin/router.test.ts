@@ -4,6 +4,7 @@ import {
   ADMIN_VIEWS,
   DEFAULT_VIEW,
   hashForView,
+  VIEW_LABELS,
   viewFromHash,
 } from '../../../../src/web/admin/router.js';
 
@@ -62,5 +63,26 @@ describe('ADMIN_VIEWS', () => {
     for (const view of ADMIN_VIEWS) {
       expect(view).toMatch(/^[a-z][a-z0-9-]*$/);
     }
+  });
+
+  it('expose la vue « À propos »', () => {
+    expect(ADMIN_VIEWS).toContain('about');
+    expect(viewFromHash('#about')).toBe('about');
+  });
+
+  it('place « À propos » en dernier, sous les vues de travail', () => {
+    expect(ADMIN_VIEWS.at(-1)).toBe('about');
+  });
+});
+
+describe('VIEW_LABELS', () => {
+  it('nomme chaque vue', () => {
+    for (const view of ADMIN_VIEWS) {
+      expect(VIEW_LABELS[view]).not.toBe('');
+    }
+  });
+
+  it('nomme la vue « À propos »', () => {
+    expect(VIEW_LABELS.about).toBe('À propos');
   });
 });

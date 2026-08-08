@@ -86,6 +86,8 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Politique de navigation en liste blanche.** L'origine locale est la seule autorisée *dans* la fenêtre. Les pages Twitch sont renvoyées au **navigateur système** — le flux OAuth y passe, la fenêtre n'a aucune raison d'afficher une page Twitch. Tout le reste est bloqué. La comparaison d'hôte est exacte : `id.twitch.tv.evil.com` se termine par `twitch.tv` sans rien avoir de commun avec Twitch, et `https://id.twitch.tv@evil.com` pointe vers `evil.example`.
 
+Depuis la `0.9.0`, la liste admet également `github.com` et `paypal.me`, pour le lien vers le code source et celui de soutien. Ces deux hôtes sont **renvoyés au navigateur système au même titre que Twitch** : la fenêtre ne les affiche jamais. Ils sont dérivés des constantes de [about.ts](../src/core/app/about.ts) et **jamais d'une valeur de configuration** — une liste blanche réglable transformerait un réglage en choix de destination.
+
 **Les outils de développement sont fermés dans une application packagée.** Ils donneraient accès au panneau et à tout ce qu'il peut faire.
 
 ## 7. La chaîne d'approvisionnement
@@ -131,7 +133,7 @@ Le panneau n'a plus qu'un bouton qui y mène. **Aucune adresse ne traverse cette
 ## 9. Ce que ChronoCast ne fait pas
 
 - **Aucune télémétrie**, aucune statistique d'usage, aucun rapport de crash envoyé.
-- **Aucune connexion sortante** en dehors de Twitch : `id.twitch.tv`, `api.twitch.tv`, `eventsub.wss.twitch.tv`. Et rien d'autre.
+- **Aucune connexion sortante** en dehors de Twitch : `id.twitch.tv`, `api.twitch.tv`, `eventsub.wss.twitch.tv`. Et rien d'autre. Les liens vers le dépôt et vers la page de soutien n'y changent rien : cliquer ouvre **votre navigateur**, l'application n'émet aucune requête vers ces hôtes et ne sait pas si vous avez cliqué.
 - **Aucun webhook**, donc aucun nom de domaine ni port ouvert sur Internet.
 - **Aucun téléchargement, aucun lancement de processus.** Les mises à jour viennent du Store.
 
@@ -145,7 +147,7 @@ Le panneau n'a plus qu'un bouton qui y mène. **Aucune adresse ne traverse cette
 | `static-handler.test.ts` | La traversée de chemin et les liens sortants sont bloqués |
 | `headers.test.ts` | La CSP et les en-têtes sont ceux attendus |
 | `api-hardening.test.ts` | Un import de configuration malveillant est refusé, les secrets n'apparaissent nulle part |
-| `navigation-policy.test.ts` | Seules l'origine locale et Twitch sont admises, et Twitch au navigateur |
+| `navigation-policy.test.ts` | Seuls l'origine locale, Twitch, le dépôt et la page de soutien sont admis — et tout ce qui n'est pas local part au navigateur |
 | `browser-opener.test.ts` | Seul `https:` est ouvert à l'extérieur |
 
 Ces tests emploient de vraies charges hostiles, et ils tournent dans un vrai parseur HTML : un faux `document` prouverait qu'on a appelé `textContent`, pas qu'aucun script n'a été exécuté.

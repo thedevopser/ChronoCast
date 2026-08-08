@@ -171,6 +171,20 @@ describe('cohérence de la version', () => {
     expect(APP_VERSION).toBe(manifest.version);
   });
 
+  // Le verrou porte la version à deux endroits, et `npm ci` refuse un verrou désaccordé du
+  // manifeste. Le bump de la 0.8.0 l'avait oublié sans que rien ne le signale : ce test est
+  // là pour que l'oubli suivant soit visible en conteneur.
+  it('annonce la même version dans le verrou de dépendances', async () => {
+    const manifest = JSON.parse(await read('package.json')) as { readonly version: string };
+    const lock = JSON.parse(await read('package-lock.json')) as {
+      readonly version: string;
+      readonly packages: Readonly<Record<string, { readonly version?: string }>>;
+    };
+
+    expect(lock.version).toBe(manifest.version);
+    expect(lock.packages['']?.version).toBe(manifest.version);
+  });
+
   it('emploie une version sémantique', async () => {
     const manifest = JSON.parse(await read('package.json')) as { readonly version: string };
 

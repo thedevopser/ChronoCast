@@ -2,7 +2,9 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il est **vivant** : il est mis à jour à chaque lot, et il fait foi.
 
-**Dernière mise à jour :** 8 août 2026, chantier 3 livré. ChronoCast passe au **Microsoft Store**, seul canal de distribution : plus aucune release GitHub, plus aucun `.exe` publié. **Le chantier 1 — la mise à jour automatique — est retiré**, le Store s'en chargeant. La version passe à **`0.8.0`**.
+**Dernière mise à jour :** 8 août 2026, chantier 4 livré. ChronoCast **crédite enfin son auteur** : vue « À propos » dans le panneau, remerciement en fin d'assistant, lien de soutien, et le fichier `LICENSE` qui manquait depuis l'origine. La version passe à **`0.9.0`**.
+
+**Rappel du chantier 3**, livré le même jour : ChronoCast passe au **Microsoft Store**, seul canal de distribution — plus aucune release GitHub, plus aucun `.exe` publié. **Le chantier 1 — la mise à jour automatique — est retiré**, le Store s'en chargeant.
 
 **Éprouvé sur poste Windows le 8 août 2026**, par chargement latéral d'un paquet signé pour l'essai : le chiffrement DPAPI des secrets et le rappel OAuth sur `localhost:37771` fonctionnent dans le conteneur MSIX. **La reprise des données et la tâche de démarrage restent à vérifier** — voir la section 7.
 
@@ -77,6 +79,13 @@ Ces décisions ont été validées par l'utilisateur. **Ne pas les rouvrir.** Le
 | Reprise des données | **Écrite et testée**, décidée sur la présence de `config.json`, copié en dernier | Sans elle, chaque utilisateur déjà installé perdrait compteur, configuration et jetons |
 | Lancement au démarrage | **Retiré du schéma.** Extension `windows.startupTask` du manifeste, état détenu par Windows | `setLoginItemSettings` écrit dans un registre virtualisé : la case aurait coché sans que rien ne démarre, **et rien ne l'aurait dit** |
 | Soumission au Store | **Manuelle depuis Partner Center.** La CI produit l'artefact | Automatiser demanderait trois secrets Azure AD dans le dépôt : qui en dispose publie sous l'identité du projet |
+| **Paternité et soutien** | Une vue « À propos » dans le panneau et un remerciement en fin d'assistant | L'application est installée depuis le Store par des streamers qui ne verront jamais le dépôt. Le panneau est le seul endroit où ils passent |
+| Nom affiché | **`TheDevOpser`**, le pseudo seul | Le nom civil n'a rien à faire dans un binaire distribué publiquement, ni dans les captures d'écran du panneau |
+| Plateforme de dons | **PayPal.me**, lien unique | Choix de l'auteur. L'URL est définie au seul endroit `DONATION_URL` dans [about.ts](../src/core/app/about.ts) |
+| Ce qu'un don déverrouille | **Rien.** Aucune fonctionnalité conditionnée, aucun compteur de clics, aucune télémétrie | C'est ce qui garde la promesse « gratuit et local » intacte, et c'est aussi la posture la moins risquée face à la certification du Store |
+| Politique du Store | **Non tranchée, à revérifier avant chaque soumission** | Les politiques encadrent les liens de paiement sortants et changent sans prévenir. Voir [STORE-SUBMISSION.md](STORE-SUBMISSION.md) |
+| Liste blanche de navigation | **Dérivée des constantes**, jamais recopiée | Un lien mis à jour sans la liste blanche serait bloqué en silence par `decideNavigation`, sans aucun message |
+| Crédit dans l'overlay | **Aucun** | L'overlay est en direct devant les spectateurs : un crédit permanent y serait retiré par le streamer dès le premier jour |
 
 ### Pourquoi pas `electron-updater`
 
@@ -93,19 +102,21 @@ L'updater maison tient en quatre modules purs et un port. Toute la décision se 
 
 ## 5. État du dépôt
 
-**Branche courante : `chore/version-0.6.0`**, qui porte le passage de version et cette mise à jour. La PR #24 est fusionnée en squash dans `main`.
+**Branche courante : `feat/a-propos-et-soutien`**, qui porte le chantier 4 et cette mise à jour. La PR #26 est fusionnée en squash dans `main`.
 
 ```
-9cc12e9 Commande de chat `!addtime` — créditer du temps depuis le direct (#24)   <- main
+aa944f2 feat(store): distribuer ChronoCast par le Microsoft Store (#26)   <- main
+19c4654 chore: passer en 0.6.0 (#25)
+9cc12e9 Commande de chat `!addtime` — créditer du temps depuis le direct (#24)
 a75e0a8 Mise à jour automatique — ChronoCast 0.5.0 (#23)              <- v0.5.0
 67d0efb docs: illustrer le README de trois captures du panneau (#22)  <- v0.4.0
 ```
 
-**1 737 tests, 82 fichiers.** Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur. (1 527 à la fin de la V1, plus les **140** du chantier 1 et les **70** du premier lot du chantier 2.)
+**1 673 tests, 79 fichiers.** Lint, les trois typechecks et `npm audit --audit-level=high` sans erreur. Le compte a baissé face aux 1 737 annoncés plus haut dans l'historique de ce document : le chantier 3 a **retiré** l'updater maison et ses tests avec lui.
 
 **`npm audit` reste à zéro et aucune dépendance n'a été ajoutée** — c'est l'un des arguments de la conception, et il se vérifie mécaniquement.
 
-**La version est en `0.6.0`**, à deux endroits qui doivent rester alignés : [package.json](../package.json) et `APP_VERSION` dans [src/core/app/version.ts](../src/core/app/version.ts). Un test de cohérence les tient ensemble.
+**La version est en `0.9.0`**, à **trois** endroits qui doivent rester alignés : [package.json](../package.json), [package-lock.json](../package-lock.json) — qui la porte deux fois — et `APP_VERSION` dans [src/core/app/version.ts](../src/core/app/version.ts). Un test de cohérence les tient ensemble. Le verrou n'était **pas** surveillé jusqu'au chantier 4, et le bump de la `0.8.0` l'avait laissé en `0.7.0` sans que rien ne le signale : `./scripts/dc.sh npm version <x.y.z> --no-git-tag-version` met le manifeste et le verrou à jour d'un geste, `version.ts` restant à faire à la main.
 
 **Aucune modification en attente.** `git status` ne doit rien signaler : `dist/`, `release/` et `PR-*.md` sont ignorés.
 
@@ -267,6 +278,26 @@ Rien de ce chantier n'est éprouvé sur Windows, et il touche précisément ce q
 1. **La lecture de `%APPDATA%\ChronoCast` depuis un paquet MSIX.** La documentation dit que les lectures d'AppData tombent sur le vrai répertoire quand le conteneur n'a rien écrit. Le choix de `%USERPROFILE%` contourne la question **en écriture**, mais la reprise, elle, doit bien **lire** l'ancien emplacement. Si cela ne fonctionne pas, le repli est de lire le chemin non redirigé explicitement.
 2. **La tâche de démarrage.** Elle n'existe qu'une fois le paquet installé, et rien avant ne dit qu'elle apparaîtra dans les paramètres.
 
+### Chantier 4 — Paternité, licence et soutien — **livré, un point de vérification ouvert**
+
+ChronoCast ne disait nulle part qui l'avait écrit, et `package.json` annonçait une licence MIT dont le texte n'existait pas. Le chantier ajoute une vue « À propos » au panneau, un remerciement en fin d'assistant, un lien de soutien PayPal, et le fichier [LICENSE](../LICENSE).
+
+**Ce qui est en place :**
+
+- [src/core/app/about.ts](../src/core/app/about.ts) — module pur, source unique de `AUTHOR`, `COPYRIGHT_YEAR`, `LICENSE_NAME`, `REPOSITORY_URL` et `DONATION_URL`.
+- [src/main/navigation-policy.ts](../src/main/navigation-policy.ts) — l'ensemble `SUPPORT_HOSTS` est **dérivé** de ces URL et non recopié. C'était le vrai obstacle du chantier : la liste blanche n'autorisait que quatre hôtes Twitch, et un lien vers un hôte absent est bloqué **en silence**, sans aucun message dans la fenêtre.
+- `tests/unit/assets/about.test.ts` — le garde-fou : il lie ce que les pages publient à ce que `decideNavigation` accepte, et exige `target="_blank" rel="noopener noreferrer"` sur tout lien sortant. Ajouter un lien sans toucher la liste blanche fait rougir la suite au lieu de produire un bouton mort.
+
+**Trois arbitrages à ne pas rouvrir :**
+
+1. **Les métadonnées ne transitent pas par le protocole WebSocket** comme `appVersion`. Elles sont figées à la compilation : les faire voyager aurait allongé `application.ts`, `ws-hub.ts`, `api.ts`, `protocol.ts` et `dashboard-model.ts` pour cinq constantes. Elles sont écrites dans le HTML, et le test de cohérence interdit la dérive.
+2. **La version n'est pas répétée dans la carte « À propos ».** L'afficher aurait demandé une ligne dans [src/web/admin/main.ts](../src/web/admin/main.ts) — le seul module admin qu'aucun test n'importe, volontairement gardé sans décision. La barre latérale l'affiche déjà en permanence, à l'écran en même temps que la vue.
+3. **Aucun crédit dans l'overlay.** Il est en direct devant les spectateurs.
+
+**Le point ouvert : la politique du Microsoft Store.** Les politiques de certification encadrent les mécanismes de paiement et les liens sortants, et elles changent sans prévenir. **Aucun numéro de politique n'est cité nulle part dans le dépôt, volontairement.** À revérifier avant chaque soumission — voir [STORE-SUBMISSION.md](STORE-SUBMISSION.md), qui décrit aussi le repli : `DONATION_URL` étant à un seul endroit, retirer le lien des pages est mécanique.
+
+**Reste à faire sur poste Windows :** vérifier qu'un clic sur le lien de soutien ouvre bien le navigateur système **sans rien charger dans la fenêtre de l'application**. C'est le seul comportement du chantier que ni Vitest ni le conteneur ne peuvent constater, puisqu'il traverse `shell.openExternal`.
+
 ### Chantiers suivants
 
 Aucun autre n'est décidé. Voir la section 9 pour ce qui a été évoqué sans être tranché.
@@ -283,7 +314,8 @@ Restent hors de portée de la suite :
 - DPAPI, donc le chiffrement réel des secrets ;
 - **la lecture de `%APPDATA%\ChronoCast` à travers la virtualisation MSIX**, dont dépend toute la reprise des données ;
 - **la tâche `windows.startupTask`**, qui n'existe qu'une fois le paquet installé ;
-- le paquet lui-même : installation, raccourcis, **désinstallation puis réinstallation**.
+- le paquet lui-même : installation, raccourcis, **désinstallation puis réinstallation** ;
+- **`shell.openExternal`**, donc le fait qu'un clic sur le lien du dépôt ou celui du soutien ouvre le navigateur système **sans rien charger dans la fenêtre**. `decideNavigation` est intégralement vérifiée en conteneur, mais ce qu'Electron fait de sa réponse ne l'est pas.
 
 ### Comment éprouver tout cela sans publier
 
@@ -303,6 +335,8 @@ Le modèle de la V1 tient intégralement : voir la section 8 de [REPRISE.md](REP
 ### La promesse « la seule communication sortante va vers Twitch » est rétablie
 
 Le chantier 1 l'avait retirée en ajoutant `api.github.com` et `objects.githubusercontent.com`. **Le chantier 3 la rend de nouveau vraie** : ces deux hôtes disparaissent avec l'updater, et le réglage qui permettait de les couper disparaît avec eux, n'ayant plus d'objet.
+
+**Le chantier 4 ne la reprend pas**, et il faut être précis sur la raison. Il ajoute `github.com` et `paypal.me` à la liste blanche de `decideNavigation`, mais **cette liste ne gouverne pas ce que l'application émet** : elle gouverne ce que la fenêtre a le droit de faire d'un clic. Ces deux hôtes ne sont jamais joints par un `fetch` de ChronoCast ; ils sont passés à `shell.openExternal`, c'est-à-dire au navigateur de l'utilisateur, hors du processus. La promesse porte sur les requêtes de l'application, et elle tient. Ce que le chantier élargit, c'est la surface de **navigation** — et le prix en est connu : deux hôtes de plus vers lesquels une injection dans une page du panneau pourrait tenter d'entraîner l'utilisateur. C'est pourquoi la liste reste dérivée de constantes et jamais d'une valeur de configuration.
 
 Disparaissent également, et ce sont les parties les plus délicates de l'ancien chantier : le téléchargement d'un exécutable par l'application, sa vérification par condensat, le contrôle d'URL qui empêchait une réponse d'API contrefaite d'envoyer le téléchargement ailleurs, et le lancement d'un processus détaché. **Le code qui n'existe plus n'a pas de faille.**
 

@@ -7,6 +7,7 @@ export const ADMIN_VIEWS = [
   'logs',
   'settings',
   'transfer',
+  'about',
 ] as const;
 
 export type AdminViewId = (typeof ADMIN_VIEWS)[number];
@@ -26,6 +27,7 @@ export const VIEW_LABELS: Readonly<Record<AdminViewId, string>> = {
   logs: 'Journaux',
   settings: 'Paramètres',
   transfer: 'Import / export',
+  about: 'À propos',
 };
 
 function isAdminView(value: string): value is AdminViewId {

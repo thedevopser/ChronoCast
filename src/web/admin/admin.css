@@ -135,6 +135,11 @@
   font-size: var(--cc-text-sm);
 }
 
+.about__line {
+  margin: 0;
+  font-size: var(--cc-text-sm);
+}
+
 .counter {
   margin: 0;
   font-family: var(--cc-font-mono);

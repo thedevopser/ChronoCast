@@ -108,6 +108,21 @@ ChronoCast n'est pas affilié à Twitch ni à Amazon.
 | Captures d'écran | Celles de [images/](images/) conviennent |
 | Contact de support | L'onglet Issues du dépôt |
 
+### Le lien de soutien — à vérifier avant chaque soumission
+
+Depuis la `0.9.0`, la vue « À propos » du panneau et la dernière étape de l'assistant proposent un lien vers une page PayPal. **Les politiques de certification du Store encadrent les mécanismes de paiement et les liens sortants : ce point est à revérifier dans les Microsoft Store Policies en vigueur avant chaque soumission.** Ce document ne cite volontairement aucun numéro de politique, qui changerait sans prévenir.
+
+Les précautions déjà prises, à rappeler à un relecteur qui interrogerait :
+
+- Le lien est présenté comme un **soutien facultatif au développement**, jamais comme un achat.
+- **Aucune fonctionnalité n'est conditionnée à un don.** Rien n'est déverrouillé, rien n'est réservé, et les pages le disent explicitement.
+- Le lien **ouvre le navigateur système** et non une vue intégrée : l'application ne traite aucun paiement et n'observe pas ce qui se passe ensuite.
+- La réponse « aucun achat » au questionnaire IARC reste exacte : il n'y a ni achat intégré, ni contenu payant.
+
+Si la certification refuse malgré tout, le repli est de retirer le lien des pages et de ne le laisser que dans le [README](../README.md) : `DONATION_URL` est défini au seul endroit [src/core/app/about.ts](../src/core/app/about.ts), et le test `tests/unit/assets/about.test.ts` signalera aussitôt les pages à corriger.
+
+---
+
 **Pour la première soumission, choisir une audience privée** restreinte à votre propre compte. Vous recevez alors le paquet réellement signé par Microsoft, installé depuis le Store, sans que personne d'autre ne le voie. C'est le seul moyen d'éprouver ce que recevront les utilisateurs. Voir la section 5 de [RELEASE.md](RELEASE.md) pour la liste d'essai.
 
 ---

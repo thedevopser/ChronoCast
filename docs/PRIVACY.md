@@ -51,6 +51,10 @@ Uniquement à **Twitch**, et uniquement quand vous avez connecté votre chaîne 
 
 **Et à personne d'autre.** ChronoCast ne contacte aucun serveur de l'auteur, aucun service d'analyse, aucun réseau de diffusion de contenu. Les mises à jour sont gérées par le Microsoft Store, pas par l'application.
 
+### Les liens vers l'extérieur
+
+Le panneau d'administration et l'assistant de configuration proposent des liens vers le dépôt du projet, la console développeur de Twitch et une page de soutien PayPal. **Ces liens n'engendrent aucune requête de la part de ChronoCast** : cliquer ouvre votre navigateur, et l'application ne sait ni si vous avez cliqué, ni ce que vous faites ensuite. Aucune fonctionnalité n'est réservée à qui donne, et aucun paiement n'est traité par l'application.
+
 ## 4. Ce que Twitch communique à ChronoCast
 
 Quand vous autorisez l'application, Twitch lui transmet, pour votre chaîne :

@@ -49,7 +49,7 @@ L'artefact contient alors le `.appx` signé **et** `ChronoCast-essai.cer`. Sur l
 
 ```powershell
 Import-Certificate -FilePath .\ChronoCast-essai.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-Add-AppxPackage -Path ".\ChronoCast 0.8.0.appx"
+Add-AppxPackage -Path ".\ChronoCast 0.9.0.appx"
 ```
 
 Le nom du paquet porte une espace : les guillemets ne sont pas optionnels. Pour désinstaller :

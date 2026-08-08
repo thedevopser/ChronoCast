@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { DONATION_URL, REPOSITORY_URL } from '../../src/core/app/about.js';
 import { decideNavigation } from '../../src/main/navigation-policy.js';
 
 const APP_ORIGIN = 'http://127.0.0.1:3777';
@@ -60,6 +61,46 @@ describe('decideNavigation', () => {
 
     it('refuse un port explicite sur Twitch', () => {
       expect(decide('https://id.twitch.tv:8443/oauth2/authorize')).toBe('block');
+    });
+  });
+
+  describe('dépôt et soutien, renvoyés au navigateur système', () => {
+    it('renvoie le dépôt du projet', () => {
+      expect(decide(REPOSITORY_URL)).toBe('external');
+    });
+
+    it('renvoie la page de soutien', () => {
+      expect(decide(DONATION_URL)).toBe('external');
+    });
+
+    it('refuse ces mêmes hôtes en clair', () => {
+      expect(decide('http://github.com/thedevopser/ChronoCast')).toBe('block');
+      expect(decide('http://paypal.me/Gothdroid')).toBe('block');
+    });
+
+    it('refuse un port explicite', () => {
+      expect(decide('https://paypal.me:8443/Gothdroid')).toBe('block');
+    });
+
+    // La liste blanche porte sur l'hôte seul : rien n'y restreint le chemin, donc le lien
+    // écrit dans les pages est le seul garant de la destination. C'est le test de cohérence
+    // du HTML, et non celui-ci, qui vérifie qu'aucun autre chemin n'est publié.
+    it('ne restreint pas le chemin sur un hôte autorisé', () => {
+      expect(decide('https://github.com/quelquun/autre-projet')).toBe('external');
+    });
+  });
+
+  describe('hôtes qui ressemblent au dépôt ou au soutien', () => {
+    const usurpations = [
+      ['https://paypal.me.evil.test/Gothdroid', 'suffixe : le vrai domaine est evil.test'],
+      ['https://github.com.evil.test/', 'suffixe sur le dépôt'],
+      ['https://www.paypal.me/Gothdroid', 'sous-domaine non listé'],
+      ['https://paypaI.me/Gothdroid', 'homographe : i majuscule au lieu de l'],
+      ['https://evil.test/paypal.me/Gothdroid', 'hôte hostile, chemin trompeur'],
+    ] as const;
+
+    it.each(usurpations)('refuse %s (%s)', (url) => {
+      expect(decide(url)).toBe('block');
     });
   });
 
