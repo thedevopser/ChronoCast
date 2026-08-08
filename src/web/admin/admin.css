@@ -1,24 +1,3 @@
-/*
- * Panneau d'administration.
- *
- * Aucune valeur littérale : tout vient des tokens de `theme.css`, qui reposent
- * eux-mêmes sur les primitives d'Open Props. Cette feuille ne connaît ni l'un
- * ni l'autre — elle ne nomme que des intentions.
- *
- * Les classes de composant reprennent celles de l'assistant (`.button`,
- * `.field`, `.banner`, `.note`, `.copyable`, `.actions`) : ce sont les mêmes
- * objets, et les diviser en deux vocabulaires ferait diverger deux pages du
- * même produit. Elles sont redéclarées plutôt que partagées faute d'une feuille
- * commune de composants — sujet à trancher si une troisième page apparaît.
- *
- * Direction artistique actée : sombre, dense, accent Twitch, aucune animation
- * superflue. C'est un outil qu'on garde ouvert six heures sur un second écran.
- */
-
-/* -------------------------------------------------------------------------- */
-/* Gabarit                                                                     */
-/* -------------------------------------------------------------------------- */
-
 .shell {
   display: grid;
   grid-template-columns: var(--cc-sidebar-width) 1fr;
@@ -32,7 +11,6 @@
   padding: var(--cc-space-4) var(--cc-space-3);
   background: var(--cc-surface);
   border-right: var(--cc-border-width) solid var(--cc-border);
-  /* Le panneau se parcourt en gardant la navigation sous les yeux. */
   position: sticky;
   top: 0;
   height: 100vh;
@@ -47,10 +25,6 @@
 }
 
 .sidebar__mark {
-  /*
-   * Dimensions posées ici comme dans l'attribut : la place est réservée avant
-   * même que l'image arrive, et la barre latérale ne sursaute pas au chargement.
-   */
   width: 32px;
   height: 32px;
   border-radius: var(--cc-radius);
@@ -69,13 +43,8 @@
 
 .content {
   padding: var(--cc-space-5) var(--cc-space-4);
-  /* Le panneau respire, mais une ligne de texte ne traverse pas un 34 pouces. */
   max-width: calc(var(--cc-measure) * 1.6);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Navigation                                                                  */
-/* -------------------------------------------------------------------------- */
 
 .nav {
   display: flex;
@@ -103,10 +72,6 @@
   font-weight: var(--cc-weight-medium);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Vues                                                                        */
-/* -------------------------------------------------------------------------- */
-
 .view[hidden] {
   display: none;
 }
@@ -126,10 +91,6 @@
   font-size: var(--cc-text-sm);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Cartes                                                                      */
-/* -------------------------------------------------------------------------- */
-
 .board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
@@ -145,7 +106,6 @@
 }
 
 .card--counter {
-  /* Le compteur est ce qu'on vient voir : il occupe la largeur disponible. */
   grid-column: 1 / -1;
 }
 
@@ -181,7 +141,6 @@
   font-size: var(--cc-text-counter);
   font-weight: var(--cc-weight-bold);
   line-height: 1.1;
-  /* Les chiffres ne dansent pas d'une seconde à l'autre. */
   font-variant-numeric: tabular-nums;
 }
 
@@ -190,10 +149,6 @@
   border: 0;
   border-top: var(--cc-border-width) solid var(--cc-border);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Pastilles et indicateurs                                                    */
-/* -------------------------------------------------------------------------- */
 
 .pill {
   display: inline-block;
@@ -239,10 +194,6 @@
   background: var(--cc-danger);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Liste d'événements                                                          */
-/* -------------------------------------------------------------------------- */
-
 .events {
   margin: 0;
   padding: 0;
@@ -275,7 +226,6 @@
 }
 
 .event__user {
-  /* Un pseudo peut être long : il se coupe, il ne pousse pas la colonne. */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -291,10 +241,6 @@
   color: var(--cc-text-faint);
   text-decoration: line-through;
 }
-
-/* -------------------------------------------------------------------------- */
-/* Champs                                                                      */
-/* -------------------------------------------------------------------------- */
 
 .row {
   display: flex;
@@ -337,10 +283,6 @@
 .field__input:focus {
   border-color: var(--cc-accent);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Boutons                                                                     */
-/* -------------------------------------------------------------------------- */
 
 .actions {
   display: flex;
@@ -393,10 +335,6 @@
   background: transparent;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Groupes de champs engendrés                                                 */
-/* -------------------------------------------------------------------------- */
-
 .fields {
   display: flex;
   flex-direction: column;
@@ -425,7 +363,6 @@
   align-items: start;
 }
 
-/* Une case à cocher tient sur une ligne : elle n'a pas besoin d'une colonne. */
 .field--switch {
   grid-column: 1 / -1;
   flex-direction: row;
@@ -451,15 +388,10 @@
   border-color: var(--cc-danger);
 }
 
-/* Un sélecteur de couleur natif reste minuscule sans hauteur explicite. */
 .field__input[type="color"] {
   height: 2.4rem;
   padding: var(--cc-space-1);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Aperçu de l'overlay                                                         */
-/* -------------------------------------------------------------------------- */
 
 .preview {
   padding: var(--cc-space-3);
@@ -474,8 +406,6 @@
   height: 14rem;
   border: var(--cc-border-width) dashed var(--cc-border);
   border-radius: var(--cc-radius);
-  /* Damier : l'overlay a un fond transparent, et sur un aplat sombre on ne
-     distinguerait pas un texte noir d'un texte absent. */
   background-color: var(--cc-bg);
   background-image:
     linear-gradient(45deg, var(--cc-surface-raised) 25%, transparent 25%),
@@ -485,10 +415,6 @@
   background-size: 1.5rem 1.5rem;
   background-position: 0 0, 0 0.75rem, 0.75rem -0.75rem, -0.75rem 0;
 }
-
-/* -------------------------------------------------------------------------- */
-/* Paliers de bits                                                             */
-/* -------------------------------------------------------------------------- */
 
 .tiers {
   margin: 0;
@@ -506,10 +432,6 @@
   align-items: end;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Listes de la vue Twitch                                                     */
-/* -------------------------------------------------------------------------- */
-
 .scopes,
 .subscriptions {
   margin: var(--cc-space-2) 0 0;
@@ -526,10 +448,6 @@
 .subscriptions li {
   font-family: var(--cc-font-mono);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Listes de consultation : historique et journaux                             */
-/* -------------------------------------------------------------------------- */
 
 .records {
   margin: 0;
@@ -555,7 +473,6 @@
   font-size: var(--cc-text-sm);
 }
 
-/* Les journaux n'ont pas de colonne de récompense, mais un message long. */
 .records--logs .record {
   grid-template-columns: 6rem 8rem 1fr;
 }
@@ -574,7 +491,6 @@
 
 .record__title {
   display: block;
-  /* Un pseudo ou un message long se coupe ; il ne pousse pas la colonne. */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -586,8 +502,6 @@
   font-size: var(--cc-text-xs);
 }
 
-/* Le contexte est du JSON indenté : il garde ses retours à la ligne et défile
-   pour lui-même plutôt que d'élargir la page. */
 .record__context {
   margin: var(--cc-space-1) 0 0;
   padding: var(--cc-space-2);
@@ -634,10 +548,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Bandeau, notes, copie                                                       */
-/* -------------------------------------------------------------------------- */
-
 .banner {
   margin: 0 0 var(--cc-space-3);
   padding: var(--cc-space-2) var(--cc-space-3);
@@ -657,48 +567,6 @@
 .banner--success {
   background: var(--cc-success-soft);
   color: var(--cc-success);
-}
-
-/* Bandeau de mise à jour.
-   Distinct de `.banner`, qui porte les messages transitoires d'enregistrement :
-   celui-ci persiste tant qu'une version attend, et vit dans la coquille plutôt
-   que dans une vue — une mise à jour n'appartient à aucune. */
-.update {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--cc-space-3);
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 var(--cc-space-3);
-  padding: var(--cc-space-3);
-  border: var(--cc-border-width) solid var(--cc-accent);
-  border-radius: var(--cc-radius);
-  background: var(--cc-accent-soft);
-}
-
-.update[hidden] {
-  display: none;
-}
-
-.update--error {
-  border-color: var(--cc-danger);
-  background: var(--cc-danger-soft);
-}
-
-.update__text {
-  margin: 0;
-  flex: 1 1 20rem;
-  font-size: var(--cc-text-sm);
-}
-
-.update__actions {
-  display: flex;
-  gap: var(--cc-space-3);
-  align-items: center;
-}
-
-.update__notes[hidden] {
-  display: none;
 }
 
 .note {

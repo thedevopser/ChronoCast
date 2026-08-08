@@ -1,29 +1,14 @@
-/**
- * Socket d'essai pour le hub WebSocket.
- *
- * Même patron que `createSocketDouble` du client EventSub : le hub ne connaît
- * qu'une interface, les tests injectent la sienne. Aucun serveur, aucun port,
- * aucune attente réelle — et les cas qui comptent, socket muette ou socket qui
- * lève à l'écriture, deviennent triviaux à provoquer.
- */
-
 import type { HubSocket } from '../../src/core/server/ws-hub.js';
 
 export interface SocketDouble {
   readonly socket: HubSocket;
-  /** Messages envoyés au client, déjà désérialisés. */
   readonly sent: Record<string, unknown>[];
   readonly pings: number;
-  /** Vrai lorsque le hub a fermé la connexion. */
   readonly closed: boolean;
   readonly closeCode: number | null;
-  /** Simule un message reçu du client. */
   receive(data: string): void;
-  /** Simule la réponse à un ping. */
   pong(): void;
-  /** Simule une fermeture à l'initiative du client. */
   disconnect(): void;
-  /** Fait échouer toute écriture ultérieure, comme une socket déjà morte. */
   breakSending(): void;
 }
 

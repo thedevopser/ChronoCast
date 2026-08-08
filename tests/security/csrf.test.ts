@@ -10,20 +10,6 @@ import {
 } from '../../src/core/server/security/csrf.js';
 import { makeRequest } from '../helpers/http-request.js';
 
-/**
- * La garde d'`Host` bloque une page tierce qui *lit* l'application. Elle ne suffit
- * pas pour l'écriture : un formulaire HTML peut poster vers `http://127.0.0.1:3777`
- * sans que le navigateur ne demande la permission, et l'en-tête `Host` sera alors
- * parfaitement légitime.
- *
- * Le jeton est ce qui manque à l'attaquant. Il est injecté dans la page
- * d'administration, jamais renvoyé par une route, et exigé sur toute mutation.
- * Une page tierce ne peut ni le deviner, ni le lire.
- *
- * L'overlay, lui, reste accessible sans jeton : OBS charge l'URL telle quelle et
- * ne lit rien d'autre que l'état — d'où la distinction lecture/écriture.
- */
-
 describe('createCsrfToken', () => {
   it('produit un jeton hexadécimal de 32 octets', () => {
     expect(createCsrfToken()).toMatch(/^[0-9a-f]{64}$/);
@@ -45,8 +31,6 @@ describe('isMutatingMethod', () => {
   });
 
   it('considère une méthode inconnue comme mutante', () => {
-    // Le doute profite à la sécurité : une méthode non répertoriée est traitée
-    // comme dangereuse plutôt que laissée passer.
     expect(isMutatingMethod('TRACE')).toBe(true);
   });
 });
@@ -63,8 +47,6 @@ describe('verifyCsrfToken', () => {
   });
 
   it('refuse un jeton de longueur différente sans lever', () => {
-    // `timingSafeEqual` lève si les tampons diffèrent en longueur : la longueur
-    // doit être comparée avant, sinon la garde plante au lieu de refuser.
     expect(verifyCsrfToken(expected, 'a'.repeat(63))).toBe(false);
     expect(verifyCsrfToken(expected, 'a'.repeat(65))).toBe(false);
   });
@@ -75,8 +57,6 @@ describe('verifyCsrfToken', () => {
   });
 
   it("refuse tout jeton lorsque le jeton attendu est vide", () => {
-    // Un jeton attendu vide signale un service mal initialisé : tout accepter
-    // serait exactement le mauvais comportement de repli.
     expect(verifyCsrfToken('', '')).toBe(false);
     expect(verifyCsrfToken('', 'peu importe')).toBe(false);
   });
@@ -114,8 +94,6 @@ describe('checkCsrf', () => {
 
 describe('isAllowedWebSocketOrigin', () => {
   it("accepte l'absence d'Origin", () => {
-    // OBS et les clients non navigateur n'envoient pas d'Origin. Le refuser
-    // interdirait l'overlay, qui est précisément le cas d'usage principal.
     expect(isAllowedWebSocketOrigin(undefined)).toBe(true);
   });
 

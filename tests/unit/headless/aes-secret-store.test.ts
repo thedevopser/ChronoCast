@@ -8,24 +8,6 @@ import { createAesSecretStore } from '../../../src/headless/aes-secret-store.js'
 import { createLogger, type LogRecord, type LogSink } from '../../../src/core/logging/logger.js';
 import type { SecretStore } from '../../../src/core/app/ports.js';
 
-/**
- * Ce magasin est un **repli assumé**, pas une solution.
- *
- * Sous Windows — seule cible de la V1 — les jetons Twitch sont protégés par
- * `safeStorage`, adossé à DPAPI : la clé est dérivée du compte utilisateur, si
- * bien qu'un autre compte de la même machine ne peut rien déchiffrer. C'est ce
- * que la coquille Electron apportera en Phase 6.
- *
- * Hors d'Electron, rien de tel n'existe. La clé vit à côté des données chiffrées :
- * quiconque lit le disque lit les jetons. Le chiffrement n'y protège que d'un
- * regard distrait, jamais d'un attaquant.
- *
- * D'où les deux exigences vérifiées ici, qui comptent autant que la cryptographie :
- * `isEncryptionAvailable()` répond **faux**, et un avertissement explicite part
- * dans les journaux au démarrage. Un utilisateur averti vaut mieux qu'une fausse
- * impression de sécurité.
- */
-
 function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
   const records: LogRecord[] = [];
   return {
@@ -38,10 +20,6 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
 }
 
 describe('createAesSecretStore', () => {
-  // Windows ne connaît pas les permissions POSIX : `stat` y rend `0o666` quoi
-  // qu'on demande. L'assertion n'a donc de sens que là où le mode existe, et
-  // c'est sans conséquence : sous Windows, la protection réelle des secrets
-  // vient de DPAPI, pas d'un bit de permission.
   const itPosix = process.platform === 'win32' ? it.skip : it;
 
   let directory: string;
@@ -113,7 +91,6 @@ describe('createAesSecretStore', () => {
     });
 
     it('conserve les valeurs entre deux instances', async () => {
-      // Le cas réel : l'application redémarre et doit retrouver ses jetons.
       await store.write('twitch', 'jeton-persistant');
 
       const second = createAesSecretStore({
@@ -140,8 +117,6 @@ describe('createAesSecretStore', () => {
     });
 
     it('produit un chiffré différent à chaque écriture de la même valeur', async () => {
-      // Un vecteur d'initialisation réutilisé rendrait deux valeurs identiques
-      // reconnaissables — et, avec GCM, casserait l'authentification.
       await store.write('a', 'même-valeur');
       const first = await readAllFiles(directory);
 
@@ -152,8 +127,6 @@ describe('createAesSecretStore', () => {
     });
 
     it('refuse une valeur altérée plutôt que de rendre n’importe quoi', async () => {
-      // AES-GCM authentifie : une modification d'un octet doit être détectée,
-      // pas déchiffrée en silence.
       await store.write('twitch', 'jeton');
 
       const secretsPath = join(directory, 'secrets.json');
@@ -180,8 +153,6 @@ describe('createAesSecretStore', () => {
 
   describe('robustesse', () => {
     it('repart proprement d’un fichier de secrets corrompu', async () => {
-      // Une coupure en pleine écriture ne doit pas empêcher le démarrage : au
-      // pire, l'utilisateur se réauthentifie.
       await writeFile(join(directory, 'secrets.json'), '{ tronqué', 'utf8');
 
       const fresh = createAesSecretStore({
@@ -196,7 +167,6 @@ describe('createAesSecretStore', () => {
   });
 });
 
-/** Contenu brut de tous les fichiers du répertoire, pour chercher une fuite. */
 async function readAllFiles(directory: string): Promise<string[]> {
   const { readdir } = await import('node:fs/promises');
   const names = await readdir(directory);

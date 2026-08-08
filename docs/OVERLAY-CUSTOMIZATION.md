@@ -41,7 +41,7 @@ Pour reproduire le style le plus courant — anneau coloré, intérieur transpar
 
 Quand un réglage manque, `custom.css` prend le relais. Elle est chargée **en dernier** et peut donc tout surcharger.
 
-**Où :** `%APPDATA%\ChronoCast\custom.css`. Ce nom-là, cet endroit-là, et nulle part ailleurs.
+**Où :** `%USERPROFILE%\ChronoCast\custom.css`. Ce nom-là, cet endroit-là, et nulle part ailleurs.
 
 **Comment l'activer :** vue *Apparence* → groupe *Texte du compteur* → case **« Charger custom.css depuis le répertoire de données »**. Tant qu'elle est décochée, le fichier n'est pas servi même s'il existe.
 

@@ -8,16 +8,6 @@ import {
   resolveSubscriptions,
 } from '../../../src/core/twitch/subscription-plan.js';
 
-/**
- * Le plan de souscriptions est déclaratif à dessein : ajouter un événement Twitch
- * doit se réduire à une entrée dans ce tableau et un cas dans le convertisseur,
- * sans toucher au client WebSocket ni au reste de l'application.
- *
- * Il porte aussi la correspondance entre souscriptions et portées OAuth. C'est
- * elle qui permet de dire à l'utilisateur « il vous manque telle autorisation »
- * plutôt que de le laisser face à un compteur qui ne bouge pas.
- */
-
 const CONTEXT = { broadcasterUserId: '1337', userId: '1337' };
 
 function twitchConfig(patch: unknown): TwitchConfig {
@@ -26,8 +16,6 @@ function twitchConfig(patch: unknown): TwitchConfig {
 
 describe('SUBSCRIPTION_PLAN', () => {
   it('déclare une version pour chaque souscription', () => {
-    // Twitch versionne ses souscriptions : omettre la version ferait échouer la
-    // création avec un message peu explicite.
     for (const definition of SUBSCRIPTION_PLAN) {
       expect(definition.version).not.toBe('');
     }
@@ -57,7 +45,6 @@ describe('SUBSCRIPTION_PLAN', () => {
   });
 
   it('utilise la version 2 pour le follow', () => {
-    // La version 1 est dépréciée et n'accepte plus de nouvelles souscriptions.
     const follow = SUBSCRIPTION_PLAN.find((definition) => definition.type === 'channel.follow');
 
     expect(follow?.version).toBe('2');
@@ -106,8 +93,6 @@ describe('resolveSubscriptions', () => {
   });
 
   it('écarte la lecture du chat tant que les commandes sont désactivées', () => {
-    // Lire tout le chat d'une chaîne ne s'active pas dans le dos de quelqu'un
-    // qui met simplement à jour : c'est la règle de raid et de follow.
     const types = resolveSubscriptions(DEFAULT_CONFIG.twitch, CONTEXT).map(
       (resolved) => resolved.type,
     );
@@ -142,7 +127,6 @@ describe('resolveSubscriptions', () => {
     });
 
     it('ajoute l\'utilisateur lecteur pour les notifications de chat', () => {
-      // Twitch exige de savoir au nom de quel compte le chat est lu.
       const resolved = resolveSubscriptions(DEFAULT_CONFIG.twitch, CONTEXT).find(
         (item) => item.type === 'channel.chat.notification',
       );
@@ -151,8 +135,6 @@ describe('resolveSubscriptions', () => {
     });
 
     it('ajoute l\'utilisateur lecteur pour les messages de chat', () => {
-      // Même exigence que pour les notifications : Twitch veut savoir au nom de
-      // quel compte le chat est lu.
       const resolved = resolveSubscriptions(twitchConfig({ enableChatCommands: true }), CONTEXT).find(
         (item) => item.type === 'channel.chat.message',
       );
@@ -190,8 +172,6 @@ describe('resolveSubscriptions', () => {
     });
 
     it('marque la lecture du chat comme facultative', () => {
-      // Une commande qui ne se souscrit pas ne doit pas arrêter le subathon :
-      // seuls les abonnements et les bits sont vitaux.
       const resolved = resolveSubscriptions(twitchConfig({ enableChatCommands: true }), CONTEXT).find(
         (item) => item.type === 'channel.chat.message',
       );
@@ -200,8 +180,6 @@ describe('resolveSubscriptions', () => {
     });
 
     it('marque le raid comme facultatif', () => {
-      // Un raid qui ne se souscrit pas ne doit pas empêcher le subathon de
-      // tourner : seuls les abonnements et les bits sont vitaux.
       const resolved = resolveSubscriptions(twitchConfig({ enableRaid: true }), CONTEXT).find(
         (item) => item.type === 'channel.raid',
       );
@@ -233,8 +211,6 @@ describe('requiredScopes', () => {
   });
 
   it('ajoute les portées de chat lorsque seules les commandes sont activées', () => {
-    // Le cas qui compte : quelqu'un ayant désactivé la détection Prime et
-    // activé les commandes doit malgré tout obtenir de quoi lire le chat.
     const scopes = requiredScopes(
       twitchConfig({ enableChatNotifications: false, enableChatCommands: true }),
     );
@@ -243,9 +219,6 @@ describe('requiredScopes', () => {
   });
 
   it('ne demande aucune portée supplémentaire pour les commandes', () => {
-    // `channel.chat.message` réclame exactement ce que réclame déjà
-    // `channel.chat.notification`, active par défaut : activer les commandes
-    // n'oblige donc personne à se réauthentifier.
     const sans = requiredScopes(DEFAULT_CONFIG.twitch);
     const avec = requiredScopes(twitchConfig({ enableChatCommands: true }));
 
@@ -259,7 +232,6 @@ describe('requiredScopes', () => {
   });
 
   it('ne demande pas de portée pour le raid', () => {
-    // channel.raid ne requiert aucune autorisation particulière.
     const sans = requiredScopes(DEFAULT_CONFIG.twitch);
     const avec = requiredScopes(twitchConfig({ enableRaid: true }));
 

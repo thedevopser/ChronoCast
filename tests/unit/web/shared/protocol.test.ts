@@ -1,34 +1,3 @@
-/**
- * Alignement du contrat de fil entre le noyau et le code navigateur.
- *
- * Le risque couvert est une désynchronisation silencieuse. `src/web/shared/
- * protocol.ts` **redéclare** le contrat au lieu de le ré-exporter, non par
- * choix mais par contrainte : `tsconfig.web.json` fixe `rootDir` à `src/web`,
- * et TypeScript refuse tout fichier du programme situé hors de cette racine
- * (TS6059) — y compris atteint par un simple `import type`. Retirer `rootDir`
- * ferait émettre le noyau compilé dans `dist/public`, ce qui est hors de
- * question. La duplication est donc subie, et doit être surveillée.
- *
- * D'où ce fichier, qui est le garde-fou de cette duplication. Il vit dans
- * `tests/`, seul endroit du dépôt qui a le droit de voir les deux côtés à la
- * fois : la règle ESLint n'interdit les imports du noyau que depuis
- * `src/web/**`, et `tsconfig.json` n'impose aucun `rootDir`.
- *
- * Deux garanties, de natures différentes :
- *
- * - les **types** sont comparés à la compilation. Ces assertions ne coûtent
- *   rien à l'exécution et n'apparaissent dans aucun rapport de test : elles
- *   font échouer `npm run typecheck`, qui couvre `tests/**`. Un champ ajouté,
- *   supprimé, renommé ou retypé d'un seul côté casse la compilation.
- * - les **constantes** sont comparées à l'exécution, puisqu'une valeur ne peut
- *   pas être vérifiée par le système de types.
- *
- * La comparaison de types est une assignabilité mutuelle et non une égalité
- * stricte : les modificateurs `readonly` relèvent de l'ergonomie locale de
- * chaque côté, alors qu'un champ manquant ou mal typé est une vraie rupture de
- * contrat. On surveille ce qui circule sur le fil, pas la façon de le tenir.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import type { CounterChangeOrigin, TwitchConnectionStatus } from '../../../../src/core/app/app-events.js';
@@ -60,14 +29,8 @@ import {
   type TwitchConnectionStatus as WebTwitchConnectionStatus,
 } from '../../../../src/web/shared/protocol.js';
 
-/* -------------------------------------------------------------------------- */
-/* Alignement des types, vérifié par le compilateur                            */
-/* -------------------------------------------------------------------------- */
-
-/** Vrai si chacun des deux types est acceptable là où l'autre est attendu. */
 type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-/** Ne compile que si l'alignement est vérifié. Exporté pour rester « utilisé ». */
 type Aligned<T extends true> = T;
 
 export type CounterStateAligned = Aligned<MutuallyAssignable<CounterState, WebCounterState>>;
@@ -81,8 +44,6 @@ export type OriginAligned = Aligned<MutuallyAssignable<CounterChangeOrigin, WebC
 export type StatusAligned = Aligned<
   MutuallyAssignable<TwitchConnectionStatus, WebTwitchConnectionStatus>
 >;
-
-/* -------------------------------------------------------------------------- */
 
 describe('alignement des constantes avec le noyau', () => {
   it('déclare la même version de protocole que le noyau', () => {
@@ -119,8 +80,6 @@ describe('parseServerMessage', () => {
 
   describe('refus', () => {
     it('rejette du JSON invalide sans lever', () => {
-      // Une exception non rattrapée tuerait la boucle de réception, et une
-      // Browser Source OBS n'est jamais rechargée : l'overlay resterait mort.
       expect(parseServerMessage('{ceci n’est pas du JSON')).toBeNull();
     });
 

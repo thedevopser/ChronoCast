@@ -1,29 +1,3 @@
-/**
- * Fin du flux d'autorisation : du code reçu à une connexion EventSub vivante.
- *
- * C'est l'enchaînement le plus critique de la première configuration, et le
- * seul qui touche à la fois au magasin de secrets, à Twitch, à la configuration
- * persistée et au client EventSub. L'écrire directement dans le composition
- * root le rendrait invérifiable : il est donc isolé ici, avec toutes ses
- * dépendances injectées, exactement comme le reste du noyau.
- *
- * Trois points méritent d'être fixés par des tests plutôt que laissés à
- * l'improvisation.
- *
- * **Sans secret client, on ne tente rien.** L'échange exige le secret ; partir
- * quand même produirait une erreur de Twitch illisible pour l'utilisateur, là
- * où le problème est simplement qu'une étape de l'assistant a été sautée.
- *
- * **L'identité vient de la validation du jeton, pas d'une saisie.** Twitch dit
- * lui-même quel compte vient d'autoriser l'application : le demander à
- * l'utilisateur serait une faute de frappe en puissance.
- *
- * **Une portée facultative manquante n'échoue pas.** `channel.chat.notification`
- * est marquée facultative depuis la Phase 3 : sans elle, le subathon fonctionne,
- * Prime étant simplement traité comme un Tier 1. Refuser la connexion pour
- * cela priverait l'utilisateur d'un produit qui marche.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import { createLogger } from '../../../src/core/logging/logger.js';
@@ -108,8 +82,6 @@ describe('createOAuthCompletion', () => {
     });
 
     it('refuse de partir sans secret, avec un message compréhensible', async () => {
-      // Sans cette garde, Twitch répondrait une erreur d'API que l'utilisateur
-      // n'a aucun moyen de relier à l'étape qu'il a sautée.
       const harness = createHarness({ clientSecret: null });
 
       await expect(harness.complete('code-recu')).rejects.toThrow(/secret/iu);
@@ -135,9 +107,6 @@ describe('createOAuthCompletion', () => {
     });
 
     it('ne remplace pas une chaîne déjà configurée', async () => {
-      // Le compte qui autorise n'est pas toujours celui de la chaîne : un bot
-      // ou un modérateur peut avoir été branché exprès. Écraser ce réglage
-      // ferait décrocher les événements sans rien expliquer.
       const harness = createHarness({ broadcasterUserId: '999', broadcasterLogin: 'la-chaine' });
 
       await harness.complete('code');
@@ -157,8 +126,6 @@ describe('createOAuthCompletion', () => {
 
   describe('enchaînement', () => {
     it('remet Twitch en route après avoir écrit la configuration', async () => {
-      // L'ordre compte : le client EventSub lit l'identité de la chaîne au
-      // démarrage. Le relancer avant l'écriture le ferait repartir à vide.
       const harness = createHarness();
 
       await harness.complete('code');
@@ -181,8 +148,6 @@ describe('createOAuthCompletion', () => {
     });
 
     it('ne redémarre rien si la validation échoue', async () => {
-      // Le jeton est déjà en magasin, mais sans identité de chaîne EventSub
-      // n'aurait rien à souscrire : mieux vaut le dire que feindre le succès.
       const harness = createHarness({
         validate: () => Promise.reject(new Error('jeton refusé')),
       });

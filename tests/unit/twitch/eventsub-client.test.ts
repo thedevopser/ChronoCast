@@ -13,24 +13,6 @@ import {
 } from '../../../src/core/twitch/eventsub-client.js';
 import type { HelixClient } from '../../../src/core/twitch/helix-client.js';
 
-/**
- * Le client EventSub est le seul lien avec Twitch pendant tout le subathon. S'il
- * tombe sans se relever, le compteur continue à descendre mais plus rien ne le
- * fait monter — et personne ne s'en aperçoit avant plusieurs minutes.
- *
- * Sa conception répond donc à trois situations réelles :
- *
- *   - **la coupure silencieuse**, où la connexion paraît ouverte mais ne
- *     transporte plus rien. D'où le chien de garde armé sur le keepalive :
- *     l'absence de message est le seul signal disponible.
- *   - **la migration de session**, où Twitch demande de basculer sur une
- *     nouvelle URL. L'ancienne connexion ne doit être fermée qu'après
- *     confirmation de la nouvelle, sous peine de perdre les événements de
- *     l'intervalle.
- *   - **la révocation**, où Twitch retire une souscription sans fermer la
- *     connexion. Rien ne se voit, sinon que les subs cessent de créditer.
- */
-
 const SESSION_ID = 'session-abc';
 const RECONNECT_URL = 'wss://eventsub.wss.twitch.tv/ws?challenge=xyz';
 
@@ -45,7 +27,6 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
   };
 }
 
-/** Socket simulée : les tests injectent les messages de Twitch à la main. */
 function createSocketDouble(url: string) {
   const handlers: {
     open?: () => void;
@@ -98,7 +79,6 @@ function createSocketDouble(url: string) {
   };
 }
 
-/** Minuteurs pilotés à la main : aucun test n'attend une durée réelle. */
 function createFakeTimers() {
   let nextId = 1;
   const pending = new Map<number, { readonly runAt: number; readonly handler: () => void }>();
@@ -118,7 +98,6 @@ function createFakeTimers() {
     get pendingCount(): number {
       return pending.size;
     },
-    /** Avance le temps et déclenche les minuteurs échus, dans l'ordre. */
     advance(ms: number): void {
       currentTime += ms;
       const due = [...pending.entries()]
@@ -174,8 +153,6 @@ describe('createEventSubClient', () => {
   let bus: EventBus<AppEvents>;
   let sink: ReturnType<typeof createMemorySink>;
   let helix: HelixClient;
-  // Mocks typés d'après le contrat réel : `vi.fn()` sans paramètre de type
-  // attend une implémentation renvoyant void, ce qui interdit nos promesses.
   let createSubscription: Mock<HelixClient['createEventSubSubscription']>;
   let onNotification: Mock<(context: NotificationContext, payload: unknown) => void>;
 
@@ -224,12 +201,10 @@ describe('createEventSubClient', () => {
     });
   }
 
-  /** Ouvre la connexion et joue l'accueil, situation de départ de la plupart des tests. */
   async function connect(client: ReturnType<typeof createClient>) {
     await client.start();
     sockets[0]?.open();
     sockets[0]?.send(welcomeMessage());
-    // Les souscriptions sont créées de façon asynchrone après l'accueil.
     await vi.waitFor(() => {
       expect(client.getStatus()).toBe('ready');
     });
@@ -341,13 +316,9 @@ describe('createEventSubClient', () => {
 
   describe('chien de garde sur le keepalive', () => {
     it('reconnecte lorsque plus aucun message n\'arrive', async () => {
-      // Cas réel de la coupure silencieuse : la connexion paraît ouverte mais ne
-      // transporte plus rien. L'absence de message est le seul signal.
       const client = createClient();
       await connect(client);
 
-      // Le chien de garde expire et programme une reconnexion, qui reste
-      // soumise à l'espacement : elle n'est pas immédiate.
       timers.advance(30_000 * 1.2 + 1);
       expect(client.getStatus()).toBe('reconnecting');
 
@@ -394,7 +365,6 @@ describe('createEventSubClient', () => {
     });
 
     it('ne ferme l\'ancienne connexion qu\'après confirmation de la nouvelle', async () => {
-      // Fermer trop tôt perdrait les événements survenus dans l'intervalle.
       const client = createClient();
       await connect(client);
 
@@ -411,8 +381,6 @@ describe('createEventSubClient', () => {
     });
 
     it('ne recrée aucune souscription après migration', async () => {
-      // Twitch transfère les souscriptions vers la nouvelle session : les
-      // recréer produirait des doublons facturés au quota.
       const client = createClient();
       await connect(client);
       const avant = createSubscription.mock.calls.length;
@@ -442,8 +410,6 @@ describe('createEventSubClient', () => {
 
   describe('révocation', () => {
     it('signale la révocation sur le bus', async () => {
-      // Twitch retire la souscription sans fermer la connexion : rien ne se voit,
-      // sinon que les subs cessent de créditer.
       const client = createClient();
       await connect(client);
       const revocations = vi.fn();
@@ -497,14 +463,10 @@ describe('createEventSubClient', () => {
       sockets[apresPremiere - 1]?.remoteClose();
       timers.advance(1_000);
 
-      // La seconde tentative attend plus longtemps que la première : sans
-      // espacement, une panne de Twitch produirait une tempête de connexions.
       expect(sockets.length).toBe(apresPremiere);
     });
 
     it('recrée les souscriptions après une véritable reconnexion', async () => {
-      // À la différence d'une migration, une reconnexion ouvre une session
-      // nouvelle : les souscriptions ne sont pas transférées.
       const client = createClient();
       await connect(client);
       const avant = createSubscription.mock.calls.length;

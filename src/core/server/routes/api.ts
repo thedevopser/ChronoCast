@@ -1,33 +1,13 @@
-/**
- * API JSON du panneau d'administration.
- *
- * Les routes ne font que déléguer : le métier vit dans les services, chacun
- * testé pour lui-même. Ce qui se joue ici est ailleurs.
- *
- * **La validation.** Tout corps entrant vient d'une page, et une page peut avoir
- * été ouverte par un lien. Zod est la seule porte, et une valeur refusée produit
- * un `400` explicite plutôt qu'un `500` — la différence entre « vous vous êtes
- * trompé » et « le serveur est cassé » se lit dans le code de statut.
- *
- * **Le secret.** Le secret client Twitch s'écrit et ne se lit jamais. Il ne
- * traverse pas la configuration : il est frère de `config` dans le corps du
- * `PATCH`, jamais son enfant. L'exclusion devient ainsi structurelle, au lieu
- * d'être une exception qu'on finirait par oublier lors d'un ajout de champ.
- *
- * **La provenance des pannes.** Une erreur venue de Twitch devient un `502` et
- * non un `500` : le streamer doit savoir de quel côté chercher.
- */
-
 import { z } from 'zod';
 
 import type { TwitchStatusPayload } from '../../app/app-events.js';
+import type { SystemSettingsOpener } from '../../app/ports.js';
 import type { ConfigService } from '../../config/config-service.js';
 import type { CounterEventOutcome, CounterService } from '../../counter/counter-service.js';
 import type { DomainEvent, DomainEventType } from '../../events/domain-event.js';
 import type { EventHistoryService } from '../../history/event-history-service.js';
 import type { Logger, LogLevel } from '../../logging/logger.js';
 import type { RingBufferSink } from '../../logging/sinks/ring-buffer-sink.js';
-import type { UpdateStatus } from '../../update/update-service.js';
 import {
   errorResponse,
   jsonResponse,
@@ -37,15 +17,9 @@ import {
 } from '../http-types.js';
 import type { Route } from '../router.js';
 
-/* -------------------------------------------------------------------------- */
-/* Dépendances                                                                 */
-/* -------------------------------------------------------------------------- */
-
-/** Vue de la chaîne Twitch réduite à ce que l'API expose. */
 export interface TwitchApiPort {
   getStatus(): TwitchStatusPayload;
 
-  /** État de l'authentification. Ne renvoie jamais de jeton ni de secret. */
   describe(): Promise<{
     readonly broadcasterLogin: string;
     readonly clientId: string;
@@ -55,7 +29,6 @@ export interface TwitchApiPort {
     readonly missingScopes: readonly string[];
   }>;
 
-  /** Prépare le flux OAuth et renvoie l'URL à ouvrir. */
   startAuthorization(): Promise<{ readonly authorizationUrl: string }>;
 
   revoke(): Promise<void>;
@@ -64,67 +37,33 @@ export interface TwitchApiPort {
     { readonly id: string; readonly type: string; readonly status: string }[]
   >;
 
-  /** Enregistre le secret client dans le magasin chiffré. */
   setClientSecret(secret: string): Promise<void>;
-}
-
-/**
- * Vue du service de mise à jour réduite à ce que l'API expose.
- *
- * Trois verbes et rien de plus. Le panneau ne peut ni choisir la version, ni
- * désigner un fichier, ni pointer une autre source : la seule chose qu'il
- * commande est « installe ce que tu as déjà vérifié ».
- */
-export interface UpdateApiPort {
-  getStatus(): UpdateStatus;
-  check(): Promise<UpdateStatus>;
-  install(): Promise<void>;
 }
 
 export interface ApiContext {
   readonly config: ConfigService;
   readonly counter: CounterService;
   readonly history: EventHistoryService;
-  readonly update: UpdateApiPort;
-  /** Journaux en mémoire : réponse immédiate, sans lecture disque. */
+
+  readonly system?: SystemSettingsOpener | undefined;
   readonly logs: RingBufferSink;
   readonly twitch: TwitchApiPort;
-  /** Port réellement retenu, qui peut différer de celui demandé. */
   readonly getPort: () => number;
   readonly appVersion: string;
-  /** Injecte un événement fabriqué dans le pipeline, pour l'aperçu d'overlay. */
   readonly applyManualEvent: (event: DomainEvent) => Promise<CounterEventOutcome>;
   readonly logger: Logger;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Bornes                                                                      */
-/* -------------------------------------------------------------------------- */
-
-/** Une entrée d'historique par page d'affichage, au plus. */
 const HISTORY_LIMIT = { min: 1, max: 500, fallback: 50 } as const;
 const LOG_LIMIT = { min: 1, max: 1_000, fallback: 200 } as const;
 
-/**
- * Plafond d'un motif d'ajustement manuel.
- *
- * Le motif finit dans l'historique et sur le WebSocket : le borner évite qu'une
- * page locale ne remplisse le disque une requête à la fois.
- */
 const MAX_REASON_LENGTH = 200;
 
-/** Plafond d'un pseudo. Le même s'applique aux pseudos venus de Twitch. */
 const MAX_USER_NAME_LENGTH = 64;
 
-/** Une journée en secondes borne largement tout ajustement manuel raisonnable. */
 const MAX_ADJUSTMENT_SECONDS = 86_400;
 
-/** Trente jours : au-delà, ce n'est plus un subathon. */
 const MAX_INITIAL_SECONDS = 2_592_000;
-
-/* -------------------------------------------------------------------------- */
-/* Schémas                                                                     */
-/* -------------------------------------------------------------------------- */
 
 const secondsSchema = z.number().int().positive().max(MAX_ADJUSTMENT_SECONDS);
 
@@ -141,14 +80,7 @@ const initialSchema = z
 
 const configPatchSchema = z
   .object({
-    /** Fragment de configuration. Validé ensuite par le service, seul juge de sa forme. */
     config: z.record(z.string(), z.unknown()).optional(),
-    /**
-     * Secret client Twitch, en **écriture seule**.
-     *
-     * Frère de `config` et non son enfant : ainsi il ne peut pas se retrouver
-     * écrit dans le fichier de configuration par inadvertance.
-     */
     clientSecret: z.string().min(1).max(200).optional(),
   })
   .strip();
@@ -164,15 +96,8 @@ const overlayTestSchema = z
 
 const LOG_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warning', 'error'];
 
-/* -------------------------------------------------------------------------- */
-/* Utilitaires                                                                 */
-/* -------------------------------------------------------------------------- */
-
-/** Analyse un corps JSON. `null` signale un corps illisible, pas un corps vide. */
 function parseJsonBody(request: HttpRequest): unknown {
   if (request.body === '') {
-    // Un corps vide est légitime pour les mutations sans paramètre : il vaut
-    // l'objet vide, que les schémas complètent ou refusent selon le cas.
     return {};
   }
   try {
@@ -186,7 +111,6 @@ function badRequest(message: string): HttpResponse {
   return errorResponse(400, 'invalid_request', message);
 }
 
-/** Ramène un entier de la chaîne de requête dans ses bornes, sans jamais refuser. */
 function boundedInteger(
   raw: string | null,
   bounds: { readonly min: number; readonly max: number; readonly fallback: number },
@@ -198,20 +122,12 @@ function boundedInteger(
   return Math.min(bounds.max, Math.max(bounds.min, Math.trunc(parsed)));
 }
 
-/**
- * Fabrique un événement de démonstration.
- *
- * Les valeurs sont représentatives plutôt que minimales : un test d'overlay
- * n'a d'intérêt que s'il ressemble à ce que le streamer verra en direct.
- */
 function buildTestEvent(type: DomainEventType, userName: string, now: number): DomainEvent {
   const base = {
     id: `test-${String(now)}`,
     occurredAt: now,
     userId: 'test',
     userName: userName.slice(0, MAX_USER_NAME_LENGTH),
-    // Marqué manuel : sans cela, un test serait indiscernable d'un vrai
-    // abonnement dans l'historique.
     source: 'manual',
   } as const;
 
@@ -229,16 +145,9 @@ function buildTestEvent(type: DomainEventType, userName: string, now: number): D
     case 'follow':
       return { ...base, type: 'follow' };
     case 'command':
-      // Le nom est celui du défaut et non celui de la configuration : ce
-      // bouton teste l'**apparence** de la bulle, pas la résolution de la
-      // commande. Les secondes, elles, traversent le barème comme les autres.
       return { ...base, type: 'command', command: 'addtime', seconds: 300 };
   }
 }
-
-/* -------------------------------------------------------------------------- */
-/* Routes                                                                      */
-/* -------------------------------------------------------------------------- */
 
 export function createApiRoutes(context: ApiContext): Route[] {
   const {
@@ -247,7 +156,7 @@ export function createApiRoutes(context: ApiContext): Route[] {
     history,
     logs,
     twitch,
-    update,
+    system,
     getPort,
     appVersion,
     applyManualEvent,
@@ -255,13 +164,6 @@ export function createApiRoutes(context: ApiContext): Route[] {
   } = context;
   const scoped = logger.child('api');
 
-  /**
-   * Exécute une opération Twitch en traduisant sa panne en `502`.
-   *
-   * Une erreur venue de Twitch n'est pas une erreur de ChronoCast : le distinguer
-   * évite au streamer de chercher la panne du mauvais côté. Le détail reste dans
-   * les journaux, jamais dans la réponse.
-   */
   async function throughTwitch<T>(
     operation: () => Promise<T>,
     describe: string,
@@ -301,8 +203,6 @@ export function createApiRoutes(context: ApiContext): Route[] {
           return description;
         }
 
-        // La configuration ne contient aucun secret par construction : seul un
-        // booléen dit si un secret client est enregistré.
         return jsonResponse(200, {
           config: config.get(),
           hasClientSecret: description.hasClientSecret,
@@ -338,8 +238,6 @@ export function createApiRoutes(context: ApiContext): Route[] {
           try {
             await config.update(parsed.data.config);
           } catch (error) {
-            // Le service de configuration refuse une valeur hors bornes : c'est
-            // une erreur de saisie, pas une panne du serveur.
             scoped.warning('modification de configuration refusée', { cause: error });
             return badRequest('Valeur de configuration invalide.');
           }
@@ -499,8 +397,6 @@ export function createApiRoutes(context: ApiContext): Route[] {
       method: 'GET',
       path: '/api/history',
       handler: async (request) => {
-        // La limite est ramenée dans ses bornes plutôt que refusée : une valeur
-        // aberrante dans une URL ne mérite pas une page d'erreur.
         const limit = boundedInteger(request.query.get('limit'), HISTORY_LIMIT);
         return jsonResponse(200, { entries: await history.list(limit) });
       },
@@ -513,8 +409,6 @@ export function createApiRoutes(context: ApiContext): Route[] {
         const limit = boundedInteger(request.query.get('limit'), LOG_LIMIT);
         const requested = request.query.get('level');
 
-        // Filtre par niveau **minimal** : chercher les avertissements sans voir
-        // les erreurs n'aurait aucun sens.
         const threshold = LOG_LEVELS.indexOf(requested as LogLevel);
         const records = logs
           .snapshot(limit)
@@ -550,38 +444,18 @@ export function createApiRoutes(context: ApiContext): Route[] {
     },
 
     {
-      method: 'GET',
-      path: '/api/update',
-      handler: () => jsonResponse(200, update.getStatus()),
-    },
-
-    {
       method: 'POST',
-      path: '/api/update/check',
-      handler: async () => jsonResponse(200, await update.check()),
-    },
-
-    {
-      method: 'POST',
-      path: '/api/update/install',
+      path: '/api/system/startup-settings',
       handler: async () => {
-        try {
-          await update.install();
-        } catch (error: unknown) {
-          // `409` et non `500` : il n'y a rien de cassé, il n'y a rien à
-          // installer. Le panneau n'affiche le bouton que sur l'état `ready`,
-          // mais l'API est atteignable directement, et un `500` ferait
-          // chercher une panne qui n'existe pas.
-          scoped.warning('installation de mise à jour refusée', { cause: error });
+        if (system === undefined) {
           return errorResponse(
-            409,
-            'update_not_ready',
-            'Aucune mise à jour vérifiée n’est prête à être installée.',
+            501,
+            'shell_unavailable',
+            'Ce point d’entrée ne peut pas ouvrir les paramètres de Windows.',
           );
         }
 
-        // L'application se ferme dans la foulée : cette réponse est la
-        // dernière chose que la page recevra.
+        await system.openStartupSettings();
         return noContentResponse();
       },
     },

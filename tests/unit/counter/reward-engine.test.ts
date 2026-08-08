@@ -13,19 +13,8 @@ import type {
   SubEvent,
 } from '../../../src/core/events/domain-event.js';
 
-/**
- * Le barème est une fonction pure : un événement et une configuration donnent un
- * nombre de secondes. C'est ce qui rend vérifiable, sans attendre un seul vrai
- * sub, la totalité des combinaisons — y compris les salves de gift subs et les
- * dons de bits massifs qui, en production, n'arrivent qu'une fois par subathon.
- *
- * Aucune valeur n'est codée en dur dans le moteur : tout vient de la
- * configuration, donc du panneau d'administration.
- */
-
 const REWARDS: RewardsConfig = DEFAULT_CONFIG.rewards;
 
-/** Construit une configuration de barème dérivée des valeurs par défaut. */
 function rewardsWith(patch: unknown): RewardsConfig {
   return configSchema.parse({ rewards: patch }).rewards;
 }
@@ -139,8 +128,6 @@ describe('computeReward', () => {
     });
 
     it('ne crédite que les unités entières', () => {
-      // 250 bits pour une unité de 100 donnent deux unités, pas deux et demie :
-      // le streamer ne doit pas devoir expliquer des secondes à la virgule.
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
 
       expect(computeReward(event, REWARDS).seconds).toBe(120);
@@ -199,8 +186,6 @@ describe('computeReward', () => {
     });
 
     it('retient le palier le plus élevé même si les paliers sont mal ordonnés', () => {
-      // La configuration vient de l'utilisateur : elle peut arriver dans
-      // n'importe quel ordre sans que le barème en soit faussé.
       const rewards = rewardsWith({
         bits: {
           mode: 'tiers',
@@ -264,8 +249,6 @@ describe('computeReward', () => {
     });
 
     it('cesse de créditer au-delà du quota horaire', () => {
-      // Garde-fou anti robots de follow : sans lui, une attaque automatisée
-      // pourrait prolonger le subathon indéfiniment.
       const rewards = rewardsWith({ follow: { enabled: true, seconds: 10, maxPerHour: 5 } });
       const event: FollowEvent = { ...baseEvent(), type: 'follow' };
 
@@ -307,13 +290,6 @@ describe('computeReward', () => {
   });
 });
 
-/**
- * Commande de chat.
- *
- * Seul cas où les secondes viennent de l'événement et non du barème : c'est un
- * modérateur qui les a tapées. Le moteur reste néanmoins la seule réponse à la
- * question « combien de secondes », et il y applique le plafond du schéma.
- */
 describe('commande de chat', () => {
   function commandEvent(seconds: number): CommandEvent {
     return { ...baseEvent(), source: 'chat-command', type: 'command', command: 'addtime', seconds };
@@ -325,18 +301,12 @@ describe('commande de chat', () => {
   });
 
   it('écrête au plafond configuré', () => {
-    // Écrêtage défensif : le service refuse déjà une valeur hors bornes avant
-    // de produire l'événement. Cette borne-ci tient les chemins qui ne passent
-    // pas par lui — le bouton de test de l'overlay, un historique relu.
     const rewards = rewardsWith({ chatCommand: { maxSeconds: 600 } });
 
     expect(computeReward(commandEvent(99_999), rewards).seconds).toBe(600);
   });
 
   it('refuse une durée nulle ou négative', () => {
-    // `applyAdd` ignore silencieusement un delta négatif ou nul : sans ce
-    // refus, l'historique dirait l'événement appliqué alors que le compteur
-    // n'aurait pas bougé, et le streamer chercherait la panne longtemps.
     expect(computeReward(commandEvent(0), REWARDS).applied).toBe(false);
     expect(computeReward(commandEvent(-60), REWARDS).applied).toBe(false);
     expect(computeReward(commandEvent(-60), REWARDS).seconds).toBe(0);

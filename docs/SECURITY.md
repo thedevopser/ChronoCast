@@ -98,40 +98,42 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Les scripts d'outillage sont sans dépendance.** La préparation des icônes décode et réencode le PNG en une centaine de lignes de bibliothèque standard plutôt que de tirer une bibliothèque d'images, son arbre transitif et ses binaires natifs — pour un travail qu'on fait trois fois dans la vie du projet.
 
-## 8. La mise à jour automatique
+## 8. La distribution par le Microsoft Store
 
-Depuis la `0.5.0`, ChronoCast interroge GitHub pour savoir s'il existe une version plus récente, télécharge l'installeur en tâche de fond et **propose** son installation. Il ne l'installe jamais de lui-même.
+Depuis la `0.8.0`, ChronoCast n'est distribué que par le Microsoft Store, et **la mise à jour automatique maison a été retirée**. C'est le Store qui met à jour, sans que l'application n'ait rien à télécharger ni à lancer.
 
-### Ce que cela change dans le trafic sortant
+### Ce que cela retire de la surface
 
-Deux hôtes s'ajoutent à ceux de Twitch : **`api.github.com`** et **`objects.githubusercontent.com`**, en HTTPS. Les requêtes ne portent **ni jeton ni identifiant** — l'API publique des releases n'en demande pas — et il en part quatre par jour. Ce que GitHub peut en déduire se limite à une adresse IP et à la version installée, que le `User-Agent` annonce.
+**La promesse « la seule communication sortante va vers Twitch » redevient vraie.** `api.github.com` et `objects.githubusercontent.com` disparaissent du trafic ; le réglage qui permettait de les couper disparaît avec eux, n'ayant plus d'objet.
 
-Le réglage **« Vérifier les mises à jour »**, dans *Paramètres*, coupe entièrement ce trafic. Il est activé par défaut : un correctif qui ne parvient à personne ne corrige rien.
+Disparaissent également, et ce sont les parties les plus délicates de l'ancien chantier : le téléchargement d'un exécutable par l'application, sa vérification par condensat, le contrôle d'URL qui empêchait une réponse d'API contrefaite d'envoyer le téléchargement ailleurs, et le lancement d'un processus détaché. **Le code qui n'existe plus n'a pas de faille.**
 
-### SmartScreen ne protège pas ce chemin, et c'est le point important
+### Ce que la signature du Store apporte
 
-Le binaire n'est pas signé — un certificat coûte plusieurs centaines d'euros par an. Mais surtout : **le fichier téléchargé par ChronoCast ne porte aucune *Mark of the Web***. Windows n'écrit ce flux alternatif `Zone.Identifier` que lorsqu'un navigateur ou un client de messagerie dépose le fichier ; un téléchargement fait par l'application ne le reçoit pas. **SmartScreen ne se déclenchera donc jamais sur cet installeur, altéré ou non.**
+Le paquet est **signé par Microsoft** à la certification. Trois effets concrets, qui étaient les trois symptômes du binaire non signé : plus d'avertissement SmartScreen au premier lancement, moins de mises en quarantaine par les antivirus, et une provenance vérifiable qui ne repose plus sur un condensat que personne ne comparait.
 
-Deux contrôles compensent, et ils sont indépendants.
+L'utilisateur installe depuis le Store, qui vérifie lui-même la signature du paquet. Il n'y a plus de fichier à télécharger à la main, donc plus de fichier à vérifier à la main.
 
-**Le condensat SHA-256.** Le workflow `Release` publie un `.sha256` à côté de chaque installeur. ChronoCast le télécharge **avant** l'installeur, vérifie qu'il désigne bien le fichier attendu — un condensat valide portant sur un autre artefact validerait n'importe quoi — puis compare l'empreinte des octets reçus. **Rien n'est écrit sur le disque avant cette vérification** : les octets restent en mémoire, et un installeur non vérifié n'existe jamais sous forme de fichier. Discordance : tout est jeté, l'incident est journalisé, rien n'est lancé.
+### Ce que le conteneur MSIX change pour les données
 
-**Le contrôle d'URL.** Les adresses de téléchargement sont **analysées**, jamais comparées par préfixe, et doivent mener exactement à l'artefact attendu du dépôt `thedevopser/ChronoCast`. C'est ce qui empêche une réponse d'API contrefaite d'envoyer le téléchargement ailleurs. `https://github.com@evil.test/…` commence par la bonne chaîne et ne va pas du tout au bon endroit : `hostname` ignore l'identifiant qui précède l'arobase.
+Un paquet MSIX **virtualise ce que l'application écrit dans `%APPDATA%`**, dans un conteneur que la désinstallation emporte. Les données de ChronoCast vivent donc dans `%USERPROFILE%\ChronoCast`, hors du conteneur : c'est ce qui fait qu'un subathon en cours survit à une réinstallation, comme c'était le cas auparavant.
 
-Le dépôt source est une **constante du code, jamais un réglage**. Le rendre configurable donnerait à qui saurait écrire dans le fichier de configuration la capacité de faire télécharger et lancer un exécutable arbitraire — c'est-à-dire transformerait un réglage en exécution de code.
+Les jetons Twitch y restent chiffrés par DPAPI, liés au compte Windows. Le changement d'emplacement ne change rien à cela : `safeStorage` chiffre pour l'utilisateur, pas pour le répertoire.
 
-**L'asset est cherché par son nom exact**, déduit de la version, et non pris parmi les `.exe` de la release : un artefact étranger déposé sur une release ne peut pas se substituer à l'installeur.
+Au premier lancement, les données d'une installation antérieure sont **reprises** depuis `%APPDATA%\ChronoCast`. La reprise copie, ne déplace jamais, et n'écrase aucun fichier existant.
 
-### Ce qui protège le direct
+### Ce que le conteneur MSIX change pour le démarrage
 
-**Rien ne s'installe sans un clic.** Installer ferme l'application ; le faire d'autorité pendant un subathon coûterait le stream. Quand le compteur tourne, le panneau demande en plus une confirmation qui dit ce qui va se passer. L'arrêt passe par le chemin propre, celui qui écrit le dernier état du compteur avant de sortir.
+`app.setLoginItemSettings` écrit dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, que le conteneur virtualise également : la valeur n'atteint jamais le vrai registre. Le réglage a donc été retiré, et le manifeste du paquet déclare une tâche `windows.startupTask` dont **Windows détient l'état**, dans Paramètres → Applications → Démarrage.
+
+Le panneau n'a plus qu'un bouton qui y mène. **Aucune adresse ne traverse cette route** : elle ne porte pas de charge utile, et la destination est une constante de la coquille. Faire voyager l'adresse, même sur la boucle locale, transformerait un renvoi en capacité d'ouvrir un schéma arbitraire — ce que la garde `https:` de l'ouverture de navigateur refuse précisément ailleurs.
 
 ## 9. Ce que ChronoCast ne fait pas
 
 - **Aucune télémétrie**, aucune statistique d'usage, aucun rapport de crash envoyé.
-- **Aucune connexion sortante** en dehors de Twitch — `id.twitch.tv`, `api.twitch.tv`, `eventsub.wss.twitch.tv` — et de GitHub pour les mises à jour, désactivable.
+- **Aucune connexion sortante** en dehors de Twitch : `id.twitch.tv`, `api.twitch.tv`, `eventsub.wss.twitch.tv`. Et rien d'autre.
 - **Aucun webhook**, donc aucun nom de domaine ni port ouvert sur Internet.
-- **Aucune installation automatique** : une mise à jour est proposée, jamais appliquée sans votre accord.
+- **Aucun téléchargement, aucun lancement de processus.** Les mises à jour viennent du Store.
 
 ## 10. La suite de tests de sécurité
 

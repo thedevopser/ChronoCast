@@ -1,21 +1,3 @@
-/**
- * Cycle de vie du serveur de rappel OAuth.
- *
- * Ce serveur écoute sur un port fixe, `37771`, imposé par Twitch : la redirect
- * URI doit correspondre **exactement** à celle déclarée dans la console
- * développeur, alors que le port applicatif est configurable et peut se replier.
- *
- * Le risque couvert est celui d'un port laissé ouvert. Un serveur qui accepte
- * un code d'autorisation doit exister le moins longtemps possible : armé au
- * moment où l'utilisateur clique sur « Se connecter », éteint dès que le rappel
- * est arrivé, et de toute façon éteint au bout de cinq minutes. Passé ce délai,
- * l'utilisateur a abandonné, et ce qui reste à l'écoute n'est plus qu'une
- * surface.
- *
- * Le serveur sous-jacent et les minuteurs sont injectés : ces tests n'ouvrent
- * aucun socket et n'attendent pas cinq minutes.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import { createLogger } from '../../../src/core/logging/logger.js';
@@ -109,8 +91,6 @@ describe('createOAuthCallbackServer', () => {
     });
 
     it('ne démarre pas un second serveur si l’on réarme', async () => {
-      // L'utilisateur peut cliquer deux fois sur « Se connecter ». La seconde
-      // demande doit repartir sur un délai neuf, pas ouvrir un second port.
       const harness = createHarness();
       await harness.server.arm();
 
@@ -121,8 +101,6 @@ describe('createOAuthCallbackServer', () => {
     });
 
     it('propage un port déjà occupé', async () => {
-      // Le port est imposé par Twitch : sans repli possible, l'utilisateur doit
-      // savoir que quelque chose d'autre occupe 37771.
       const harness = createHarness({ failStart: true });
 
       await expect(harness.server.arm()).rejects.toThrow(/EADDRINUSE/u);

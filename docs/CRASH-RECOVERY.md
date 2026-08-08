@@ -56,7 +56,7 @@ Le temps restant doit être celui noté, à cinq secondes près et jamais moins.
 
 C'est le cas le plus grave, et le plus rare : les deux fichiers étaient illisibles.
 
-**Rien n'est perdu pour autant.** L'historique des événements, lui, est écrit ligne à ligne dans `%APPDATA%\ChronoCast\history\` — un format où une ligne corrompue n'emporte pas les autres. La vue *Historique* du panneau vous donne le total crédité depuis le début.
+**Rien n'est perdu pour autant.** L'historique des événements, lui, est écrit ligne à ligne dans `%USERPROFILE%\ChronoCast\history\` — un format où une ligne corrompue n'emporte pas les autres. La vue *Historique* du panneau vous donne le total crédité depuis le début.
 
 Pour remettre le compteur d'aplomb : *Tableau de bord* → **Ajouter du temps**, avec le montant reconstitué. Le geste est manuel, mais l'information nécessaire est là.
 
@@ -70,4 +70,4 @@ Pour remettre le compteur d'aplomb : *Tableau de bord* → **Ajouter du temps**,
 
 ## 7. En cas de doute, les journaux
 
-`%APPDATA%\ChronoCast\logs\`, également consultables depuis la vue *Journaux*. Au démarrage, ChronoCast y dit exactement d'où vient l'état qu'il a chargé : fichier principal, fichier de secours, ou valeurs par défaut. Les secrets y sont masqués, la copie est donc sans risque.
+`%USERPROFILE%\ChronoCast\logs\`, également consultables depuis la vue *Journaux*. Au démarrage, ChronoCast y dit exactement d'où vient l'état qu'il a chargé : fichier principal, fichier de secours, ou valeurs par défaut. Les secrets y sont masqués, la copie est donc sans risque.

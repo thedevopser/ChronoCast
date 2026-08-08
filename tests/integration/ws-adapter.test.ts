@@ -12,27 +12,9 @@ import type { Router } from '../../src/core/server/router.js';
 import { createWsAdapter, type WsAdapter } from '../../src/core/server/ws-adapter.js';
 import { createWsHub, type WsHub } from '../../src/core/server/ws-hub.js';
 
-/**
- * L'adaptateur est le seul fichier de ChronoCast à importer `ws`. Tout ce qui a
- * une logique vit dans le hub, testé avec des sockets doubles ; ce qui reste ici
- * est du câblage, et ne se vérifie qu'avec de vraies sockets.
- *
- * Ce qui compte, c'est que la poignée de main soit gardée. Une connexion WebSocket
- * ne passe pas par le routeur : la garde d'`Host` doit donc être posée une seconde
- * fois ici, sans quoi le rebinding DNS refermé côté HTTP resterait grand ouvert
- * côté WebSocket — et l'attaquant y lirait l'état du compteur en direct.
- */
-
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
 const NOOP_ROUTER: Router = { handle: () => Promise.resolve(jsonResponse(200, { ok: true })) };
 
-/**
- * Collecte les messages dès l'ouverture.
- *
- * `hello` et `state` partent tous deux à la poignée de main : un écouteur posé
- * message par message manquerait le second. Un vrai client attache son
- * gestionnaire une fois pour toutes, et le harnais doit faire pareil.
- */
 function collect(socket: WebSocket) {
   const received: Record<string, unknown>[] = [];
 
@@ -42,7 +24,6 @@ function collect(socket: WebSocket) {
 
   return {
     received,
-    /** Attend que `count` messages soient arrivés, puis les renvoie. */
     async waitFor(count: number): Promise<Record<string, unknown>[]> {
       const deadline = Date.now() + 2_000;
       while (received.length < count) {
@@ -58,14 +39,11 @@ function collect(socket: WebSocket) {
   };
 }
 
-/** Résout à `true` si la connexion s'ouvre, à `false` si elle est refusée. */
 function tryConnect(url: string, options: WebSocket.ClientOptions = {}): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new WebSocket(url, options);
     const settle = (opened: boolean): void => {
       socket.removeAllListeners();
-      // Une connexion refusée est déjà démontée par `ws` : `close` comme
-      // `terminate` y lèvent. Seule une connexion réellement ouverte se ferme.
       if (socket.readyState === WebSocket.OPEN) {
         socket.close();
       }
@@ -84,7 +62,6 @@ function tryConnect(url: string, options: WebSocket.ClientOptions = {}): Promise
   });
 }
 
-/** Attend la fermeture de la connexion, quelle qu'en soit la cause. */
 function waitForClose(socket: WebSocket): Promise<number> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -123,7 +100,6 @@ describe('createWsAdapter', () => {
         clearInterval: () => undefined,
       },
       getPort: () => port,
-      // Mode `shared` : le socket est attaché au serveur HTTP, donc le même port.
       getWsPort: () => port,
       appVersion: '0.1.0',
       logger,
@@ -164,7 +140,6 @@ describe('createWsAdapter', () => {
   }
 
   it('accueille un client sur le même port que le serveur HTTP', async () => {
-    // Mode `shared` : un seul port à configurer, un seul à retenir pour OBS.
     const messages = collect(connect());
     const [hello] = await messages.waitFor(1);
 
@@ -195,8 +170,6 @@ describe('createWsAdapter', () => {
   });
 
   it('refuse une poignée de main dont le Host n’est pas local', async () => {
-    // La connexion WebSocket ne traverse pas le routeur : sans cette seconde
-    // garde, le rebinding DNS refermé côté HTTP resterait ouvert ici.
     const refused = await tryConnect(`ws://127.0.0.1:${String(port)}/ws`, {
       headers: { host: 'evil.com' },
     });
@@ -232,8 +205,6 @@ describe('createWsAdapter', () => {
 
     socket.send('x'.repeat(8_192));
 
-    // `ws` refuse lui-même la trame trop longue : le plafond est appliqué avant
-    // que la charge utile n'atteigne la mémoire de l'application.
     expect(await waitForClose(socket)).toBeGreaterThan(0);
   });
 

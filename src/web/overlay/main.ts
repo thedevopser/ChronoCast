@@ -1,18 +1,3 @@
-/**
- * Point d'entrée de l'overlay.
- *
- * Ce fichier n'est **que du câblage** : il ne décide rien. Le décompte, la
- * reconnexion, la mise en forme, la file des bulles et la traduction de la
- * configuration en variables CSS vivent dans des modules purs, tous couverts
- * par des tests. Ce qui reste ici — obtenir les éléments du gabarit, brancher
- * un vrai `WebSocket`, appeler `requestAnimationFrame` — n'est pas vérifiable
- * sans navigateur et n'a rien à décider.
- *
- * Aucune écriture directe dans le DOM : tout passe par `safe-dom`. Aucun
- * `console` non plus, banni par ESLint dans `src/web` — un overlay n'a pas de
- * lecteur, et un incident se diagnostique par les journaux du serveur.
- */
-
 import { createCountdown, type SyncMode } from '../shared/countdown.js';
 import {
   requireElement,
@@ -33,28 +18,14 @@ import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
 import { overlayCssVariables } from './overlay-style.js';
 import { createToastQueue } from './toast-queue.js';
 
-/**
- * Canaux utiles à l'overlay.
- *
- * Ni `log` ni `twitch` : pousser chaque ligne de journal vers une Browser
- * Source qui n'en fait rien gaspille de la bande passante et du travail de
- * désérialisation, soixante fois par seconde de direct.
- */
 const OVERLAY_CHANNELS: readonly Channel[] = ['counter', 'event', 'config'];
 
-/** Classes d'animation, alignées sur `overlay.animation.onAdd` du schéma. */
 const ANIMATION_CLASSES: Readonly<Record<string, string>> = {
   flash: 'is-flash',
   pulse: 'is-pulse',
   shake: 'is-shake',
 };
 
-/**
- * Adaptateur du `WebSocket` du navigateur vers le port attendu par le client.
- *
- * Il déplie `MessageEvent.data` pour que `ws-client` n'ait pas à connaître le
- * DOM — c'est ce qui permet de le tester dans un Node nu.
- */
 function createBrowserSocket(url: string): WsSocket {
   const native = new WebSocket(url);
 
@@ -93,9 +64,6 @@ function start(): void {
   let overlayConfig: OverlayConfig | null = null;
   let animationTimer: number | null = null;
 
-  // Dernières valeurs écrites : réécrire un `textContent` identique à chaque
-  // image provoque un recalcul de mise en page inutile, soixante fois par
-  // seconde et pendant des heures.
   let renderedCountdown = '';
   let renderedToastId: string | null = null;
 
@@ -111,9 +79,6 @@ function start(): void {
       return;
     }
 
-    // Retrait puis reflow forcé : sans cela, deux ajouts rapprochés ne
-    // rejoueraient pas l'animation, le navigateur ne voyant aucun changement
-    // de classe.
     countdownElement.classList.remove(className);
     void countdownElement.offsetWidth;
     countdownElement.classList.add(className);
@@ -127,7 +92,6 @@ function start(): void {
     }, overlayConfig?.animation.durationMs ?? 600);
   }
 
-  /** Une érosion de routine se rattrape ; tout le reste s'impose. */
   function syncModeOf(origin: CounterChangeOrigin): SyncMode {
     return origin === 'tick' ? 'tick' : 'authoritative';
   }
@@ -135,9 +99,6 @@ function start(): void {
   function handle(message: ServerMessage): void {
     switch (message.type) {
       case 'hello':
-        // Une Browser Source n'est jamais rechargée : une page ancienne peut
-        // parler à un serveur neuf. On le note pour le diagnostic, sans rien
-        // afficher — un avertissement à l'écran partirait sur le direct.
         if (message.protocolVersion !== PROTOCOL_VERSION) {
           root.dataset['protocolMismatch'] = String(message.protocolVersion);
         }
@@ -156,8 +117,6 @@ function start(): void {
         break;
 
       case 'event':
-        // Un événement non crédité — plafond atteint, barème à zéro — n'a rien
-        // à annoncer : la bulle promettrait un gain qui n'a pas eu lieu.
         if (message.applied && (overlayConfig?.toast.enabled ?? false)) {
           const toast = {
             id: message.event.id,
@@ -167,10 +126,6 @@ function start(): void {
           };
 
           toasts.push(
-            // La clé est **omise** et non posée à `undefined` : le projet
-            // compile en `exactOptionalPropertyTypes`, où les deux diffèrent.
-            // Le libellé est absent de tout ce qui n'est pas une commande de
-            // chat, et d'une commande dont le libellé a été vidé au panneau.
             message.label === undefined ? toast : { ...toast, label: message.label },
             performance.now(),
             overlayConfig?.toast.durationMs ?? 4_000,
@@ -184,15 +139,8 @@ function start(): void {
 
       case 'twitch:status':
       case 'log':
-      case 'update':
       case 'pong':
       case 'error':
-        // Rien à afficher : l'overlay ne montre que le compteur et ses bulles.
-        // Le cas `update` ne devrait même pas arriver — l'overlay ne s'abonne
-        // pas à ce canal, et une mise à jour disponible n'a rien à faire
-        // devant les spectateurs. Il est traité malgré tout, parce qu'un
-        // message inattendu ne doit jamais casser une page qu'OBS ne
-        // rechargera pas.
         break;
     }
   }
@@ -216,8 +164,6 @@ function start(): void {
         renderedToastId = null;
       }
     } else if (toast.id !== renderedToastId) {
-      // Le libellé est masqué plutôt que vidé : un élément vide mais présent
-      // conserverait la gouttière du `gap`, et la bulle paraîtrait décalée.
       const label = toast.label ?? '';
       setText(toastLabelElement, label);
       toastLabelElement.hidden = label === '';
@@ -232,10 +178,6 @@ function start(): void {
   }
 
   const client = createWsClient({
-    // Le port vient du marqueur substitué dans le gabarit, et non du message
-    // `hello` : celui-ci arrive sur la connexion qu'il aurait fallu savoir
-    // ouvrir. À défaut de marqueur, on reste sur l'hôte courant, ce qui est
-    // exact en mode `shared` — le défaut acté.
     url: resolveWebSocketUrl({
       host: window.location.host,
       protocol: window.location.protocol,

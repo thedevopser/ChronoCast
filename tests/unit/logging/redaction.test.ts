@@ -2,13 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { createRedactor, REDACTED } from '../../../src/core/logging/redaction.js';
 
-/**
- * La rédaction est un contrôle de sécurité, pas une commodité : un jeton OAuth
- * écrit dans `logs/chronocast-*.jsonl` reste sur le disque en clair et se
- * retrouve dans le premier rapport de bug transmis par un utilisateur.
- *
- * Ces tests décrivent donc ce que le système garantit avant tout écriture de log.
- */
 describe('createRedactor', () => {
   describe('clés sensibles', () => {
     it('masque la valeur associée à une clé sensible', () => {
@@ -44,8 +37,6 @@ describe('createRedactor', () => {
     it('laisse intactes les clés de diagnostic qui ressemblent à des secrets', () => {
       const redactor = createRedactor();
 
-      // `code` porte le code d'erreur système (ENOENT, ECONNRESET) et `status` le
-      // code HTTP : les masquer rendrait les logs inexploitables.
       expect(redactor.redact({ code: 'ENOENT', status: 404, statusCode: 500 })).toEqual({
         code: 'ENOENT',
         status: 404,
@@ -95,8 +86,6 @@ describe('createRedactor', () => {
 
     it("ignore l'enregistrement d'une chaîne trop courte pour être un secret", () => {
       const redactor = createRedactor();
-      // Enregistrer une valeur courte masquerait des fragments de texte au hasard
-      // et rendrait les logs illisibles.
       redactor.registerSecret('ab');
 
       expect(redactor.redact('table abstraite')).toBe('table abstraite');

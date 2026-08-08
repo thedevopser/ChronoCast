@@ -1,16 +1,3 @@
-/**
- * Filtrage, recherche et pagination de l'historique.
- *
- * L'historique répond à une question que le streamer se pose forcément un
- * jour : « d'où viennent ces trois heures ? ». Une liste brute de plusieurs
- * centaines d'entrées n'y répond pas — il faut pouvoir isoler un type, une
- * personne, ou ce qui n'a **pas** été crédité.
- *
- * Toute cette logique vit ici, dans un module pur : elle est faite de
- * comparaisons et de découpages, exactement ce qu'un test vérifie sans effort
- * et ce qu'un clic vérifie très mal.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -55,8 +42,6 @@ describe('filterHistory', () => {
   });
 
   it('ne filtre pas sur un type vide', () => {
-    // La liste déroulante rend une chaîne vide pour « tous les types » : la
-    // traiter comme un type ferait disparaître l'historique entier.
     expect(filterHistory(ENTRIES, { type: '' })).toHaveLength(4);
   });
 
@@ -65,8 +50,6 @@ describe('filterHistory', () => {
   });
 
   it('filtre les événements non crédités', () => {
-    // C'est le filtre qui a le plus de valeur : un don écarté par un plafond
-    // est précisément celui qui intrigue.
     expect(filterHistory(ENTRIES, { applied: false }).map((item) => item.id)).toEqual(['c', 'd']);
   });
 
@@ -83,8 +66,6 @@ describe('filterHistory', () => {
   });
 
   it('ne traite pas la recherche comme une expression régulière', () => {
-    // Un pseudo peut contenir n'importe quoi, et une recherche interprétée
-    // ferait lever le module au premier `(` tapé dans le champ.
     expect(() => filterHistory(ENTRIES, { search: '([' })).not.toThrow();
     expect(filterHistory(ENTRIES, { search: '.*' })).toHaveLength(0);
   });
@@ -116,7 +97,6 @@ describe('paginate', () => {
   });
 
   it('annonce une page unique pour une liste vide', () => {
-    // Zéro page ferait afficher « page 1 sur 0 », qui n'a pas de sens.
     const page = paginate([], 0, 10);
 
     expect(page.pageCount).toBe(1);
@@ -125,8 +105,6 @@ describe('paginate', () => {
   });
 
   it('ramène une page hors bornes dans les bornes', () => {
-    // Le filtre peut réduire la liste alors qu'on est sur la dernière page :
-    // sans ce recadrage, l'écran se viderait sans explication.
     const page = paginate(many, 99, 10);
 
     expect(page.page).toBe(2);
@@ -161,8 +139,6 @@ describe('formatDetail', () => {
   });
 
   it('n’invente rien pour un palier inconnu', () => {
-    // Le détail vient d'un fichier sur le disque, qui a pu être écrit par une
-    // version antérieure : il doit traverser tel quel, jamais être deviné.
     expect(formatDetail(entry({ type: 'sub', detail: 'tier9' }))).toContain('tier9');
   });
 });

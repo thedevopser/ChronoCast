@@ -5,60 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ChronoCast — Overlay</title>
 
-    <!--
-      Aucun jeton CSRF ici, délibérément : `routes/pages.ts` ne substitue le
-      marqueur que sur /admin et /setup. L'overlay ne mute rien, et une page
-      affichée dans OBS n'a aucune raison de porter un secret.
-
-      Le port du WebSocket, lui, est bien substitué : ce n'est pas un secret, et
-      c'est la seule façon pour l'overlay de savoir où se connecter avant
-      d'ouvrir le socket. Le `hello` qui porte ce port arrive trop tard, puisque
-      c'est ce même socket qu'il aurait fallu joindre.
-    -->
     <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
 
-    <!--
-      Aucune ressource distante. La CSP l'interdirait de toute façon,
-      mais la vraie raison est ailleurs : l'application doit fonctionner sans
-      connexion, et une Browser Source qui attend une police sur un CDN affiche
-      un compteur vide pendant plusieurs secondes au démarrage de la scène.
-    -->
     <link rel="stylesheet" href="/overlay/overlay.css" />
 
-    <!--
-      Feuille personnelle, chargée en dernier pour qu'elle puisse tout
-      surcharger. Servie depuis le répertoire de données, et seulement si
-      `overlay.enableCustomCss` est actif : sinon la réponse est une 404, sans
-      conséquence pour une feuille de style.
-    -->
     <link rel="stylesheet" href="/custom.css" />
   </head>
 
   <body>
-    <!--
-      Chemins absolus et non relatifs : la page est servie à l'URL /overlay,
-      sans barre oblique finale, où « overlay.css » se résoudrait en /overlay.css.
-    -->
     <div class="overlay" id="overlay">
-      <!--
-        Une enveloppe autour du compteur, qui porte le remplissage ; le trait du
-        cadre est peint par son pseudo-élément, masqué en son centre. Le
-        remplissage ne peut pas vivre sur le compteur lui-même : un dégradé de
-        texte se peint par `background-clip: text`, qui le découperait à la
-        forme des chiffres.
-
-        Cadre éteint, l'enveloppe est transparente et sans épaisseur :
-        l'overlay est alors strictement identique à ce qu'il était.
-      -->
       <div class="frame">
         <div class="countdown" id="countdown">--:--:--</div>
       </div>
 
-      <!--
-        Libellé de la bulle : renseigné pour les commandes de chat, masqué
-        partout ailleurs. Il précède le pseudo parce qu'il annonce la nature de
-        l'ajout — « Temps ajouté » — avant de dire qui en est l'auteur.
-      -->
       <div class="toast" id="toast" hidden>
         <span class="toast__label" id="toast-label" hidden></span>
         <span class="toast__user" id="toast-user"></span>

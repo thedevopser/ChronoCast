@@ -6,19 +6,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createFsPathProvider, defaultWebRoot } from '../../../src/core/app/fs-path-provider.js';
 
-/**
- * Fournisseur de chemins, implémentation du port `PathProvider`.
- *
- * Il vit dans `core/app/` et non dans un point d'entrée, aux côtés de
- * `system-clock` et `system-ticker`, parce qu'il a désormais deux appelants :
- * le point d'entrée headless, qui le laisse choisir sa racine, et la coquille
- * Electron, qui lui impose `app.getPath('userData')` — soit
- * `%APPDATA%\ChronoCast` sous Windows.
- *
- * Il n'était couvert par aucun test jusqu'ici. C'est d'autant moins tenable
- * qu'il porte une garde : composer un chemin de données ne doit jamais
- * permettre d'en sortir.
- */
 describe('createFsPathProvider', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -33,8 +20,6 @@ describe('createFsPathProvider', () => {
         webRootDirectory: '/app/public',
       });
 
-      // C'est la voie qu'emprunte la coquille Electron : elle sait où sont les
-      // données de l'utilisateur, l'environnement n'a pas à la contredire.
       expect(paths.dataDirectory).toBe(resolve('/tmp/explicite'));
     });
 
@@ -47,8 +32,6 @@ describe('createFsPathProvider', () => {
     });
 
     it('ignore une variable d’environnement vide', () => {
-      // Une variable définie mais vide est une variable non renseignée : la
-      // traiter comme une racine ferait écrire à la racine du système.
       vi.stubEnv('CHRONOCAST_DATA_DIR', '');
 
       const paths = createFsPathProvider({ webRootDirectory: '/app/public' });
@@ -87,8 +70,6 @@ describe('createFsPathProvider', () => {
     });
 
     it('garde la racine web hors de celle des données', () => {
-      // Le contenu servi est livré avec l'application : il n'a rien à faire
-      // dans le répertoire modifiable de l'utilisateur.
       const paths = createFsPathProvider({
         dataDirectory: '/tmp/racine',
         webRootDirectory: '/app/dist/public',
@@ -118,9 +99,6 @@ describe('createFsPathProvider', () => {
     });
 
     it('refuse de remonter au-dessus de la racine', () => {
-      // Le contrat du port l'exige. Un segment `..` est une erreur de
-      // programmation, et il vaut mieux la voir tout de suite qu'écrire hors
-      // du répertoire de données.
       expect(() => paths.resolveDataFile('..', 'ailleurs.json')).toThrow(
         /hors de la racine/,
       );
@@ -130,17 +108,10 @@ describe('createFsPathProvider', () => {
     });
 
     it('neutralise un segment absolu au lieu de le laisser écraser la racine', () => {
-      // `join` aplatit un segment absolu en segment relatif — c'est `resolve`
-      // seul qui lui aurait laissé reprendre la main. Le chemin reste donc sous
-      // la racine, ce que le contrat exige, et le cas ne lève pas : il n'y a
-      // rien d'anormal à demander un fichier nommé `etc/passwd` chez soi.
       expect(paths.resolveDataFile('/etc/passwd')).toBe(join(root, 'etc', 'passwd'));
     });
 
     it('accepte un répertoire dont le nom commence comme la racine', () => {
-      // Piège classique de la comparaison par préfixe : `/tmp/racine-bis` ne
-      // doit pas passer pour un enfant de `/tmp/racine`, et réciproquement un
-      // enfant légitime ne doit pas être refusé.
       expect(paths.resolveDataFile('racine-bis', 'fichier.json')).toBe(
         join(root, 'racine-bis', 'fichier.json'),
       );
@@ -148,25 +119,11 @@ describe('createFsPathProvider', () => {
   });
 });
 
-/**
- * Racine par défaut des ressources web.
- *
- * Elle est calculée depuis l'URL du module **appelant**, et non depuis celle de
- * ce fichier-ci : les deux points d'entrée compilés — `dist/headless/index.js`
- * et `dist/main/main.js` — sont chacun à un niveau sous `dist/`, alors que ce
- * module est enfoui plus profond. Le mesurer depuis lui donnerait un chemin
- * juste pour l'un et faux pour l'autre, et surtout un chemin qui changerait à
- * la première réorganisation de `src/core`.
- */
 describe('defaultWebRoot', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  // `file:///app/...` n'est pas une URL de fichier valide sous Windows, où un
-  // chemin absolu porte une lettre de lecteur : `fileURLToPath` y lève. Les URL
-  // sont donc construites depuis un chemin de la plateforme, comme le fait
-  // `import.meta.url` en vrai.
   const entryUrl = (...segments: string[]): string =>
     pathToFileURL(resolve(join('/app/dist', ...segments))).href;
 
@@ -185,8 +142,6 @@ describe('defaultWebRoot', () => {
   });
 
   it('laisse l’environnement imposer une racine', () => {
-    // C'est ce qui permet de servir une compilation en cours pendant le
-    // développement, sans toucher au code.
     vi.stubEnv('CHRONOCAST_WEB_ROOT', '/ailleurs/public');
 
     expect(defaultWebRoot(entryUrl('headless', 'index.js'))).toBe('/ailleurs/public');

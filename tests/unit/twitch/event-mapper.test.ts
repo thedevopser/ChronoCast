@@ -4,31 +4,12 @@ import { mapNotification, semanticKey } from '../../../src/core/twitch/event-map
 import type { DomainEvent } from '../../../src/core/events/domain-event.js';
 import * as fixtures from '../../fixtures/eventsub-payloads.js';
 
-/**
- * Le convertisseur est la frontière entre le protocole Twitch et le métier. Il
- * absorbe toutes les bizarreries du premier pour que le second n'ait à connaître
- * qu'un vocabulaire propre.
- *
- * Deux de ces bizarreries sont des pièges à double comptage, et ce sont elles
- * qui justifient l'essentiel des tests qui suivent :
- *
- *   - un don d'abonnements produit à la fois un `channel.subscription.gift` pour
- *     le donateur et un `channel.subscribe` par bénéficiaire ;
- *   - un don groupé produit un `community_sub_gift` porteur du total, suivi d'un
- *     `sub_gift` par bénéficiaire.
- *
- * Le convertisseur ne lève jamais. Une charge utile inattendue est signalée,
- * jamais propagée en exception : une notification mal formée ne doit pas
- * interrompre la connexion EventSub.
- */
-
 const RECEIVED_AT = 1_754_000_000_000;
 
 function context(subscriptionType: string) {
   return { messageId: 'msg-abc', receivedAt: RECEIVED_AT, subscriptionType };
 }
 
-/** Extrait l'événement produit, ou fait échouer le test avec un message utile. */
 function expectEvent(result: ReturnType<typeof mapNotification>): DomainEvent {
   if (result.kind !== 'event') {
     throw new Error(`événement attendu, obtenu « ${result.kind} » : ${result.reason}`);
@@ -61,7 +42,6 @@ describe('mapNotification', () => {
     });
 
     it('écarte un abonnement offert', () => {
-      // Sinon chaque bénéficiaire serait compté en plus du don lui-même.
       const result = mapNotification(context('channel.subscribe'), fixtures.channelSubscribeGifted);
 
       expect(result.kind).toBe('ignored');
@@ -147,8 +127,6 @@ describe('mapNotification', () => {
 
   describe('channel.chat.notification', () => {
     it('distingue un abonnement Prime d\'un Tier 1', () => {
-      // Raison d'être de ce flux : c'est le seul endroit du protocole où
-      // l'indicateur Prime existe.
       const event = expectEvent(
         mapNotification(context('channel.chat.notification'), fixtures.chatNotificationSubPrime),
       );
@@ -181,7 +159,6 @@ describe('mapNotification', () => {
     });
 
     it('écarte un don individuel rattaché à un don groupé', () => {
-      // Il a déjà été comptabilisé dans le total du don groupé.
       const result = mapNotification(
         context('channel.chat.notification'),
         fixtures.chatNotificationSubGiftInCommunity,
@@ -266,9 +243,6 @@ describe('mapNotification', () => {
 
 describe('semanticKey', () => {
   it('produit la même clé pour un abonnement décrit par deux sources', () => {
-    // C'est ce qui permet d'écarter le doublon entre channel.subscribe et
-    // channel.chat.notification, qui portent des identifiants de message
-    // différents mais décrivent le même abonnement.
     const viaEventSub = expectEvent(
       mapNotification(context('channel.subscribe'), fixtures.channelSubscribe),
     );

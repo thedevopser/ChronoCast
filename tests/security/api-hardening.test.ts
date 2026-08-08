@@ -10,18 +10,6 @@ import type { StaticHandler } from '../../src/core/server/static-handler.js';
 import { createApiDoubles, type ApiDoubles } from '../helpers/api-context.js';
 import { makeRequest } from '../helpers/http-request.js';
 
-/**
- * Ces tests traversent le routeur complet, et non les routes seules. C'est la
- * seule façon de vérifier ce qui compte : que les gardes s'appliquent
- * effectivement à chaque route, y compris à celles ajoutées après coup.
- *
- * L'application est locale, sans authentification, et pilote un compteur affiché
- * en direct devant des milliers de personnes. Trois choses ne doivent jamais
- * arriver : qu'une page tierce la commande, qu'un secret en ressorte, et qu'un
- * fichier importé par l'utilisateur en modifie le comportement au-delà de ce que
- * le schéma autorise.
- */
-
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
 const TOKEN = 'a'.repeat(64);
 
@@ -30,7 +18,6 @@ const NO_STATIC: StaticHandler = {
   serve: () => Promise.resolve({ status: 404, headers: {}, body: 'introuvable' }),
 };
 
-/** Toutes les mutations de l'API, pour n'en oublier aucune. */
 const MUTATIONS: readonly (readonly [string, string])[] = [
   ['PATCH', '/api/config'],
   ['POST', '/api/config/import'],
@@ -45,7 +32,6 @@ const MUTATIONS: readonly (readonly [string, string])[] = [
   ['POST', '/api/overlay/test'],
 ];
 
-/** Toutes les lectures de l'API. */
 const READS: readonly string[] = [
   '/api/state',
   '/api/config',
@@ -65,7 +51,6 @@ describe('durcissement de l’API', () => {
     router = createRouter({
       routes: createApiRoutes(doubles.context),
       pageHandler: NO_PAGE,
-      // Aucune feuille personnelle : ce fichier n'audite que l'API.
       customCssHandler: NO_PAGE,
       staticHandler: NO_STATIC,
       getCsrfToken: () => TOKEN,
@@ -84,7 +69,6 @@ describe('durcissement de l’API', () => {
       const response = await router.handle(makeRequest({ method, path, body: '{}' }));
 
       expect(response.status).toBe(403);
-      // Aucune trace d'exécution : la garde intervient avant la route.
       expect(doubles.calls).toEqual([]);
     });
 
@@ -97,8 +81,6 @@ describe('durcissement de l’API', () => {
     });
 
     it.each(READS)('%s reste lisible sans jeton', async (path) => {
-      // L'overlay est chargé par OBS, qui ne peut pas ajouter d'en-tête : la
-      // lecture doit rester ouverte, et c'est pourquoi elle ne divulgue rien.
       const response = await router.handle(makeRequest({ path }));
 
       expect(response.status).not.toBe(403);
@@ -138,9 +120,6 @@ describe('durcissement de l’API', () => {
 
   describe('import hostile', () => {
     it('neutralise une tentative de pollution de prototype', async () => {
-      // Le JSON est écrit à la main, littéralement. Le passer par un littéral
-      // d'objet ne testerait rien : `{ __proto__: … }` définit le prototype de
-      // l'objet au lieu d'y créer une clé, et `JSON.stringify` ne l'émettrait pas.
       const hostileConfig = '{"__proto__":{"pollué":true},"counter":{"initialSeconds":60}}';
 
       await authorized(
@@ -188,8 +167,6 @@ describe('durcissement de l’API', () => {
     });
 
     it("n'autorise jamais une écoute hors de la boucle locale", async () => {
-      // Le point le plus sensible de tout le fichier de configuration : une
-      // écoute sur 0.0.0.0 offrirait le panneau d'administration au réseau.
       await authorized(
         'PATCH',
         '/api/config',

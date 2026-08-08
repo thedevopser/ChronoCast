@@ -6,20 +6,6 @@ import type { Route } from '../../../../src/core/server/router.js';
 import { createApiDoubles, type ApiDoubles } from '../../../helpers/api-context.js';
 import { makeRequest, type RequestOverrides } from '../../../helpers/http-request.js';
 
-/**
- * Les routes ne font que déléguer : le métier vit dans les services, déjà testés
- * pour eux-mêmes. Ce qui se joue ici est ailleurs.
- *
- * D'abord la **validation** : tout corps entrant vient d'une page, et une page
- * peut avoir été ouverte par un lien. Zod est la seule porte, et une valeur
- * refusée doit produire un `400` explicite plutôt qu'un `500` — la différence
- * entre « vous vous êtes trompé » et « le serveur est cassé ».
- *
- * Ensuite le **secret** : le secret client Twitch s'écrit et ne se lit jamais.
- * Il n'entre pas dans la configuration, ne ressort ni par `GET`, ni par
- * l'export, ni par le WebSocket.
- */
-
 describe('createApiRoutes', () => {
   let doubles: ApiDoubles;
   let routes: Route[];
@@ -29,7 +15,6 @@ describe('createApiRoutes', () => {
     routes = createApiRoutes(doubles.context);
   });
 
-  /** Exécute une route comme le ferait le routeur, gardes déjà franchies. */
   async function call(
     method: string,
     path: string,
@@ -95,9 +80,6 @@ describe('createApiRoutes', () => {
     });
 
     it('dirige le secret client vers le magasin chiffré, pas vers la configuration', async () => {
-      // Le secret n'a pas de place dans un fichier JSON en clair : il est
-      // sibling de `config` dans le corps, jamais dedans, pour que l'exclusion
-      // soit structurelle plutôt qu'une exception à ne pas oublier.
       await call('PATCH', '/api/config', {
         body: JSON.stringify({ clientSecret: 'secret-tres-confidentiel' }),
       });
@@ -166,8 +148,6 @@ describe('createApiRoutes', () => {
     });
 
     it('fournit un motif par défaut', async () => {
-      // L'historique doit rester lisible même quand l'interface ne demande rien :
-      // une entrée sans motif ne s'explique plus six heures après.
       await call('POST', '/api/counter/add', { body: JSON.stringify({ seconds: 60 }) });
 
       expect(doubles.calls.some((entry) => entry.startsWith('counter.addTime:60:'))).toBe(true);
@@ -204,8 +184,6 @@ describe('createApiRoutes', () => {
     });
 
     it('refuse un motif démesuré', async () => {
-      // Le motif finit dans l'historique et sur le WebSocket : le borner évite
-      // qu'une page locale ne remplisse le disque une requête à la fois.
       const response = await call('POST', '/api/counter/add', {
         body: JSON.stringify({ seconds: 60, reason: 'x'.repeat(5_000) }),
       });
@@ -245,8 +223,6 @@ describe('createApiRoutes', () => {
     });
 
     it('traduit une panne Twitch en 502, sans détail interne', async () => {
-      // Une erreur de Twitch n'est pas une erreur de ChronoCast : le 502 le dit,
-      // et évite au streamer de chercher la panne du mauvais côté.
       doubles.failTwitch = true;
 
       const response = await call('GET', '/api/twitch/status');
@@ -304,8 +280,6 @@ describe('createApiRoutes', () => {
 
       const response = await call('GET', '/api/logs', { query: { level: 'warning' } });
 
-      // Un filtre par niveau minimal, pas par niveau exact : chercher les
-      // avertissements sans voir les erreurs n'aurait aucun sens.
       expect(body(response)['records']).toHaveLength(2);
     });
 
@@ -325,8 +299,6 @@ describe('createApiRoutes', () => {
     });
 
     it('marque l’événement comme manuel', async () => {
-      // Sans cette provenance, un test d'overlay serait indiscernable d'un vrai
-      // abonnement dans l'historique.
       const response = await call('POST', '/api/overlay/test', {
         body: JSON.stringify({ type: 'bits' }),
       });
@@ -349,8 +321,6 @@ describe('createApiRoutes', () => {
     });
 
     it('tronque un pseudo démesuré plutôt que de le refuser', async () => {
-      // Le pseudo vient de l'interface ici, mais il vient de Twitch en
-      // production : le même plafond doit s'appliquer aux deux chemins.
       const response = await call('POST', '/api/overlay/test', {
         body: JSON.stringify({ type: 'sub', userName: 'é'.repeat(500) }),
       });
@@ -361,56 +331,29 @@ describe('createApiRoutes', () => {
     });
   });
 
-  describe('mise à jour', () => {
-    /** Place le service dans l'état où une version vérifiée attend un clic. */
-    function makeReady(): void {
-      doubles.updateStatus = {
-        phase: 'ready',
-        currentVersion: '0.1.0',
-        availableVersion: '0.5.1',
-        notesUrl: 'https://github.com/thedevopser/ChronoCast/releases/tag/v0.5.1',
-        message: null,
-        checkedAt: 1_700_000_000_000,
-      };
-    }
-
-    it('renvoie l’état courant', async () => {
-      const response = await call('GET', '/api/update');
-
-      expect(response.status).toBe(200);
-      expect(body(response)).toMatchObject({ phase: 'idle', currentVersion: '0.1.0' });
-    });
-
-    it('déclenche une vérification à la demande', async () => {
-      const response = await call('POST', '/api/update/check');
-
-      expect(response.status).toBe(200);
-      expect(doubles.calls).toContain('update.check');
-    });
-
-    it('lance l’installation quand une version est prête', async () => {
-      makeReady();
-
-      const response = await call('POST', '/api/update/install');
+  describe('POST /api/system/startup-settings', () => {
+    it('demande à la coquille d’ouvrir les paramètres de démarrage', async () => {
+      const response = await call('POST', '/api/system/startup-settings');
 
       expect(response.status).toBe(204);
-      expect(doubles.calls).toContain('update.install');
+      expect(doubles.calls).toContain('system.openStartupSettings');
     });
 
-    it('refuse l’installation quand rien n’est prêt, en 409', async () => {
-      // Un `500` dirait « le serveur est cassé » là où la vérité est « il n'y
-      // a rien à installer ». La distinction se lit dans le panneau.
-      const response = await call('POST', '/api/update/install');
+    it('répond 501 quand le point d’entrée n’a pas de coquille', async () => {
+      const withoutShell = createApiDoubles();
+      const routesWithoutShell = createApiRoutes({
+        ...withoutShell.context,
+        system: undefined,
+      });
+      const route = routesWithoutShell.find(
+        (entry) => entry.method === 'POST' && entry.path === '/api/system/startup-settings',
+      );
 
-      expect(response.status).toBe(409);
-    });
+      const response = await route?.handler(
+        makeRequest({ method: 'POST', path: '/api/system/startup-settings' }),
+      );
 
-    it('n’installe rien tant que le service n’est pas prêt', async () => {
-      await call('POST', '/api/update/install');
-
-      // L'appel est bien transmis — c'est le service qui décide, pas la route —
-      // mais rien ne s'installe, et l'utilisateur reçoit un refus explicite.
-      expect(body(await call('GET', '/api/update'))['phase']).toBe('idle');
+      expect(response?.status).toBe(501);
     });
   });
 });

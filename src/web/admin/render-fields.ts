@@ -1,28 +1,8 @@
-/**
- * Rendu des champs décrits par `fields.ts`.
- *
- * Le gabarit ne contient aucun des soixante-dix champs de réglage : ils sont
- * construits ici, à partir de la table de descripteurs. Les recopier dans le
- * HTML créerait une seconde source de vérité, et une faute de frappe entre un
- * sélecteur et son descripteur ne se verrait qu'à l'usage — un réglage « qui ne
- * s'enregistre pas », sans message ni trace.
- *
- * C'est la seule frontière du panneau où l'on écrit dans le DOM à partir d'une
- * description, d'où le module séparé et testé. Tout ce qui décide — quoi
- * envoyer, quoi refuser — reste dans `form-binding.ts`, qui ne connaît pas le
- * DOM ; ici on ne fait que peindre et relire.
- *
- * **Rien n'est écrit autrement que par `textContent`.** Les libellés sont les
- * nôtres, donc sûrs, mais la discipline vaut par sa constance : une exception
- * accordée une fois est une exception qu'on reproduit.
- */
-
 import type { AdminField } from './fields.js';
 import { groupOf } from './fields.js';
 import type { FieldError, RawValue } from './form-binding.js';
 import { setText } from '../shared/safe-dom.js';
 
-/** Type de champ HTML par genre. `enum` fait exception : c'est un `select`. */
 const INPUT_TYPES: Readonly<Record<string, string>> = {
   integer: 'number',
   number: 'number',
@@ -31,12 +11,10 @@ const INPUT_TYPES: Readonly<Record<string, string>> = {
   color: 'color',
 };
 
-/** Identifiant du porte-message d'erreur associé à un champ. */
 function errorIdOf(selector: string): string {
   return `${selector.replace(/^#/, '')}-error`;
 }
 
-/** Construit le contrôle correspondant au genre du descripteur. */
 function createControl(source: Document, field: AdminField): HTMLElement {
   if (field.kind === 'enum') {
     const select = source.createElement('select');
@@ -57,13 +35,9 @@ function createControl(source: Document, field: AdminField): HTMLElement {
   input.className = 'field__input';
   input.id = field.selector.replace(/^#/, '');
   input.type = INPUT_TYPES[field.kind] ?? 'text';
-  // Rien de ce qui est ici n'a vocation à être complété par le navigateur :
-  // ce sont des réglages, pas une identité.
   input.autocomplete = 'off';
 
   if (field.kind === 'integer' || field.kind === 'number') {
-    // Le navigateur ne s'en sert que pour ses flèches et son incrément. La
-    // validation qui compte reste celle de `form-binding`, puis celle de Zod.
     if (field.min !== undefined) {
       input.min = String(field.min);
     }
@@ -76,13 +50,6 @@ function createControl(source: Document, field: AdminField): HTMLElement {
   return input;
 }
 
-/**
- * Peint les champs, regroupés sous leurs titres.
- *
- * Le conteneur est **remplacé** et non complété : les vues se rechargent après
- * chaque enregistrement, et empiler dupliquerait les champs à chaque
- * sauvegarde.
- */
 export function renderFieldGroups(
   source: Document,
   container: Element,
@@ -120,8 +87,6 @@ export function renderFieldGroups(
 
       const control = createControl(source, field);
 
-      // La case précède son libellé, le reste le suit : c'est la disposition
-      // que tout le monde attend, et l'inverser fait hésiter au clic.
       if (isSwitch) {
         wrapper.append(control, label);
       } else {
@@ -148,12 +113,6 @@ export function renderFieldGroups(
   }
 }
 
-/**
- * Écrit les valeurs dans les champs.
- *
- * Une valeur visant un champ absent est ignorée : chaque vue ne rend que ses
- * propres champs, et lever ici obligerait l'appelant à filtrer avant d'appeler.
- */
 export function writeFieldValues(
   container: ParentNode,
   fields: readonly AdminField[],
@@ -175,13 +134,6 @@ export function writeFieldValues(
   }
 }
 
-/**
- * Relit les champs présents dans le conteneur.
- *
- * Les champs absents sont **omis** plutôt que rendus vides : `patchFrom` ignore
- * ce qu'il ne reçoit pas, alors qu'il refuserait une chaîne vide. C'est ce qui
- * permet d'enregistrer une vue sans toucher aux réglages des autres.
- */
 export function readFieldValues(
   container: ParentNode,
   fields: readonly AdminField[],
@@ -201,7 +153,6 @@ export function readFieldValues(
   return values;
 }
 
-/** Affiche les messages sous les champs fautifs et les marque. */
 export function showFieldErrors(container: ParentNode, errors: readonly FieldError[]): void {
   for (const error of errors) {
     const element = container.querySelector(error.selector);
@@ -214,12 +165,6 @@ export function showFieldErrors(container: ParentNode, errors: readonly FieldErr
   }
 }
 
-/**
- * Efface les messages et les marques.
- *
- * Sans cela, une erreur corrigée resterait affichée sous un champ redevenu
- * valide, et l'utilisateur chercherait un problème qui n'existe plus.
- */
 export function clearFieldErrors(container: ParentNode, fields: readonly AdminField[]): void {
   for (const field of fields) {
     container.querySelector(field.selector)?.classList.remove('field__input--invalid');

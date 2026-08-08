@@ -1,24 +1,6 @@
-# Services Docker de ChronoCast.
-#
-# Aucun binaire Node n'est installé sur l'hôte : toutes les commandes de
-# développement passent par ces services, pilotés par ./scripts/dc.sh.
-#
-# **Il n'y a pas de service de packaging.** L'installeur Windows est construit
-# par le workflow `Release`, sur un runner `windows-latest`, nativement. Un
-# service Wine local a existé jusqu'à la version 0.2.0 : il pesait plusieurs
-# gigaoctets, construisait en croisé ce que GitHub construit nativement, et
-# n'était plus le chemin de release depuis la Phase 7. Voir docs/BUILD.md.
-#
-# Le dossier node_modules est un volume nommé et non un bind-mount. Deux raisons :
-#   - les performances d'E/S sur un bind-mount WSL2 sont médiocres pour des
-#     arborescences de dizaines de milliers de fichiers ;
-#   - node_modules contient des artefacts compilés pour Linux, qui n'ont rien à
-#     faire dans l'arborescence d'un projet dont la cible est Windows.
-
 name: chronocast
 
 services:
-  # Service principal : lint, typecheck, tests, installation des dépendances.
   dev:
     build:
       context: ..
@@ -28,15 +10,10 @@ services:
       - ..:/app
       - node_modules:/app/node_modules
     environment:
-      # Répertoire de données isolé pour les tests, hors du volume projet, afin
-      # qu'un test ne puisse jamais écrire dans les sources.
       CHRONOCAST_DATA_DIR: /tmp/chronocast-data
     init: true
-    # Le conteneur reste disponible pour des exécutions successives via `run`.
     command: ["sleep", "infinity"]
 
-  # Serveur EventSub factice fourni par la Twitch CLI, utilisé par les tests
-  # d'intégration et par ./scripts/twitch-mock.sh.
   twitch-cli:
     build:
       context: ..

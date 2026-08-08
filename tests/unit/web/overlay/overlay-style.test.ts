@@ -1,28 +1,8 @@
-/**
- * Traduction de la configuration d'apparence en variables CSS.
- *
- * Le risque couvert est un contournement de la CSP. `style-src 'self'` interdit
- * la balise `<style>` comme l'attribut `style=` écrit dans le HTML : il est
- * donc impossible de composer une feuille de style à partir de la
- * configuration. La seule voie restante est le CSSOM, qui n'est pas couvert par
- * la directive — d'où un jeu de variables CSS, calculé ici et posé par
- * `safe-dom.setCssVariables`.
- *
- * Cette fonction est pure : elle prend une configuration et rend un
- * dictionnaire. Tout le comportement observable de l'apparence se vérifie donc
- * sans navigateur, sans feuille de style et sans rendu.
- *
- * Le point délicat est la composition de `text-shadow` : l'ombre portée et la
- * lueur sont deux réglages indépendants qui alimentent la **même** propriété
- * CSS. Activer l'un ne doit pas effacer l'autre.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import type { OverlayConfig } from '../../../../src/web/shared/protocol.js';
 import { overlayCssVariables } from '../../../../src/web/overlay/overlay-style.js';
 
-/** Configuration par défaut du schéma, reproduite pour partir d'un socle connu. */
 const BASE: OverlayConfig = {
   fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
   fontSize: 96,
@@ -100,8 +80,6 @@ describe('overlayCssVariables', () => {
     });
 
     it('cumule l’ombre et la lueur sur la même propriété', () => {
-      // Les deux réglages alimentent `text-shadow`. Activer l'un ne doit pas
-      // effacer l'autre : c'est exactement ce qu'une écriture naïve ferait.
       const variables = overlayCssVariables({
         ...BASE,
         shadow: { enabled: true, color: '#000000CC', blur: 12, offsetX: 0, offsetY: 4 },
@@ -124,9 +102,6 @@ describe('overlayCssVariables', () => {
     });
 
     it('annule la largeur quand il est inactif', () => {
-      // Neutraliser par la largeur plutôt que par la couleur : une largeur nulle
-      // désactive `-webkit-text-stroke` sans dépendre du fond, qui est
-      // transparent dans une Browser Source.
       const variables = overlayCssVariables({
         ...BASE,
         outline: { enabled: false, color: '#101010', width: 3 },
@@ -159,16 +134,6 @@ describe('overlayCssVariables', () => {
   });
 
   describe('dégradé', () => {
-    /*
-     * Le dégradé ne peut pas être une simple couleur : `color` n'accepte pas
-     * d'image. Le texte est donc peint par un fond découpé à la forme des
-     * glyphes (`background-clip: text`), ce qui impose de rendre la couleur du
-     * texte transparente — sans quoi elle recouvrirait le dégradé.
-     *
-     * Corollaire à ne jamais perdre de vue : la couleur de remplissage doit
-     * redevenir opaque dès que le dégradé est éteint, faute de quoi le compteur
-     * disparaît purement et simplement de la scène.
-     */
     it('laisse la couleur unie peindre le texte quand il est éteint', () => {
       const variables = overlayCssVariables(BASE);
 
@@ -187,9 +152,6 @@ describe('overlayCssVariables', () => {
     });
 
     it('laisse le texte tranquille quand il ne vise que le cadre', () => {
-      // Les deux cibles sont indépendantes : un dégradé sur le cadre ne doit
-      // pas rendre les chiffres transparents, sous peine de les faire
-      // disparaître si le cadre est éteint.
       const variables = overlayCssVariables({
         ...BASE,
         gradient: { ...BASE.gradient, onFrame: true },
@@ -203,8 +165,6 @@ describe('overlayCssVariables', () => {
 
   describe('cadre', () => {
     it('est parfaitement neutre quand il est éteint', () => {
-      // Rien ne doit changer pour qui ne l'a pas demandé : la scène OBS est
-      // déjà cadrée sur ce que le streamer voit aujourd'hui.
       const variables = overlayCssVariables(BASE);
 
       expect(variables['--cc-frame-width']).toBe('0px');
@@ -249,8 +209,6 @@ describe('overlayCssVariables', () => {
     });
 
     it('partage la même définition que le texte quand les deux sont visés', () => {
-      // Une seule paire de couleurs et un seul angle : les dédoubler n'aurait
-      // servi qu'à donner l'occasion de les désaccorder.
       const variables = overlayCssVariables({
         ...BASE,
         gradient: { ...BASE.gradient, onText: true, onFrame: true },
@@ -261,9 +219,6 @@ describe('overlayCssVariables', () => {
     });
 
     it('laisse l’intérieur libre par défaut', () => {
-      // Un cadre est un trait, pas un pavé : un remplissage opaque par défaut
-      // masquerait la scène derrière lui, et c'est le contraire de ce qu'on
-      // attend d'un cadre.
       const variables = overlayCssVariables({
         ...BASE,
         frame: { ...BASE.frame, enabled: true },
@@ -273,11 +228,6 @@ describe('overlayCssVariables', () => {
     });
 
     it('ne calcule aucun rayon intérieur', () => {
-      // Il l'était, du temps où le trait était le `padding` d'une enveloppe et
-      // le remplissage celui d'une seconde. Le trait étant désormais peint par
-      // un pseudo-élément dont on soustrait la boîte intérieure, les rayons
-      // intérieurs sont calculés par le moteur — les recalculer ici les ferait
-      // diverger au premier arrondi non entier.
       const variables = overlayCssVariables({
         ...BASE,
         frame: { ...BASE.frame, enabled: true, radius: 18, width: 4 },
@@ -287,11 +237,6 @@ describe('overlayCssVariables', () => {
     });
 
     describe('remplissage', () => {
-      /*
-       * L'opacité est un réglage à part parce que `<input type="color">` ne
-       * sait pas exprimer la transparence : il rend toujours six chiffres
-       * hexadécimaux. Les deux sont donc recomposés ici.
-       */
       it('compose la couleur et l’opacité en une notation à huit chiffres', () => {
         const variables = overlayCssVariables({
           ...BASE,
@@ -316,8 +261,6 @@ describe('overlayCssVariables', () => {
       });
 
       it('développe la notation courte avant d’y ajouter l’opacité', () => {
-        // `#RGB` est une notation légale que le schéma accepte ; y coller deux
-        // chiffres de plus produirait une couleur silencieusement fausse.
         const variables = overlayCssVariables({
           ...BASE,
           frame: { ...BASE.frame, enabled: true, fillColor: '#1AF', fillOpacity: 1 },
@@ -327,9 +270,6 @@ describe('overlayCssVariables', () => {
       });
 
       it('remplace l’opacité déjà portée par la couleur', () => {
-        // Une couleur venue d'une configuration importée peut déjà porter huit
-        // chiffres. Le réglage visible dans le panneau doit l'emporter, sans
-        // quoi le curseur d'opacité n'aurait aucun effet.
         const variables = overlayCssVariables({
           ...BASE,
           frame: { ...BASE.frame, enabled: true, fillColor: '#101820FF', fillOpacity: 0.4 },
@@ -342,8 +282,6 @@ describe('overlayCssVariables', () => {
 
   describe('contrat avec safe-dom', () => {
     it('ne produit que des noms de variables CSS', () => {
-      // `setCssVariables` refuse tout nom qui n'est pas préfixé : cette
-      // vérification évite de découvrir la faute de frappe à l'écran.
       const names = Object.keys(overlayCssVariables(BASE));
 
       expect(names.length).toBeGreaterThan(0);

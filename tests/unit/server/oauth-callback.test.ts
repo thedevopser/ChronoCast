@@ -1,34 +1,3 @@
-/**
- * Gestionnaire du rappel OAuth de Twitch.
- *
- * C'est le seul point de ChronoCast où un **navigateur extérieur au produit**
- * pousse une requête dans l'application. Twitch renvoie l'utilisateur sur
- * `http://127.0.0.1:37771/callback?code=…&state=…`, et ce code s'échange contre
- * un jeton d'accès à la chaîne. Autrement dit, ce fichier garde la porte.
- *
- * Le `state` est la seule défense contre l'attaque classique du flux
- * d'autorisation : un tiers déclenche son propre flux, glisse **son** code dans
- * la session du streamer, et ChronoCast se retrouve connecté au compte de
- * l'attaquant — qui reçoit alors les événements, ou pire, se sert de la chaîne
- * du streamer comme d'un relais. La comparaison est à temps constant et
- * réutilise `verifyCsrfToken`, le `state` ayant exactement la même forme que le
- * jeton CSRF : trente-deux octets en hexadécimal.
- *
- * Deux propriétés valent d'être énoncées, parce qu'elles ne vont pas de soi.
- *
- * **Le gestionnaire ne voit jamais le `state` attendu.** Il ne reçoit qu'un
- * `verifyState()` qui répond oui ou non. Il ne peut donc ni le journaliser, ni
- * le renvoyer dans une page, ni le laisser fuir dans une URL de redirection.
- *
- * **Un `state` qui ne correspond pas ne consomme rien.** N'importe quelle page
- * distante peut provoquer une navigation vers la boucle locale ; si un
- * `state` erroné suffisait à consommer la demande en cours, le premier venu
- * pourrait faire échouer la connexion du streamer à distance, en boucle.
- *
- * Le gestionnaire est une fonction pure de requête vers réponse, comme tout le
- * routage de la Phase 4 : aucun socket n'est ouvert dans ces tests.
- */
-
 import { describe, expect, it, vi } from 'vitest';
 
 import { createOAuthCallbackRouter } from '../../../src/core/server/oauth-callback.js';
@@ -42,7 +11,6 @@ interface Harness {
   readonly router: ReturnType<typeof createOAuthCallbackRouter>;
   readonly exchanged: string[];
   readonly verified: string[];
-  /** Issues transmises à `onSettled`, dans l'ordre. */
   readonly settled: string[];
 }
 
@@ -94,10 +62,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('rend une page terminale, sans renvoyer le navigateur dans l’assistant', async () => {
-      // Rediriger vers `/setup` faisait poursuivre la configuration **dans le
-      // navigateur**, pendant que la fenêtre de l'application restait à
-      // l'étape précédente : deux assistants ouverts, et l'utilisateur qui
-      // termine dans le mauvais. Le navigateur a fait sa part, il s'arrête là.
       const harness = createHarness();
 
       const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
@@ -116,9 +80,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('garde un lien vers l’assistant, seul retour du mode headless', async () => {
-      // Sans fenêtre applicative, cette page est le seul retour possible :
-      // supprimer ce lien enfermerait l'utilisateur du point d'entrée headless
-      // sur une page morte.
       const harness = createHarness();
 
       const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
@@ -127,8 +88,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('signale l’issue du flux', async () => {
-      // C'est ce qui désarme le serveur éphémère — il n'a plus rien à écouter —
-      // et ce qui, dans la coquille, ramène la fenêtre au premier plan.
       const harness = createHarness();
 
       await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
@@ -147,9 +106,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('omet le lien quand le port applicatif est inconnu', async () => {
-      // Le rappel peut aboutir alors que le serveur principal n'écoute pas
-      // encore : un lien vers un port qui n'existe pas vaut moins que pas de
-      // lien du tout.
       const harness = createHarness({ appPort: null });
 
       const response = await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
@@ -162,8 +118,6 @@ describe('createOAuthCallbackRouter', () => {
 
   describe('refus de l’utilisateur', () => {
     it('clôt le flux sans tenter d’échange', async () => {
-      // Twitch renvoie `error=access_denied` quand l'utilisateur clique sur
-      // « Annuler ». Ce n'est pas une anomalie, c'est une décision.
       const harness = createHarness();
 
       const response = await harness.router.handle(
@@ -177,8 +131,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('ne reflète pas le message d’erreur de Twitch', async () => {
-      // Ce texte est contrôlé par un tiers et finirait dans une barre d'adresse
-      // puis dans l'assistant : il n'apporte rien et ouvre une porte.
       const harness = createHarness();
 
       const response = await harness.router.handle(
@@ -200,9 +152,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('ne consomme pas la demande en cours quand le state est faux', async () => {
-      // Une page distante peut provoquer une navigation vers la boucle locale.
-      // Si un state erroné suffisait à clore le flux, n'importe qui pourrait
-      // faire échouer la connexion du streamer, à distance et en boucle.
       const harness = createHarness({ verifyState: () => false });
 
       await harness.router.handle(callback({ code: 'abc', state: 'b'.repeat(64) }));
@@ -252,7 +201,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('ne reflète pas le message d’erreur dans la page', async () => {
-      // Le détail appartient aux journaux, pas à une barre d'adresse.
       const harness = createHarness({
         complete: () => Promise.reject(new Error('client_secret invalide : abcdef')),
       });
@@ -263,8 +211,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('clôt tout de même le flux', async () => {
-      // Le code d'autorisation est à usage unique : le rejouer échouerait de
-      // toute façon. Laisser le serveur armé n'offrirait qu'une surface.
       const harness = createHarness({ complete: () => Promise.reject(new Error('échec')) });
 
       await harness.router.handle(callback({ code: 'abc', state: VALID_STATE }));
@@ -286,7 +232,6 @@ describe('createOAuthCallbackRouter', () => {
     });
 
     it('n’accepte que la lecture', async () => {
-      // Twitch redirige le navigateur : c'est un GET, et rien d'autre.
       const harness = createHarness();
 
       const response = await harness.router.handle(

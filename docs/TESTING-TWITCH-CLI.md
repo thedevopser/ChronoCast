@@ -16,7 +16,7 @@ Tout passe par un conteneur : la CLI n'est pas installée sur l'hôte.
 
 Il écoute sur `ws://127.0.0.1:8080/ws` et journalise chaque connexion et chaque notification. C'est la moitié de l'intérêt de la manœuvre : on voit ce qui part.
 
-**Pointez ChronoCast dessus.** Dans `%APPDATA%\ChronoCast\config.json` — ou dans le répertoire de données du point d'entrée headless —, remplacez :
+**Pointez ChronoCast dessus.** Dans `%USERPROFILE%\ChronoCast\config.json` — ou dans le répertoire de données du point d'entrée headless —, remplacez :
 
 ```json
 "eventsubUrl": "wss://eventsub.wss.twitch.tv/ws"

@@ -10,17 +10,6 @@ import {
   StoreWriteError,
 } from '../../../src/core/storage/atomic-json-store.js';
 
-/**
- * Ce magasin porte la promesse centrale de ChronoCast : « le compteur survit à un
- * crash ». Tout ce qui suit décrit ce que cela signifie concrètement.
- *
- * Le scénario redouté est la coupure de courant pendant l'écriture. Un
- * `writeFile` direct laisse alors un fichier tronqué, donc un JSON invalide,
- * donc un compteur perdu. D'où l'écriture dans un fichier temporaire suivie d'un
- * `rename`, opération atomique, et la conservation systématique de la version
- * précédente.
- */
-
 interface Compteur {
   readonly restantMs: number;
   readonly statut: string;
@@ -28,7 +17,6 @@ interface Compteur {
 
 const DEFAUT: Compteur = { restantMs: 43_200_000, statut: 'idle' };
 
-/** Validateur strict : refuse toute forme inattendue, comme le fera Zod. */
 function parseCompteur(raw: unknown): Compteur {
   if (typeof raw !== 'object' || raw === null) {
     throw new TypeError('objet attendu');
@@ -136,8 +124,6 @@ describe('createAtomicJsonStore', () => {
         ),
       );
 
-      // Quelle que soit la dernière écriture gagnante, le fichier doit rester un
-      // JSON valide et complet : jamais un entrelacement de deux sérialisations.
       const result = await store.read();
       expect(result.statut).toBe('concurrent');
       expect(result.restantMs).toBeGreaterThanOrEqual(0);
@@ -150,7 +136,6 @@ describe('createAtomicJsonStore', () => {
       await store.write({ restantMs: 100, statut: 'bon' });
       await store.write({ restantMs: 200, statut: 'plus-recent' });
 
-      // Simule une coupure de courant en pleine écriture.
       await writeFile(filePath, '{"restantMs": 20', 'utf8');
 
       await expect(createStore().read()).resolves.toEqual({ restantMs: 100, statut: 'bon' });
@@ -209,8 +194,6 @@ describe('createAtomicJsonStore', () => {
 
   describe('échec d\'écriture', () => {
     it('signale un échec d\'écriture par une erreur typée', async () => {
-      // Un répertoire là où le magasin attend un fichier : l'écriture ne peut
-      // pas aboutir, et le compteur doit savoir que sa persistance a échoué.
       const store = createAtomicJsonStore<Compteur>({
         filePath: directory,
         parse: parseCompteur,

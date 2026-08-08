@@ -1,47 +1,12 @@
-/**
- * Descripteurs des champs du panneau.
- *
- * Une table, et non du code : chaque réglage du schéma y est décrit une fois —
- * son chemin, son genre, ses bornes, son libellé — et `form-binding.ts` fait le
- * reste. Ajouter un réglage revient donc à ajouter une ligne ici et un champ
- * dans le gabarit, jamais à écrire une nouvelle lecture ou une nouvelle
- * comparaison.
- *
- * **Les bornes recopient celles de `core/config/schema.ts`.** Elles ne s'y
- * substituent pas : Zod reste le juge, et refusera de toute façon. Elles
- * servent à nommer la faute sous le champ plutôt qu'à renvoyer un « 400 »
- * générique après un aller-retour réseau. `tests/unit/web/admin/fields.test.ts`
- * vérifie qu'elles laissent au moins passer la valeur par défaut.
- *
- * **Le contenu de cette table est un engagement produit.** L'exigence est
- * « aucune valeur métier codée en dur, tout est configurable depuis le panneau ».
- * Le même fichier de test l'impose : chaque feuille de la configuration doit
- * être liée ici, ou écartée dans `UNBOUND_PATHS` avec sa raison. Un réglage
- * ajouté au schéma sans champ correspondant fait échouer la suite.
- */
-
 import type { FieldDescriptor } from './form-binding.js';
 import type { FieldViewId } from './router.js';
 
 export interface AdminField extends FieldDescriptor {
-  /** Vue qui affiche ce champ. */
   readonly view: FieldViewId;
-  /** Libellé, en français, affiché à côté du champ. */
   readonly label: string;
-  /** Précision affichée sous le champ, quand la valeur n'est pas évidente. */
   readonly hint?: string;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Réglages délibérément absents du panneau                                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Feuilles de la configuration qui n'ont pas de champ, et pourquoi.
- *
- * Chaque entrée est une décision, pas un oubli — c'est précisément ce que le
- * test vérifie. Une raison vague y serait aussi visible qu'un réglage manquant.
- */
 export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
   schemaVersion:
     'Métadonnée de migration et non un réglage : l’exposer inviterait à la modifier, ce qui ferait repartir de zéro une configuration parfaitement valide.',
@@ -59,14 +24,8 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
     'Tableau de paliers à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Barème avec son propre module.',
 };
 
-/* -------------------------------------------------------------------------- */
-/* Barème                                                                      */
-/* -------------------------------------------------------------------------- */
-
-/** Une journée en secondes : plafond partagé par toutes les récompenses. */
 const DAY = 86_400;
 
-/** Récompense en secondes : jamais négative, jamais délirante. */
 function reward(selector: string, path: string, label: string, view: FieldViewId = 'rewards'): AdminField {
   return { selector, path, label, view, kind: 'integer', min: 0, max: DAY };
 }
@@ -205,15 +164,10 @@ const REWARD_FIELDS: readonly AdminField[] = [
     hint: 'Affiché au-dessus du pseudo dans la bulle. Laisser vide pour n’annoncer que le pseudo et le temps.',
     view: 'rewards',
     kind: 'text',
-    // Vide vaut « pas de libellé » : c'est un réglage, pas un oubli.
     allowEmpty: true,
     max: 40,
   },
 ];
-
-/* -------------------------------------------------------------------------- */
-/* Apparence                                                                   */
-/* -------------------------------------------------------------------------- */
 
 const APPEARANCE_FIELDS: readonly AdminField[] = [
   {
@@ -287,9 +241,6 @@ const APPEARANCE_FIELDS: readonly AdminField[] = [
   { selector: '#overlay-glow-color', path: 'overlay.glow.color', label: 'Couleur du halo', view: 'appearance', kind: 'color' },
   { selector: '#overlay-glow-radius', path: 'overlay.glow.radius', label: 'Rayon', view: 'appearance', kind: 'number', min: 0 },
 
-  // Deux cibles indépendantes, une seule paire de couleurs : vouloir le dégradé
-  // sur les chiffres n'implique pas de le vouloir sur le cadre, mais rien ne
-  // justifierait deux jeux de couleurs à désaccorder.
   { selector: '#overlay-gradient-on-text', path: 'overlay.gradient.onText', label: 'Dégradé sur les chiffres', view: 'appearance', kind: 'boolean' },
   { selector: '#overlay-gradient-on-frame', path: 'overlay.gradient.onFrame', label: 'Dégradé sur le cadre', view: 'appearance', kind: 'boolean' },
   { selector: '#overlay-gradient-from', path: 'overlay.gradient.from', label: 'Première couleur', view: 'appearance', kind: 'color' },
@@ -353,10 +304,6 @@ const APPEARANCE_FIELDS: readonly AdminField[] = [
   },
 ];
 
-/* -------------------------------------------------------------------------- */
-/* Twitch                                                                      */
-/* -------------------------------------------------------------------------- */
-
 const TWITCH_FIELDS: readonly AdminField[] = [
   {
     selector: '#twitch-client-id',
@@ -406,35 +353,14 @@ const TWITCH_FIELDS: readonly AdminField[] = [
   { selector: '#twitch-id-url', path: 'twitch.idBaseUrl', label: 'Service d’identité', view: 'twitch', kind: 'text' },
 ];
 
-/* -------------------------------------------------------------------------- */
-/* Paramètres                                                                  */
-/* -------------------------------------------------------------------------- */
-
-/** Trente jours : au-delà, ce n'est plus un subathon. */
 const MAX_INITIAL_SECONDS = 2_592_000;
 
 const SETTINGS_FIELDS: readonly AdminField[] = [
-  {
-    selector: '#app-launch-at-startup',
-    path: 'app.launchAtStartup',
-    label: 'Lancer ChronoCast à l’ouverture de la session',
-    hint: 'Sans effet hors de l’application Windows.',
-    view: 'settings',
-    kind: 'boolean',
-  },
   {
     selector: '#app-start-minimized',
     path: 'app.startMinimized',
     label: 'Démarrer dans la zone de notification',
     hint: 'La fenêtre reste accessible par un clic sur l’icône. Fermer la fenêtre n’arrête jamais le compteur.',
-    view: 'settings',
-    kind: 'boolean',
-  },
-  {
-    selector: '#app-check-for-updates',
-    path: 'app.checkForUpdates',
-    label: 'Vérifier les mises à jour',
-    hint: 'Interroge GitHub au lancement puis toutes les six heures. Rien ne s’installe sans votre clic. Décocher coupe la seule communication sortante autre que Twitch.',
     view: 'settings',
     kind: 'boolean',
   },
@@ -626,10 +552,6 @@ const SETTINGS_FIELDS: readonly AdminField[] = [
   },
 ];
 
-/* -------------------------------------------------------------------------- */
-/* Table complète                                                              */
-/* -------------------------------------------------------------------------- */
-
 export const ADMIN_FIELDS: readonly AdminField[] = [
   ...REWARD_FIELDS,
   ...APPEARANCE_FIELDS,
@@ -637,27 +559,10 @@ export const ADMIN_FIELDS: readonly AdminField[] = [
   ...SETTINGS_FIELDS,
 ];
 
-/** Champs d'une vue, dans l'ordre de déclaration. */
 export function fieldsOf(view: FieldViewId): readonly AdminField[] {
   return ADMIN_FIELDS.filter((field) => field.view === view);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Regroupement                                                                */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Titres des groupes, par préfixe de chemin.
- *
- * Le regroupement est déduit du chemin plutôt que déclaré ligne à ligne : la
- * hiérarchie du schéma **est** la structure naturelle de l'interface, et la
- * recopier soixante fois créerait une seconde source de vérité à maintenir
- * d'accord avec la première.
- *
- * L'ordre compte doublement : c'est celui des sections à l'écran, et la
- * recherche retient le **premier** préfixe qui correspond, si bien qu'un
- * préfixe long doit précéder le plus court qui le contient.
- */
 const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.sub.', 'Abonnements'],
   ['rewards.resub.', 'Réabonnements'],
@@ -687,7 +592,6 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['history.', 'Historique'],
 ];
 
-/** Titres des groupes d'une vue, dans l'ordre d'affichage, sans doublon. */
 export function groupsOf(view: FieldViewId): readonly string[] {
   const seen: string[] = [];
 
@@ -703,7 +607,6 @@ export function groupsOf(view: FieldViewId): readonly string[] {
   return seen;
 }
 
-/** Groupe d'un champ, déduit de son chemin. */
 export function groupOf(path: string): string {
   for (const [prefix, label] of GROUPS) {
     if (path.startsWith(prefix)) {
@@ -711,7 +614,5 @@ export function groupOf(path: string): string {
     }
   }
 
-  // Inatteignable tant que le test de couverture passe : il exige que chaque
-  // champ tombe dans un groupe connu.
   return 'Divers';
 }

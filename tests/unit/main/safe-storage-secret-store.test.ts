@@ -11,23 +11,6 @@ import {
   type SafeStorageLike,
 } from '../../../src/main/safe-storage-secret-store.js';
 
-/**
- * Magasin de secrets de l'application Windows.
- *
- * C'est le pendant réel du magasin AES du point d'entrée headless, qui est un
- * repli honnêtement dégradé. Ici, `safeStorage` est adossé à DPAPI : la clé est
- * liée au compte utilisateur, si bien qu'un autre compte de la même machine ne
- * peut rien déchiffrer.
- *
- * `safeStorage` est **injecté** plutôt qu'importé d'`electron`. Deux raisons, et
- * la seconde est la vraie : le module reste testable dans un conteneur Linux
- * sans Chromium, et surtout la logique qui l'entoure — quoi faire quand le
- * chiffrement est indisponible, quand un blob ne se déchiffre pas, quand le
- * fichier est corrompu — cesse d'être invérifiable. Ce sont précisément les cas
- * qu'on ne veut pas découvrir sur le poste d'un utilisateur.
- */
-
-/** Double de `safeStorage`, avec un chiffrement factice mais observable. */
 function createFakeSafeStorage(
   options: { readonly available?: boolean } = {},
 ): SafeStorageLike & { readonly calls: { available: number } } {
@@ -41,15 +24,11 @@ function createFakeSafeStorage(
       return available;
     },
     encryptString(plainText: string): Buffer {
-      // Transformation réversible et manifestement distincte du texte clair :
-      // le test doit pouvoir affirmer que rien de lisible n'atteint le disque.
       return Buffer.from(`chiffré:${plainText}`, 'utf8');
     },
     decryptString(encrypted: Buffer): string {
       const raw = encrypted.toString('utf8');
       if (!raw.startsWith('chiffré:')) {
-        // DPAPI lève lorsque le blob vient d'un autre compte Windows : c'est le
-        // cas réel que ce double reproduit.
         throw new Error('déchiffrement impossible');
       }
       return raw.slice('chiffré:'.length);
@@ -91,12 +70,7 @@ describe('createSafeStorageSecretStore', () => {
 
   const secretsPath = (): string => join(directory, 'secrets.json');
 
-  // Windows ne connaît pas les permissions POSIX : `stat` y rend `0o666` quoi
-  // qu'on demande. L'assertion n'a donc de sens que là où le mode existe, et
-  // c'est sans conséquence : sous Windows, la protection réelle des secrets
-  // vient de DPAPI, pas d'un bit de permission.
   const itPosix = process.platform === 'win32' ? it.skip : it;
-
 
   describe('aller-retour', () => {
     it('relit ce qu’il a écrit', async () => {
@@ -151,8 +125,6 @@ describe('createSafeStorageSecretStore', () => {
 
       const mode = (await stat(secretsPath())).mode & 0o777;
 
-      // Sans effet réel sous Windows, où DPAPI fait le travail, mais le geste
-      // reste juste et le magasin peut tourner ailleurs pendant le développement.
       expect(mode).toBe(0o600);
     });
 
@@ -192,9 +164,6 @@ describe('createSafeStorageSecretStore', () => {
     });
 
     it('efface même lorsque le chiffrement est indisponible', async () => {
-      // Retirer un secret devenu illisible doit rester possible : c'est la
-      // seule porte de sortie de qui a recopié son répertoire de données
-      // depuis un autre compte Windows.
       const indisponible = createSafeStorageSecretStore({
         directory,
         safeStorage: createFakeSafeStorage({ available: false }),
@@ -223,9 +192,6 @@ describe('createSafeStorageSecretStore', () => {
     });
 
     it('refuse d’écrire plutôt que d’écrire en clair', async () => {
-      // C'est le cœur de ce module. Un repli en clair serait pire que l'échec :
-      // il donnerait l'illusion inverse de la vérité, et la section 9 l'interdit
-      // sans réserve. Mieux vaut une erreur franche que des jetons OAuth lisibles.
       await expect(indisponible.write('twitch.accessToken', 'jeton')).rejects.toThrow(
         /chiffrement/i,
       );
@@ -251,10 +217,6 @@ describe('createSafeStorageSecretStore', () => {
 
   describe('robustesse en lecture', () => {
     it('rend null pour un blob indéchiffrable', async () => {
-      // Cas réel : DPAPI lie le chiffrement au compte Windows, donc un
-      // répertoire de données recopié depuis un autre compte est illisible.
-      // L'utilisateur doit retomber sur l'assistant de configuration, pas sur
-      // un écran de crash.
       await writeFile(
         secretsPath(),
         JSON.stringify({ 'twitch.accessToken': Buffer.from('venu-d-ailleurs').toString('base64') }),
@@ -291,8 +253,6 @@ describe('createSafeStorageSecretStore', () => {
     });
 
     it('traite une entrée non textuelle comme absente', async () => {
-      // Le fichier est du JSON quelconque une fois relu : rien ne garantit que
-      // ses valeurs soient des chaînes, et l'hypothèse contraire lèverait.
       await writeFile(secretsPath(), JSON.stringify({ 'twitch.accessToken': 42 }), 'utf8');
 
       await expect(store.read('twitch.accessToken')).resolves.toBeNull();
@@ -301,9 +261,6 @@ describe('createSafeStorageSecretStore', () => {
 
   describe('moment d’interrogation de safeStorage', () => {
     it('n’interroge pas safeStorage à la construction', () => {
-      // `safeStorage` n'est utilisable qu'après `app.whenReady()`. L'interroger
-      // en construisant le magasin — ce que fait la composition de
-      // l'application — le prendrait trop tôt.
       const tardif = createFakeSafeStorage();
 
       createSafeStorageSecretStore({
@@ -348,8 +305,6 @@ describe('createSafeStorageSecretStore', () => {
 
   describe('erreurs d’écriture', () => {
     it('propage un échec disque au lieu de le taire', async () => {
-      // Un secret qu'on croit enregistré et qui ne l'est pas se découvre au
-      // pire moment : au redémarrage suivant, quand le streamer est en direct.
       const cassé = createSafeStorageSecretStore({
         directory: join(directory, 'fichier-occupant'),
         safeStorage: createFakeSafeStorage(),
@@ -364,10 +319,6 @@ describe('createSafeStorageSecretStore', () => {
 
 describe('interface SafeStorageLike', () => {
   it('se satisfait de la forme réelle de safeStorage', () => {
-    // Garde-fou de typage : si la forme attendue divergeait de celle
-    // d'Electron, le module ne se brancherait qu'à l'exécution, sur le poste
-    // de l'utilisateur. `vi.fn()` ne prouve rien de plus que la compatibilité
-    // structurelle, et c'est exactement ce qu'on veut vérifier ici.
     const conforme: SafeStorageLike = {
       isEncryptionAvailable: vi.fn().mockReturnValue(true),
       encryptString: vi.fn().mockReturnValue(Buffer.alloc(0)),

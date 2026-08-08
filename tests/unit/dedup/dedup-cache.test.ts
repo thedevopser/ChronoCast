@@ -2,24 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { createDedupCache } from '../../../src/core/dedup/dedup-cache.js';
 
-/**
- * Twitch retransmet des événements. La documentation EventSub est explicite :
- * une même notification peut arriver plusieurs fois, et c'est au client de s'en
- * prémunir. Sans ce cache, un seul abonnement pourrait créditer six minutes au
- * lieu de trois — un défaut invisible en développement et coûteux en direct.
- *
- * Deux usages du même mécanisme, avec des fenêtres différentes :
- *
- *   - les identifiants de message, sur une fenêtre longue, contre les
- *     retransmissions de Twitch ;
- *   - une clé sémantique, sur une fenêtre courte, contre le double comptage
- *     entre `channel.subscribe` et `channel.chat.notification`, qui décrivent le
- *     même abonnement.
- *
- * Le cache est persisté : un redémarrage pendant une salve de gift subs ne doit
- * pas rouvrir la porte aux doublons.
- */
-
 const NOW = 1_754_000_000_000;
 
 describe('createDedupCache', () => {
@@ -59,8 +41,6 @@ describe('createDedupCache', () => {
     });
 
     it('ne prolonge pas la fenêtre lors d\'une tentative refusée', () => {
-      // Une retransmission insistante ne doit pas maintenir indéfiniment
-      // l'entrée en vie et saturer le cache.
       const cache = createDedupCache({ maxEntries: 100, ttlMs: 1_000 });
       cache.admit('msg-1', NOW);
       cache.admit('msg-1', NOW + 900);
@@ -181,7 +161,6 @@ describe('createDedupCache', () => {
     });
 
     it('ignore un instantané corrompu sans lever', () => {
-      // Le fichier vient du disque : il peut avoir été tronqué par une coupure.
       const cache = createDedupCache({ maxEntries: 100, ttlMs: 600_000 });
 
       expect(() => {

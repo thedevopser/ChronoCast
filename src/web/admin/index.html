@@ -5,51 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ChronoCast — Administration</title>
 
-    <!--
-      Jeton CSRF, substitué par `routes/pages.ts` au moment de servir la page.
-      Il n'est exposé par aucune route : une page tierce ne peut ni le lire ni
-      le deviner, et c'est ce qui protège toutes les mutations de l'API.
-    -->
     <meta name="chronocast-csrf" content="__CHRONOCAST_CSRF__" />
 
-    <!--
-      Le logo engendré depuis `assets/logo.png` par `scripts/prepare-icons.mjs`.
-      Servi par la même origine : `img-src 'self'` l'autorise, et l'application
-      doit fonctionner sans connexion.
-    -->
     <link rel="icon" type="image/png" href="/shared/logo.png" />
 
-    <!-- Port du WebSocket, substitué lui aussi. Ce n'est pas un secret. -->
     <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
 
-    <!--
-      Ordre imposé : les primitives d'Open Props d'abord, nos tokens
-      sémantiques ensuite — ils les référencent —, la feuille de page en
-      dernier. Elle ne connaît que nos tokens.
-    -->
     <link rel="stylesheet" href="/shared/open-props.css" />
     <link rel="stylesheet" href="/shared/theme.css" />
     <link rel="stylesheet" href="/admin/admin.css" />
   </head>
 
   <body>
-    <!--
-      Aucun `<form>` : `form-action 'none'` interdit toute soumission. Les
-      boutons sont en `type="button"` et tout passe par `fetch`.
-    -->
     <div class="shell">
       <aside class="sidebar">
         <div class="sidebar__brand">
-          <!--
-            Le logo, et non un glyphe d'horloge : il est la marque du produit.
-            `alt` vide et non un texte : le nom suit immédiatement, et le
-            répéter ferait dire deux fois la même chose à un lecteur d'écran.
-          -->
           <img class="sidebar__mark" src="/shared/logo.png" alt="" width="32" height="32" />
           <span class="sidebar__name">ChronoCast</span>
         </div>
 
-        <!-- Peuplée par `main.ts` depuis la liste close de `router.ts`. -->
         <nav class="nav" id="nav" aria-label="Sections du panneau"></nav>
 
         <div class="sidebar__foot">
@@ -59,27 +33,8 @@
       </aside>
 
       <main class="content">
-        <!--
-          Mise à jour disponible. Distinct de `#banner`, qui porte les messages
-          transitoires d'enregistrement : les faire cohabiter dans le même
-          élément ferait effacer l'annonce de mise à jour au premier réglage
-          modifié. Il vit dans la coquille et non dans une vue, parce qu'une
-          mise à jour n'appartient à aucune et doit se voir depuis toutes.
-          Peuplé par `main.ts` via `safe-dom`, jamais écrit ici.
-        -->
-        <aside class="update" id="update" hidden>
-          <p class="update__text" id="update-text"></p>
-          <div class="update__actions">
-            <a class="update__notes" id="update-notes" target="_blank" rel="noreferrer noopener" hidden
-              >Notes de version</a
-            >
-            <button class="button" id="update-action" type="button"></button>
-          </div>
-        </aside>
-
         <p class="banner" id="banner" hidden></p>
 
-        <!-- Tableau de bord -->
         <section class="view" id="view-dashboard" hidden>
           <header class="view__head">
             <h1 class="view__title">Tableau de bord</h1>
@@ -193,14 +148,6 @@
           </div>
         </section>
 
-        <!--
-          Les quatre vues de réglage ne portent qu'une coquille : leurs champs
-          sont engendrés depuis `fields.ts` au chargement. Les recopier ici
-          créerait une seconde source de vérité, et une faute de frappe entre
-          un sélecteur et son descripteur ne se verrait qu'à l'usage.
-        -->
-
-        <!-- Barème -->
         <section class="view" id="view-rewards" hidden>
           <header class="view__head">
             <h1 class="view__title">Barème</h1>
@@ -228,7 +175,6 @@
           </div>
         </section>
 
-        <!-- Apparence -->
         <section class="view" id="view-appearance" hidden>
           <header class="view__head">
             <h1 class="view__title">Apparence</h1>
@@ -239,12 +185,6 @@
 
           <div class="preview">
             <p class="card__label">Aperçu</p>
-            <!--
-              L'overlay lui-même, servi par la même origine — `frame-ancestors
-              'self'` l'autorise. Aucun `postMessage` n'est nécessaire : un
-              enregistrement diffuse un message `config` sur le WebSocket, que
-              l'overlay de ce cadre applique de lui-même.
-            -->
             <iframe class="preview__frame" id="overlay-preview" title="Aperçu de l'overlay"></iframe>
           </div>
 
@@ -257,7 +197,6 @@
           </div>
         </section>
 
-        <!-- Twitch -->
         <section class="view" id="view-twitch" hidden>
           <header class="view__head">
             <h1 class="view__title">Twitch</h1>
@@ -314,7 +253,6 @@
           </div>
         </section>
 
-        <!-- Historique -->
         <section class="view" id="view-history" hidden>
           <header class="view__head">
             <h1 class="view__title">Historique</h1>
@@ -380,7 +318,6 @@
           </div>
         </section>
 
-        <!-- Journaux -->
         <section class="view" id="view-logs" hidden>
           <header class="view__head">
             <h1 class="view__title">Journaux</h1>
@@ -430,7 +367,6 @@
           </div>
         </section>
 
-        <!-- Paramètres -->
         <section class="view" id="view-settings" hidden>
           <header class="view__head">
             <h1 class="view__title">Paramètres</h1>
@@ -447,9 +383,19 @@
               Enregistrer les paramètres
             </button>
           </div>
+
+          <div class="card">
+            <p class="card__label">Lancer ChronoCast à l’ouverture de la session</p>
+            <p class="card__hint">
+              Ce réglage appartient à Windows, dans Paramètres → Applications → Démarrage.
+              ChronoCast y figure sous son propre nom.
+            </p>
+            <button class="button button--ghost" type="button" id="open-startup-settings">
+              Ouvrir les paramètres de démarrage
+            </button>
+          </div>
         </section>
 
-        <!-- Import / export -->
         <section class="view" id="view-transfer" hidden>
           <header class="view__head">
             <h1 class="view__title">Import / export</h1>
@@ -466,8 +412,6 @@
                 Il est donc partageable tel quel.
               </p>
               <div class="actions">
-                <!-- Route GET : aucun jeton nécessaire, le serveur pose déjà le
-                     `content-disposition` qui déclenche le téléchargement. -->
                 <a class="button button--primary" href="/api/config/export" download>
                   Télécharger la configuration
                 </a>

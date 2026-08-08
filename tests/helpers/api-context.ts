@@ -1,12 +1,3 @@
-/**
- * Contexte d'API en mémoire.
- *
- * Les routes ne sont que de la délégation : leur intérêt est dans ce qu'elles
- * valident et dans ce qu'elles refusent de renvoyer, pas dans le métier qu'elles
- * appellent. Les doubles ci-dessous rendent donc chaque dépendance triviale et
- * observable, sans disque, sans réseau et sans minuteur.
- */
-
 import type { TwitchStatusPayload } from '../../src/core/app/app-events.js';
 import { DEFAULT_CONFIG } from '../../src/core/config/defaults.js';
 import type { ChronoCastConfig } from '../../src/core/config/schema.js';
@@ -22,8 +13,7 @@ import {
   type RingBufferSink,
 } from '../../src/core/logging/sinks/ring-buffer-sink.js';
 import { createLogger, type LogSink } from '../../src/core/logging/logger.js';
-import type { ApiContext, TwitchApiPort, UpdateApiPort } from '../../src/core/server/routes/api.js';
-import type { UpdateStatus } from '../../src/core/update/update-service.js';
+import type { ApiContext, TwitchApiPort } from '../../src/core/server/routes/api.js';
 
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
 
@@ -36,9 +26,6 @@ export interface ApiDoubles {
   historyEntries: HistoryEntry[];
   twitchStatus: TwitchStatusPayload;
   clientSecret: string | null;
-  /** État de la mise à jour, que chaque test pose comme il l'entend. */
-  updateStatus: UpdateStatus;
-  /** Fait échouer la prochaine opération Twitch, pour éprouver la remontée d'erreur. */
   failTwitch: boolean;
 }
 
@@ -54,14 +41,6 @@ export function createApiDoubles(): ApiDoubles {
     twitchStatus: { status: 'ready' } as TwitchStatusPayload,
     clientSecret: null as string | null,
     failTwitch: false,
-    updateStatus: {
-      phase: 'idle',
-      currentVersion: '0.1.0',
-      availableVersion: null,
-      notesUrl: null,
-      message: null,
-      checkedAt: null,
-    } as UpdateStatus,
   };
 
   const configService: ConfigService = {
@@ -69,8 +48,6 @@ export function createApiDoubles(): ApiDoubles {
     get: () => doubles.config,
     update: (patch: DeepPartial<ChronoCastConfig>) => {
       calls.push('config.update');
-      // Fusion naïve au premier niveau : suffisant pour observer ce que la route
-      // transmet, le vrai service étant testé pour lui-même.
       doubles.config = configSchema.parse({ ...doubles.config, ...patch });
       return Promise.resolve(doubles.config);
     },
@@ -166,28 +143,18 @@ export function createApiDoubles(): ApiDoubles {
     },
   };
 
-  const update: UpdateApiPort = {
-    getStatus: () => doubles.updateStatus,
-    check: () => {
-      calls.push('update.check');
-      return Promise.resolve(doubles.updateStatus);
-    },
-    install: () => {
-      calls.push('update.install');
-      if (doubles.updateStatus.phase !== 'ready') {
-        return Promise.reject(new Error('Aucune mise à jour vérifiée n’est prête à être installée.'));
-      }
-      return Promise.resolve();
-    },
-  };
-
   const context: ApiContext = {
     config: configService,
     counter: counterService,
     history,
     logs: ringBuffer,
     twitch,
-    update,
+    system: {
+      openStartupSettings: () => {
+        calls.push('system.openStartupSettings');
+        return Promise.resolve();
+      },
+    },
     getPort: () => 3_777,
     appVersion: '0.1.0',
     applyManualEvent: (event: DomainEvent) => {
@@ -200,9 +167,5 @@ export function createApiDoubles(): ApiDoubles {
     logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),
   };
 
-  // `Object.assign` et non un objet neuf : les doubles ci-dessus lisent
-  // `doubles.config` et `doubles.counterState` par référence. Recopier ces
-  // champs figerait les valeurs vues par les fermetures, et un test qui modifie
-  // la configuration n'aurait plus aucun effet.
   return Object.assign(doubles, { context, calls, ringBuffer });
 }

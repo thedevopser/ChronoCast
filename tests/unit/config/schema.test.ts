@@ -3,14 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import { CONFIG_SCHEMA_VERSION, configSchema } from '../../../src/core/config/schema.js';
 
-/**
- * La configuration est la source de vérité de tout ce qui est paramétrable, et
- * l'exigence est stricte : aucune valeur métier ne doit être codée en dur dans le
- * code. Le schéma est donc autant un contrat qu'une documentation exécutable.
- *
- * Il joue également un rôle de sécurité : c'est lui qui filtre le fichier importé
- * par l'utilisateur depuis l'interface d'administration.
- */
 describe('configSchema', () => {
   describe('valeurs par défaut', () => {
     it('accepte la configuration par défaut', () => {
@@ -42,9 +34,6 @@ describe('configSchema', () => {
     });
 
     it('laisse le cadre et le dégradé éteints, tout en les gardant réglables', () => {
-      // Même règle que raid et follow : une nouveauté d'apparence ne doit rien
-      // changer à l'overlay des utilisateurs existants tant qu'ils ne l'ont pas
-      // demandée — leur scène OBS est déjà cadrée sur ce qu'ils voient.
       expect(DEFAULT_CONFIG.overlay.frame.enabled).toBe(false);
       expect(DEFAULT_CONFIG.overlay.gradient.onText).toBe(false);
       expect(DEFAULT_CONFIG.overlay.gradient.onFrame).toBe(false);
@@ -55,8 +44,6 @@ describe('configSchema', () => {
     });
 
     it('laisse l’intérieur du cadre libre', () => {
-      // Un cadre est un trait, pas un pavé. Un remplissage par défaut masque la
-      // scène derrière le compteur et fait passer le cadre pour un fond.
       expect(DEFAULT_CONFIG.overlay.frame.fillOpacity).toBe(0);
     });
 
@@ -65,8 +52,6 @@ describe('configSchema', () => {
     });
 
     it('diffuse le décompte une fois par seconde', () => {
-      // L'overlay interpole localement : diffuser plus souvent n'améliorerait
-      // pas la fluidité et réveillerait OBS pour rien.
       expect(DEFAULT_CONFIG.server.websocket.stateBroadcastIntervalMs).toBe(1_000);
     });
 
@@ -76,19 +61,11 @@ describe('configSchema', () => {
     });
 
     it('n’annonce aucun mode ni port propre au WebSocket', () => {
-      // Le socket est attaché au serveur HTTP, sans condition ni alternative :
-      // c'est la décision d'architecture, et elle n'a jamais eu de second
-      // écouteur. Déclarer `mode` et `port` promettait un comportement que le
-      // serveur ne produit pas — régler `mode: 'separate'` n'avait aucun effet
-      // observable, ni erreur ni changement. Un réglage inerte est pire qu'un
-      // réglage absent : il se règle, et il ment.
       expect(DEFAULT_CONFIG.server.websocket).not.toHaveProperty('mode');
       expect(DEFAULT_CONFIG.server.websocket).not.toHaveProperty('port');
     });
 
     it('plafonne la taille du corps des requêtes HTTP', () => {
-      // Une configuration exportée puis réimportée est le plus gros corps
-      // légitime : le plafond doit lui laisser de la marge, pas davantage.
       expect(DEFAULT_CONFIG.server.maxBodyBytes).toBeGreaterThan(0);
     });
   });
@@ -118,8 +95,6 @@ describe('configSchema', () => {
     });
 
     it('refuse une adresse d\'écoute autre que la boucle locale', () => {
-      // Écouter sur 0.0.0.0 exposerait le panneau d'administration au réseau
-      // local : c'est un défaut de sécurité, pas une préférence.
       expect(() => configSchema.parse({ server: { host: '0.0.0.0' } })).toThrow();
     });
 
@@ -172,10 +147,6 @@ describe('configSchema', () => {
     });
 
     it('accepte une configuration héritée portant l’ancien mode WebSocket', () => {
-      // Ces deux clés ont existé au schéma : un fichier écrit par une version
-      // antérieure les contient. Le mode `strip` les écarte sans rien rejeter,
-      // ce qui rend leur retrait indolore — aucune migration à écrire, et
-      // surtout aucun démarrage refusé à qui met simplement à jour.
       const parsed = configSchema.parse({
         server: { websocket: { mode: 'separate', port: 3778, heartbeatIntervalMs: 15_000 } },
       });
@@ -186,103 +157,37 @@ describe('configSchema', () => {
     });
 
     it('refuse un barème de bits par paliers vide', () => {
-      // Un tableau vide en mode paliers ne créditerait jamais rien : c'est une
-      // configuration silencieusement inopérante, donc un piège pour le streamer.
       expect(() => configSchema.parse({ rewards: { bits: { mode: 'tiers', tiers: [] } } })).toThrow();
     });
   });
 });
 
-/**
- * Marqueur d'achèvement de l'assistant de première configuration.
- *
- * L'assistant dérive son étape de reprise de l'état réel — a-t-on un client ID,
- * un secret, un jeton, les portées ? — plutôt que d'un compteur d'étapes qui
- * dériverait de la réalité. Une seule chose ne se déduit de rien : le fait que
- * l'utilisateur soit allé au bout. La valeur de départ du compteur a toujours
- * une valeur par défaut, on ne peut donc pas distinguer « laissée telle quelle »
- * de « jamais vue ».
- *
- * D'où ce booléen, et lui seul. C'est la plus petite chose qu'il faille écrire
- * pour que l'assistant ne renvoie pas indéfiniment le streamer à l'étape du
- * barème une fois sa configuration terminée.
- */
-/**
- * Comportements de l'application de bureau.
- *
- * Ces deux réglages n'ont d'effet que dans la coquille Electron, et c'est
- * légitime là où `websocket.mode` ne l'était pas : ils agissent dans
- * l'exécutable, seul artefact que l'utilisateur reçoit. Le point d'entrée
- * headless est un outil de développement, pas un livrable.
- *
- * Ce qui **ne s'y trouve pas** compte autant : fermer la fenêtre replie
- * toujours vers le tray, sans réglage. Un compteur de subathon ne doit pas
- * pouvoir être tué par réflexe pendant un direct, et on ne rend pas
- * configurable ce dont la mauvaise valeur coûte le stream.
- */
 describe('app', () => {
-  it('ne se lance pas au démarrage de la session sans qu’on le demande', () => {
-    // Une application qui s'installe au démarrage sans rien dire est une
-    // application qu'on désinstalle.
-    expect(configSchema.parse({}).app.launchAtStartup).toBe(false);
+  it('n’expose plus de réglage de lancement au démarrage', () => {
+    expect(configSchema.parse({}).app).not.toHaveProperty('launchAtStartup');
   });
 
   it('ouvre sa fenêtre par défaut', () => {
-    // Démarrer masqué au premier lancement laisserait croire que rien ne s'est
-    // passé. C'est un confort pour qui lance au démarrage, pas un défaut.
     expect(configSchema.parse({}).app.startMinimized).toBe(false);
   });
 
-  it('retient les trois réglages', () => {
-    const parsed = configSchema.parse({
-      app: { launchAtStartup: true, startMinimized: true, checkForUpdates: false },
-    });
+  it('retient son réglage', () => {
+    const parsed = configSchema.parse({ app: { startMinimized: true } });
 
-    expect(parsed.app).toStrictEqual({
-      launchAtStartup: true,
-      startMinimized: true,
-      checkForUpdates: false,
-    });
-  });
-
-  it('vérifie les mises à jour par défaut', () => {
-    // Un compteur de subathon tourne pendant des jours chez quelqu'un qui
-    // n'ouvre pas GitHub : laisser la vérification éteinte par défaut
-    // reviendrait à ne jamais corriger personne. Rien ne s'installe pour
-    // autant sans un clic — c'est l'installation qui protège le direct, pas la
-    // vérification.
-    expect(configSchema.parse({}).app.checkForUpdates).toBe(true);
-  });
-
-  it('laisse couper toute communication sortante vers GitHub', () => {
-    // Le seul trafic sortant du produit en dehors de Twitch. Il doit être
-    // refusable, et le rester : c'est ce que promet le modèle de menace.
-    expect(configSchema.parse({ app: { checkForUpdates: false } }).app.checkForUpdates).toBe(false);
+    expect(parsed.app).toStrictEqual({ startMinimized: true });
   });
 
   it('n’expose aucun réglage de fermeture vers le tray', () => {
-    // La fermeture de la fenêtre ne se configure pas : elle replie toujours.
     expect(configSchema.parse({}).app).not.toHaveProperty('closeToTray');
   });
 });
 
-/**
- * Commande de chat.
- *
- * C'est le seul endroit du produit où une valeur métier est **tapée par un
- * tiers** plutôt que lue dans le schéma : `!addtime 300` porte ses secondes. Ce
- * qui reste dans le schéma, et qui redevient le juge, c'est le plafond.
- */
 describe('rewards.chatCommand', () => {
   it('reste éteinte par défaut', () => {
-    // Même règle que raid et follow : une nouveauté qui écoute le chat ne
-    // s'active pas dans le dos de qui met simplement à jour.
     expect(configSchema.parse({}).twitch.enableChatCommands).toBe(false);
   });
 
   it('se nomme addtime, et le nom se règle', () => {
-    // Le nom doit s'accorder à la main avec le bot de chat qui répond : le
-    // figer dans le code imposerait une release pour changer un mot.
     expect(configSchema.parse({}).rewards.chatCommand.name).toBe('addtime');
     expect(
       configSchema.parse({ rewards: { chatCommand: { name: 'temps' } } }).rewards.chatCommand.name,
@@ -290,8 +195,6 @@ describe('rewards.chatCommand', () => {
   });
 
   it('plafonne une commande à une heure', () => {
-    // Même rôle que `maxPerEvent` des gifts et des bits : une faute de frappe
-    // ne doit pas porter le compteur au plafond d'un seul message.
     expect(configSchema.parse({}).rewards.chatCommand.maxSeconds).toBe(3_600);
   });
 
@@ -307,22 +210,17 @@ describe('rewards.chatCommand', () => {
   });
 
   it('refuse un nom vide ou non alphanumérique', () => {
-    // Un nom porteur d'espace ou de ponctuation ne serait jamais reconnu par
-    // l'analyseur : mieux vaut le refuser là où on peut encore l'expliquer.
     expect(() => configSchema.parse({ rewards: { chatCommand: { name: '' } } })).toThrow();
     expect(() => configSchema.parse({ rewards: { chatCommand: { name: 'add time' } } })).toThrow();
     expect(() => configSchema.parse({ rewards: { chatCommand: { name: '!addtime' } } })).toThrow();
   });
 
   it('refuse un plafond nul ou négatif', () => {
-    // Un plafond à zéro rendrait la commande inerte sans que rien ne le dise.
     expect(() => configSchema.parse({ rewards: { chatCommand: { maxSeconds: 0 } } })).toThrow();
     expect(() => configSchema.parse({ rewards: { chatCommand: { maxSeconds: -60 } } })).toThrow();
   });
 
   it('borne la longueur du libellé', () => {
-    // Le libellé traverse jusqu'à l'overlay : une chaîne kilométrique y
-    // débordrait de la scène, là où personne ne peut la corriger en direct.
     expect(() =>
       configSchema.parse({ rewards: { chatCommand: { overlayText: 'x'.repeat(200) } } }),
     ).toThrow();
@@ -339,8 +237,6 @@ describe('setup', () => {
   });
 
   it('écarte une valeur inconnue sans rejeter la configuration', () => {
-    // Mode `strip` comme partout : un réglage supprimé depuis ne doit pas
-    // empêcher l'application de démarrer après une mise à jour.
     const parsed = configSchema.parse({ setup: { completed: true, étape: 4 } });
 
     expect(parsed.setup).toStrictEqual({ completed: true });

@@ -1,14 +1,3 @@
-/*
- * Assistant de première configuration.
- *
- * Ne consomme que les tokens de `shared/theme.css` : aucune valeur littérale de
- * couleur ni d'espacement ici. C'est ce qui permettra à la PR C de rebaser les
- * tokens sur Open Props sans toucher à une seule de ces règles.
- *
- * Servie en fichier, jamais en ligne : `style-src 'self'` interdit la balise
- * `<style>` comme l'attribut `style=`.
- */
-
 .wizard {
   max-width: var(--cc-measure);
   margin: 0 auto;
@@ -25,10 +14,6 @@
   color: var(--cc-text-muted);
   font-size: var(--cc-text-sm);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Fil des étapes                                                              */
-/* -------------------------------------------------------------------------- */
 
 .steps {
   display: flex;
@@ -57,12 +42,6 @@
   color: var(--cc-text);
 }
 
-/*
- * Une étape hors d'atteinte reste visible mais inerte.
- *
- * La masquer ferait sauter la numérotation d'un affichage à l'autre et
- * donnerait l'impression que l'assistant change de forme en cours de route.
- */
 .steps__item:disabled {
   color: var(--cc-text-faint);
   cursor: not-allowed;
@@ -84,10 +63,6 @@
   background: var(--cc-accent);
   color: var(--cc-accent-text);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Panneau                                                                     */
-/* -------------------------------------------------------------------------- */
 
 .panel {
   padding: var(--cc-space-4);
@@ -123,10 +98,6 @@
   color: var(--cc-text-muted);
   font-size: var(--cc-text-sm);
 }
-
-/* -------------------------------------------------------------------------- */
-/* Champs                                                                      */
-/* -------------------------------------------------------------------------- */
 
 .field {
   display: block;
@@ -172,10 +143,6 @@
   border-radius: var(--cc-radius);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Boutons et actions                                                          */
-/* -------------------------------------------------------------------------- */
-
 .actions {
   display: flex;
   justify-content: flex-end;
@@ -219,17 +186,6 @@
   font-size: var(--cc-text-sm);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Valeurs à recopier                                                          */
-/* -------------------------------------------------------------------------- */
-
-/*
- * Chasse fixe pour tout ce qui se recopie ailleurs.
- *
- * Une redirect URI ou une URL d'overlay se relit caractère par caractère avant
- * d'être collée dans Twitch ou dans OBS : la confusion entre « l » et « 1 » y
- * coûte une demi-heure de recherche.
- */
 .copyable {
   display: inline-flex;
   align-items: center;
@@ -249,10 +205,6 @@
   font-family: var(--cc-font-mono);
   word-break: break-all;
 }
-
-/* -------------------------------------------------------------------------- */
-/* États                                                                       */
-/* -------------------------------------------------------------------------- */
 
 .banner {
   margin: 0 0 var(--cc-space-3);

@@ -8,19 +8,17 @@ Ce guide couvre l'installation, la connexion à Twitch, l'ajout dans OBS et l'us
 
 ## 1. Installer
 
-Téléchargez le dernier `ChronoCast-Setup-x.y.z.exe` depuis la [page des releases](https://github.com/TheDevOpser/ChronoCast/releases), puis lancez-le.
+ChronoCast s'installe depuis le **Microsoft Store** : [Installer ChronoCast](https://apps.microsoft.com/detail/9MT0NZV7KXGV). Cherchez « ChronoCast » dans l'application Store si vous préférez.
 
-**Windows va afficher un avertissement SmartScreen** — « Windows a protégé votre ordinateur », éditeur inconnu. C'est normal et ce n'est pas un aveu : signer un exécutable coûte plusieurs centaines d'euros par an à un certificat, et ChronoCast est gratuit. Cliquez sur **Informations complémentaires**, puis sur **Exécuter quand même**.
+C'est le seul canal de distribution, et il n'y a plus de `.exe` à télécharger. Le paquet est **signé par Microsoft**, ce qui vous épargne l'avertissement SmartScreen et les faux positifs d'antivirus qu'un binaire non signé provoquait.
 
-Si vous voulez vérifier que le fichier téléchargé est bien celui publié, chaque release joint un fichier `.sha256`. Dans PowerShell :
+L'installation se fait **pour votre compte utilisateur uniquement** : elle ne demande pas les droits administrateur.
 
-```powershell
-Get-FileHash .\ChronoCast-Setup-0.3.0.exe -Algorithm SHA256
-```
+### Vous veniez d'une version téléchargée sur GitHub ?
 
-L'empreinte affichée doit être identique à celle du fichier `.sha256`.
+**Vos données sont reprises automatiquement** au premier lancement : compteur en cours, réglages, jetons Twitch. Vous n'avez rien à refaire, pas même l'autorisation Twitch.
 
-L'installation se fait **pour votre compte utilisateur uniquement** : elle ne demande pas les droits administrateur et n'écrit rien dans `Program Files`.
+L'ancienne installation reste intacte et ses fichiers ne sont pas touchés — la reprise copie, elle ne déplace pas. Une fois que vous avez vérifié que tout est en place, vous pouvez désinstaller l'ancienne version depuis *Applications installées*.
 
 ## 2. Créer une application Twitch
 
@@ -98,7 +96,7 @@ Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre 
 
 **Le compteur survit à tout** : fermeture, coupure de courant, redémarrage. Il repart exactement là où il s'était arrêté, à cinq secondes près et toujours en votre faveur. Voir [CRASH-RECOVERY.md](CRASH-RECOVERY.md).
 
-**Vos données** vivent dans `%APPDATA%\ChronoCast` — collez ce chemin dans l'explorateur pour y accéder :
+**Vos données** vivent dans `%USERPROFILE%\ChronoCast` — collez ce chemin dans l'explorateur pour y accéder :
 
 | Fichier | Contenu |
 | --- | --- |
@@ -108,15 +106,12 @@ Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre 
 | `logs/` | Journaux |
 | `history/` | Historique des événements |
 | `custom.css` | Votre feuille de style, si vous en avez une |
-| `updates/` | Installeur d'une mise à jour en attente. Vidé à chaque lancement |
 
-Désinstaller ChronoCast **ne supprime pas ce répertoire** : réinstaller vous rend votre configuration et votre compteur.
+Désinstaller ChronoCast **ne supprime pas ce répertoire** : réinstaller vous rend votre configuration et votre compteur. C'est précisément la raison pour laquelle ces fichiers ne sont pas rangés là où Windows range habituellement les données d'une application du Store — cet emplacement-là part à la désinstallation.
 
-**Les mises à jour.** ChronoCast vérifie au lancement, puis toutes les six heures, s'il existe une version plus récente. S'il en trouve une, il la télécharge en silence et vérifie son empreinte, puis affiche un bandeau en haut du panneau et ajoute une entrée au menu de l'icône près de l'horloge.
+**Les mises à jour** sont gérées par le Microsoft Store et s'appliquent toutes seules. Le Store attend que ChronoCast ne soit pas en cours d'exécution : **aucune fermeture surprise en plein direct**. Si vous voulez forcer une vérification, ouvrez le Store → **Bibliothèque** → *Obtenir les mises à jour*.
 
-**Rien ne s'installe tant que vous ne l'avez pas demandé.** Aucune fermeture surprise, aucun redémarrage en plein direct. Si le compteur tourne au moment où vous cliquez, ChronoCast vous demande de confirmer et vous dit exactement ce qui va se passer : l'application se ferme, l'installeur s'ouvre, puis le compteur reprend là où il en était.
-
-Le réglage **« Vérifier les mises à jour »**, dans *Paramètres*, coupe tout : plus aucune requête ne part. Il est activé par défaut. Le fichier téléchargé atterrit dans `updates\` et disparaît au lancement suivant.
+**Lancer ChronoCast à l'ouverture de la session** se règle désormais dans Windows, et non dans ChronoCast : *Paramètres* → *Applications* → *Démarrage*. Le bouton de la vue *Paramètres* vous y emmène directement. ChronoCast y figure sous son propre nom, désactivé par défaut.
 
 ## 7. Quand quelque chose ne va pas
 

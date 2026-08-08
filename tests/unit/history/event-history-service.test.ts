@@ -12,17 +12,6 @@ import {
 } from '../../../src/core/history/event-history-service.js';
 import { createLogger, type LogSink } from '../../../src/core/logging/logger.js';
 
-/**
- * L'historique répond à une question que le streamer se pose forcément un jour :
- * « d'où viennent ces trois heures ? ». Il doit donc conserver, pour chaque
- * événement, ce qui a été crédité **et pourquoi** — y compris quand rien ne l'a
- * été, car un gift sub ignoré par le plafond est exactement le cas qui intrigue.
- *
- * C'est un journal, jamais une base : on y ajoute, on ne modifie rien. Le format
- * JSONL et la rotation quotidienne rendent la purge triviale et une coupure
- * inoffensive — une ligne tronquée en fin de fichier est simplement ignorée.
- */
-
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
 
 function makeEvent(overrides: Partial<DomainEvent> = {}): DomainEvent {
@@ -80,8 +69,6 @@ describe('createEventHistoryService', () => {
   });
 
   it('consigne aussi un événement non crédité', async () => {
-    // Un don écarté par le plafond doit apparaître : c'est précisément celui
-    // dont le streamer viendra demander l'explication.
     await service.record(
       makeEvent({ id: 'evt-2' }),
       { seconds: 0, applied: false, reason: 'plafond par événement atteint' },
@@ -132,9 +119,6 @@ describe('createEventHistoryService', () => {
   });
 
   it('consigne une commande de chat, son nom et sa provenance', async () => {
-    // L'historique est le seul endroit où le streamer peut voir *qui* a tapé
-    // la commande, et donc arbitrer un abus a posteriori. La provenance
-    // `chat-command` l'y distingue d'un ajout manuel qu'il aurait fait lui-même.
     await service.record(
       makeEvent({
         id: 'evt-cmd',
@@ -156,8 +140,6 @@ describe('createEventHistoryService', () => {
   });
 
   it('ignore une ligne corrompue sans perdre les autres', async () => {
-    // Une coupure d'alimentation en pleine écriture laisse une ligne tronquée :
-    // elle ne doit pas emporter tout l'historique avec elle.
     await service.record(makeEvent(), { seconds: 60, applied: true, reason: 'sub' }, state);
 
     const [file] = await readdir(directory);
@@ -173,8 +155,6 @@ describe('createEventHistoryService', () => {
   });
 
   it("n'interrompt jamais le subathon si l'écriture échoue", async () => {
-    // Le compteur prime sur son journal : un disque plein ne doit pas faire
-    // remonter d'exception jusqu'au service compteur.
     const broken = createEventHistoryService({
       directory: join(directory, 'fichier-occupant'),
       logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),

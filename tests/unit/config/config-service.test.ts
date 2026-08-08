@@ -10,14 +10,6 @@ import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import { CONFIG_SCHEMA_VERSION, type ChronoCastConfig } from '../../../src/core/config/schema.js';
 import type { AtomicJsonStore } from '../../../src/core/storage/atomic-json-store.js';
 
-/**
- * Le service de configuration est le seul point d'écriture des réglages. Il
- * garantit trois choses que l'interface d'administration ne peut pas assurer
- * seule : une configuration invalide n'est jamais persistée, une mise à jour
- * partielle n'efface jamais les réglages voisins, et l'import d'un fichier
- * fourni par l'utilisateur est validé avant d'être appliqué.
- */
-
 function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
   const records: LogRecord[] = [];
   return {
@@ -29,7 +21,6 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
   };
 }
 
-/** Magasin simulé, conservant la valeur en mémoire. */
 function createStoreDouble(initial?: unknown) {
   let persisted: unknown = initial;
   let failNextWrite: Error | undefined;
@@ -144,8 +135,6 @@ describe('createConfigService', () => {
         rewards: { bits: { tiers: [{ minBits: 50, seconds: 30 }] } },
       });
 
-      // Fusionner deux tableaux par index produirait un barème hybride que
-      // l'utilisateur n'a jamais demandé.
       expect(updated.rewards.bits.tiers).toEqual([{ minBits: 50, seconds: 30 }]);
     });
 
@@ -167,8 +156,6 @@ describe('createConfigService', () => {
 
       await expect(service.update({ overlay: { fontSize: 42 } })).rejects.toThrow();
 
-      // L'utilisateur doit voir la valeur réellement persistée, pas celle qu'il
-      // croyait avoir enregistrée.
       expect(service.get().overlay.fontSize).toBe(DEFAULT_CONFIG.overlay.fontSize);
     });
 

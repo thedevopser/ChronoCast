@@ -1,47 +1,3 @@
-/**
- * Composition root de ChronoCast.
- *
- * C'est le seul fichier qui connaît tout le monde. Partout ailleurs, chaque module
- * ne connaît que ses dépendances déclarées, ce qui les rend testables un à un ;
- * ici, on paie cette liberté en assemblant explicitement la chaîne complète.
- *
- * Le pipeline qu'il câble est la raison d'être de tout le reste :
- *
- * ```
- * EventSubClient.onNotification
- *   → déduplication sur message_id      (Twitch retransmet)
- *   → si channel.chat.message → evaluateChatMessage
- *   │     (analyse, habilitation, plafond → CommandEvent ou rien)
- *   → sinon → mapNotification           (vocabulaire métier)
- *   →         déduplication sur semanticKey (deux flux, un même fait)
- *   → CounterService.applyEvent         (barème, persistance, bus)
- *   → EventHistoryService               (journal)
- *   → WsHub                             (diffusion à l'overlay)
- * ```
- *
- * Les deux déduplications ne font pas double emploi. La première écarte la
- * **retransmission** du même message par Twitch ; la seconde écarte le même
- * **fait** annoncé par deux flux différents — `channel.subscribe` et
- * `channel.chat.notification` décrivent le même abonnement, et sans elle un
- * Prime serait crédité deux fois.
- *
- * **La seconde ne s'applique pas aux commandes de chat, et c'est voulu.** Elle
- * reconnaît un même fait de plateforme annoncé deux fois ; une commande n'est
- * pas un fait de plateforme mais une intention humaine. Deux `!addtime 300` à
- * trois secondes d'écart sont deux intentions, et les confondre volerait cinq
- * minutes au streamer. La retransmission, elle, reste écartée par la première.
- *
- * L'ordre de démarrage est lui aussi choisi : compteur, hub, serveur HTTP, puis
- * Twitch en dernier et sans bloquer. Une panne côté Twitch ne doit empêcher ni
- * l'overlay de s'afficher, ni le panneau de s'ouvrir — c'est précisément dans ce
- * cas-là que le streamer a besoin de les consulter.
- *
- * Tout ce qui dépend de la plateforme arrive par les ports. Ce fichier n'importe
- * donc pas `electron`, et l'application entière démarre dans un Node nu — c'est
- * ce qui rend les tests d'intégration possibles en conteneur Linux alors que la
- * cible est Windows.
- */
-
 import { mkdir } from 'node:fs/promises';
 
 import { evaluateChatMessage } from '../chat/command-service.js';
@@ -100,154 +56,74 @@ import {
 import { requiredScopes } from '../twitch/subscription-plan.js';
 import { createTokenStore, type TokenStore } from '../twitch/token-store.js';
 import type { AppEvents, TwitchStatusPayload } from './app-events.js';
+import { CONFIG_FILE, migrateDataDirectory } from './data-migration.js';
 import { createEventBus, type EventBus } from './event-bus.js';
-import type { BrowserOpener, Clock, PathProvider, SecretStore, UpdateInstaller } from './ports.js';
-import { UPDATE_REPOSITORY } from '../update/repository.js';
-import { createUpdateService, type UpdateService } from '../update/update-service.js';
-import { createFsUpdateStore } from '../update/update-store.js';
+import type {
+  BrowserOpener,
+  Clock,
+  PathProvider,
+  SecretStore,
+  SystemSettingsOpener,
+} from './ports.js';
 
-/**
- * Port fixe du serveur de rappel OAuth.
- *
- * Twitch exige une correspondance **exacte** entre l'URL de redirection déclarée
- * dans la console développeur et celle envoyée à l'autorisation. Le port HTTP
- * applicatif étant configurable — et susceptible de basculer sur un repli — il ne
- * peut pas servir : d'où ce port dédié, fixe, ouvert le temps du flux seulement.
- */
 export const OAUTH_REDIRECT_PORT = 37_771;
 
-/**
- * Hôte de la redirection, et il ne se choisit pas.
- *
- * Twitch impose HTTPS à toute URL de redirection, **sauf pour le nom littéral
- * `localhost`**. L'exception ne s'étend pas à `127.0.0.1` : la console
- * développeur refuse l'adresse numérique avec « Les URLs de redirection doivent
- * utiliser le protocole HTTPS », alors même qu'elle désigne exactement la même
- * machine. Écrire l'adresse ici rendrait donc l'application impossible à
- * configurer — l'utilisateur resterait bloqué à la première étape de
- * l'assistant, sans que rien n'explique pourquoi.
- *
- * Conséquence à ne pas perdre de vue : `localhost` est un **nom**, que le
- * système résout. Sous Windows il mène souvent à `::1` avant `127.0.0.1`, ce
- * qui oblige le serveur de rappel à écouter sur les deux adresses de bouclage.
- */
 const OAUTH_REDIRECT_HOST = 'localhost';
 export const OAUTH_REDIRECT_URI = `http://${OAUTH_REDIRECT_HOST}:${String(OAUTH_REDIRECT_PORT)}/callback`;
 
-/** Clé du secret client dans le magasin chiffré. */
 const CLIENT_SECRET_KEY = 'twitch.clientSecret';
 
-const CONFIG_FILE = 'config.json';
 const COUNTER_FILE = 'counter.json';
 
-/** Chemin du WebSocket. Doit rester stable : il finit collé dans OBS. */
 const WS_PATH = '/ws';
 
 export interface Application {
-  /** Démarre l'application et renvoie le port HTTP réellement retenu. */
   start(): Promise<number>;
 
-  /** Arrête proprement : fermeture des sockets, du serveur, puis vidange des journaux. */
   stop(): Promise<void>;
 
   getPort(): number | null;
 
-  /**
-   * Point d'entrée du pipeline d'événements.
-   *
-   * Exposé parce que deux appelants légitimes en ont besoin : le client EventSub,
-   * qui y branche ses notifications, et les tests d'intégration, qui vérifient la
-   * chaîne complète sans réseau.
-   */
   ingestNotification(context: NotificationContext, payload: unknown): Promise<void>;
 
-  /** Bus applicatif, exposé pour la coquille Electron et pour l'observation. */
   readonly bus: EventBus<AppEvents>;
 
   readonly config: ConfigService;
   readonly counter: CounterService;
   readonly history: EventHistoryService;
 
-  /**
-   * Mise à jour automatique.
-   *
-   * Toujours présente, même quand le point d'entrée n'a pas de port
-   * d'installation : elle rend alors l'état `unsupported`, ce que les routes
-   * d'API et le panneau savent afficher. Une propriété qui apparaît et
-   * disparaît selon le point d'entrée obligerait chaque appelant à s'en
-   * souvenir.
-   */
-  readonly update: UpdateService;
-
-  /** Jeton anti-CSRF de la session en cours. */
   getCsrfToken(): string;
 
-  /**
-   * Consomme le `state` OAuth engendré par le dernier appel à `connect`.
-   *
-   * Usage unique : le rendre une seconde fois permettrait de rejouer un rappel.
-   * Le serveur de la Phase 5 le comparera à celui que Twitch lui renvoie.
-   */
-  /**
-   * Vérifie le `state` renvoyé par Twitch, en temps constant.
-   *
-   * Ne consomme la demande en cours qu'en cas de correspondance : un `state`
-   * erroné ne doit pas pouvoir clore un flux légitime, sans quoi n'importe
-   * quelle page distante ferait échouer la connexion du streamer en provoquant
-   * une navigation vers la boucle locale.
-   */
   verifyOAuthState(state: string): boolean;
 }
 
 export interface ApplicationOptions {
   readonly paths: PathProvider;
+
+  readonly legacyDataDirectory?: string;
+
   readonly secrets: SecretStore;
   readonly clock: Clock;
   readonly browser: BrowserOpener;
+
+  readonly system?: SystemSettingsOpener | undefined;
+
   readonly ticker: Ticker;
   readonly appVersion: string;
 
-  /** Minuteurs du hub WebSocket. Injectés pour que les tests n'attendent rien. */
   readonly hubTimers: HubTimers;
 
-  /** Minuteurs du client EventSub. */
   readonly eventSubTimers: Timers;
 
-  /** Fabrique de sockets EventSub. Remplacée par un double dans les tests. */
   readonly createSocket: EventSubSocketFactory;
 
-  /** Implémentation de `fetch`. Remplacée dans les tests : aucun accès réseau. */
   readonly fetch: typeof fetch;
 
-  /** Temporisation entre deux tentatives Helix. Injectée pour ne rien attendre en test. */
   readonly sleep: (ms: number) => Promise<void>;
 
-  /**
-   * Minuteurs du serveur de rappel OAuth. À défaut, ceux d'EventSub.
-   *
-   * Facultatif parce que ce serveur n'existe que pendant le flux
-   * d'autorisation : aucun test qui ne le déclenche pas n'a à s'en soucier.
-   */
   readonly oauthTimers?: Timers;
 
-  /**
-   * Fabrique du serveur de rappel OAuth.
-   *
-   * Remplacée par un double dans les tests : le port 37771 est fixe et imposé
-   * par Twitch, l'ouvrir réellement ferait échouer deux suites exécutées en
-   * parallèle sur la même machine.
-   */
   readonly createOAuthServer?: (router: Router) => ArmableServer;
-
-  /**
-   * Port de lancement de l'installeur d'une mise à jour.
-   *
-   * Absent — c'est le cas du point d'entrée headless, qui n'est ni packagé ni
-   * installé — le service de mise à jour reste inerte : il n'interroge rien et
-   * n'arme aucun minuteur. Proposer une mise à jour qu'on ne saurait pas
-   * appliquer serait une promesse en l'air.
-   */
-  readonly updateInstaller?: UpdateInstaller;
 }
 
 export function createApplication(options: ApplicationOptions): Application {
@@ -255,6 +131,7 @@ export function createApplication(options: ApplicationOptions): Application {
     paths,
     secrets,
     clock,
+    system,
     ticker,
     appVersion,
     hubTimers,
@@ -262,25 +139,13 @@ export function createApplication(options: ApplicationOptions): Application {
     createSocket,
     fetch: fetchImpl,
     sleep,
-    updateInstaller = null,
   } = options;
 
   const redactor: Redactor = createRedactor();
   const csrfToken = createCsrfToken();
 
-  /* ---------------------------------------------------------------------- */
-  /* Journalisation                                                          */
-  /* ---------------------------------------------------------------------- */
-
   const ringBuffer: RingBufferSink = createRingBufferSink(500);
 
-  /**
-   * Logger de démarrage : la console seule.
-   *
-   * Il existe parce que le magasin de journaux a lui aussi besoin de journaliser
-   * ses incidents. Lui confier le logger applicatif créerait une boucle — écrire
-   * un log échoue, ce qui écrit un log, qui échoue.
-   */
   const bootstrapLogger = createLogger({
     level: 'info',
     sinks: [createConsoleSink()],
@@ -290,8 +155,6 @@ export function createApplication(options: ApplicationOptions): Application {
   const logStore = createJsonlStore<LogRecord>({
     directory: paths.logsDirectory,
     baseName: 'chronocast',
-    // Les enregistrements sortent du logger lui-même : les revalider à la
-    // relecture n'apporterait rien qu'un risque de rejeter nos propres lignes.
     parse: (raw) => raw as LogRecord,
     logger: bootstrapLogger,
     retentionDays: 14,
@@ -300,8 +163,6 @@ export function createApplication(options: ApplicationOptions): Application {
   const jsonlSink: JsonlSink = createJsonlSink({
     store: logStore,
     onError: (error) => {
-      // Neutralisé : perdre une ligne de journal ne doit jamais interrompre le
-      // subathon. L'incident reste visible sur la console.
       bootstrapLogger.error('écriture du journal impossible', { cause: error });
     },
   });
@@ -316,14 +177,9 @@ export function createApplication(options: ApplicationOptions): Application {
 
   const bus = createEventBus<AppEvents>({
     onHandlerError: (error, type) => {
-      // Un abonné défaillant ne doit pas priver les autres de l'événement.
       scoped.error('abonné du bus en échec', { type, cause: error });
     },
   });
-
-  /* ---------------------------------------------------------------------- */
-  /* Persistance et configuration                                            */
-  /* ---------------------------------------------------------------------- */
 
   const configService: ConfigService = createConfigService({
     store: createAtomicJsonStore<ChronoCastConfig>({
@@ -335,37 +191,9 @@ export function createApplication(options: ApplicationOptions): Application {
     logger: logger.child('config'),
   });
 
-  /* ---------------------------------------------------------------------- */
-  /* Mise à jour automatique                                                 */
-  /* ---------------------------------------------------------------------- */
-
-  const updateService: UpdateService = createUpdateService({
-    currentVersion: appVersion,
-    owner: UPDATE_REPOSITORY.owner,
-    repo: UPDATE_REPOSITORY.repo,
-    fetch: fetchImpl,
-    // Les mêmes minuteurs que le client EventSub : ce sont ceux du runtime
-    // Node, tous `unref`és, et le service ne doit pas retenir la boucle
-    // d'événements six heures durant.
-    timers: eventSubTimers,
-    clock,
-    files: createFsUpdateStore(paths),
-    installer: updateInstaller,
-    logger,
-    // Relu à chaque décision plutôt que capturé : le réglage change à chaud
-    // depuis le panneau, et une valeur figée au démarrage ferait mentir la
-    // case à cocher.
-    isEnabled: () => configService.get().app.checkForUpdates,
-    onStatus: (status) => {
-      bus.emit('update:status', status);
-    },
-  });
-
   const counterService: CounterService = createCounterService({
     store: createAtomicJsonStore<CounterState | null>({
       filePath: paths.resolveDataFile(COUNTER_FILE),
-      // `null` signifie « installation neuve » : c'est le service compteur, et
-      // non le magasin, qui sait quelle valeur initiale appliquer.
       parse: (raw) => (raw === null ? null : (raw as CounterState)),
       createDefault: () => null,
       logger: logger.child('counter-store'),
@@ -382,10 +210,6 @@ export function createApplication(options: ApplicationOptions): Application {
     logger,
     retentionDays: 90,
   });
-
-  /* ---------------------------------------------------------------------- */
-  /* Chaîne Twitch                                                           */
-  /* ---------------------------------------------------------------------- */
 
   const tokenStore: TokenStore = createTokenStore({
     secretStore: secrets,
@@ -425,18 +249,6 @@ export function createApplication(options: ApplicationOptions): Application {
   let twitchStatus: TwitchStatusPayload = { status: 'disconnected' };
   let pendingOAuthState: string | null = null;
 
-  /**
-   * Vérifie le `state` renvoyé par Twitch.
-   *
-   * `verifyCsrfToken` plutôt qu'une comparaison directe : la valeur a la même
-   * forme qu'un jeton CSRF — trente-deux octets en hexadécimal, engendrés par
-   * la même fabrique — et la comparaison y est à temps constant.
-   *
-   * La consommation n'a lieu **qu'en cas de correspondance**. Usage unique, donc
-   * pas de rejeu d'un rappel déjà honoré ; mais un `state` erroné ne clôt rien,
-   * sans quoi n'importe quelle page distante provoquant une navigation vers la
-   * boucle locale ferait échouer la connexion du streamer, en boucle.
-   */
   function verifyOAuthState(state: string): boolean {
     if (pendingOAuthState === null) {
       return false;
@@ -452,18 +264,11 @@ export function createApplication(options: ApplicationOptions): Application {
     twitchStatus = payload;
   });
 
-  /* ---------------------------------------------------------------------- */
-  /* Déduplication et pipeline                                               */
-  /* ---------------------------------------------------------------------- */
-
   let messageDedup: DedupCache | null = null;
   let semanticDedup: DedupCache | null = null;
 
-  /** Applique un événement métier : barème, persistance, puis journal. */
   async function applyDomainEvent(event: DomainEvent): Promise<CounterEventOutcome> {
     const outcome = await counterService.applyEvent(event);
-    // L'historique vient après le crédit : il ne doit ni le retarder ni
-    // l'empêcher, et son service neutralise déjà ses propres échecs.
     await history.record(event, outcome.reward, outcome.state);
     return outcome;
   }
@@ -480,19 +285,11 @@ export function createApplication(options: ApplicationOptions): Application {
       return;
     }
 
-    // Premier filtre : la retransmission du même message par Twitch.
     if (!messageDedup.admit(context.messageId, now)) {
       pipeline.debug('notification déjà traitée', { messageId: context.messageId });
       return;
     }
 
-    // Branche des commandes de chat, **avant** le convertisseur et non comme un
-    // cas de plus dedans. `channel.chat.message` livre chaque message de la
-    // chaîne, un volume sans commune mesure avec ce que traite le reste : le
-    // faire traverser `mapNotification` puis la déduplication sémantique serait
-    // du gaspillage à chaque ligne et remplirait les journaux. `event-mapper`
-    // reste le convertisseur des événements *comptables* ; il est pur et ne
-    // connaît pas la configuration, ce qui l'empêche de toute façon de trancher.
     if (context.subscriptionType === 'channel.chat.message') {
       const outcome = evaluateChatMessage(
         { messageId: context.messageId, receivedAt: context.receivedAt },
@@ -501,9 +298,6 @@ export function createApplication(options: ApplicationOptions): Application {
       );
 
       if (outcome.kind === 'ignored') {
-        // Fonctionnement nominal, et de très loin le cas majoritaire : la
-        // quasi-totalité du chat n'a rien à voir avec ChronoCast. D'où `debug`,
-        // et non `warning` comme pour une charge utile non conforme.
         pipeline.debug('message de chat sans effet', { reason: outcome.reason });
         return;
       }
@@ -522,13 +316,11 @@ export function createApplication(options: ApplicationOptions): Application {
     );
 
     if (mapped.kind === 'ignored') {
-      // Fonctionnement nominal : un événement sans intérêt pour le compteur.
       pipeline.debug('notification ignorée', { reason: mapped.reason });
       return;
     }
 
     if (mapped.kind === 'invalid') {
-      // Décalage avec le protocole : cela, en revanche, mérite d'être vu.
       pipeline.warning('notification non conforme', {
         reason: mapped.reason,
         subscriptionType: context.subscriptionType,
@@ -536,9 +328,6 @@ export function createApplication(options: ApplicationOptions): Application {
       return;
     }
 
-    // Second filtre : le même fait annoncé par deux flux différents. C'est lui
-    // qui empêche un Prime d'être crédité par `channel.subscribe` **et** par
-    // `channel.chat.notification`.
     if (!semanticDedup.admit(semanticKey(mapped.event), now)) {
       pipeline.debug('événement déjà crédité par une autre source', { eventId: mapped.event.id });
       return;
@@ -547,29 +336,9 @@ export function createApplication(options: ApplicationOptions): Application {
     await applyDomainEvent(mapped.event);
   }
 
-  /* ---------------------------------------------------------------------- */
-  /* Serveurs                                                                */
-  /* ---------------------------------------------------------------------- */
-
-  // Le serveur HTTP n'est construit qu'au démarrage : ses réglages — port,
-  // repli, plafond de corps — viennent de la configuration, qui n'est pas encore
-  // lue. Les composants qui ont besoin du port passent donc par cette référence.
   let httpServer: HttpServer | null = null;
   const currentPort = (): number => httpServer?.getPort() ?? 0;
 
-  /**
-   * Port sur lequel le WebSocket écoute.
-   *
-   * C'est celui du serveur HTTP, par construction : l'adaptateur est branché sur
-   * son événement `upgrade`, il n'existe aucun second écouteur, et le schéma ne
-   * déclare plus rien qui laisserait croire le contraire.
-   *
-   * La fonction subsiste néanmoins, plutôt que d'être remplacée par `currentPort`
-   * à ses deux points d'appel : elle nomme une question — « où le socket
-   * écoute-t-il ? » — dont la réponse se trouve être aujourd'hui le port HTTP.
-   * Le jour où elle cesserait de l'être, c'est ici, et nulle part ailleurs, que
-   * cela s'écrirait.
-   */
   const currentWsPort = (): number => currentPort();
 
   const hub: WsHub = createWsHub({
@@ -591,13 +360,6 @@ export function createApplication(options: ApplicationOptions): Application {
     }
   }
 
-  /**
-   * Rouvre la connexion EventSub avec l'identité et le jeton courants.
-   *
-   * Déclaré ici et non dans `oauth-completion.ts` parce que `startTwitch` est
-   * une fermeture du composition root : elle lit la configuration, le magasin
-   * de jetons et la fabrique de sockets, qui n'existent qu'à ce niveau.
-   */
   async function restartTwitch(): Promise<void> {
     await stopTwitch();
     await startTwitch();
@@ -621,27 +383,16 @@ export function createApplication(options: ApplicationOptions): Application {
     logger,
   });
 
-  /**
-   * Serveur éphémère du rappel OAuth.
-   *
-   * Il porte lui-même la vérification du `state` : le gestionnaire ne voit
-   * jamais la valeur attendue, il ne reçoit qu'un verdict. Il ne peut donc ni
-   * la journaliser, ni la renvoyer dans une page.
-   */
   const oauthCallbackServer = createOAuthCallbackServer({
     router: createOAuthCallbackRouter({
       verifyState: (state) => verifyOAuthState(state),
       complete: (code) => completeOAuth(code),
       getAppPort: () => httpServer?.getPort() ?? null,
       onSettled: (outcome) => {
-        // Le rappel est arrivé : ce port n'a plus rien à écouter.
         void oauthCallbackServer.disarm().catch((error: unknown) => {
           logger.error('fermeture du port de rappel impossible', { cause: error });
         });
 
-        // Et l'issue part sur le bus : le flux s'est déroulé dans le navigateur
-        // système, la fenêtre de l'application n'en a rien su. C'est par là
-        // qu'elle revient au premier plan et se recharge.
         bus.emit('oauth:settled', { outcome });
       },
       logger,
@@ -649,22 +400,12 @@ export function createApplication(options: ApplicationOptions): Application {
     createServer:
       options.createOAuthServer ??
       ((router) =>
-        // Les deux adresses de bouclage, parce que la redirect URI porte le nom
-        // `localhost` — seule forme non-HTTPS que Twitch accepte — et qu'un nom
-        // se résout : sous Windows, il mène souvent à `::1` avant `127.0.0.1`.
-        // N'écouter que l'une des deux ferait échouer le rappel après
-        // l'autorisation, c'est-à-dire une fois l'utilisateur convaincu d'avoir
-        // tout bien fait.
         createLoopbackPair({
           createFor: (host) =>
             createHttpServer({
               router,
               host,
               port: OAUTH_REDIRECT_PORT,
-              // Aucun repli : Twitch exige une correspondance exacte de la
-              // redirect URI. Écouter sur 37772 rendrait le rappel
-              // introuvable, ce qui serait bien plus déroutant qu'une erreur
-              // franche.
               portFallbackAttempts: 0,
               maxBodyBytes: 4_096,
               logger,
@@ -686,7 +427,6 @@ export function createApplication(options: ApplicationOptions): Application {
       return {
         broadcasterLogin: twitch.broadcasterLogin,
         clientId: twitch.clientId,
-        // Un booléen, jamais la valeur : le secret s'écrit et ne se lit pas.
         hasClientSecret: clientSecret !== null,
         connected: credentials !== null,
         scopes: granted,
@@ -697,14 +437,8 @@ export function createApplication(options: ApplicationOptions): Application {
     async startAuthorization() {
       const twitch = configService.get().twitch;
 
-      // Le port n'est ouvert qu'à partir d'ici, et pour cinq minutes au plus.
-      // L'armer au démarrage laisserait un port à l'écoute pendant tout le
-      // subathon pour une opération qui dure une poignée de secondes.
       await oauthCallbackServer.arm();
 
-      // Le `state` est engendré ici et vérifié par le serveur de rappel de la
-      // Phase 5 : sans lui, un tiers pourrait faire aboutir son propre flux
-      // d'autorisation dans la session du streamer.
       const state = createCsrfToken();
       pendingOAuthState = state;
 
@@ -736,8 +470,6 @@ export function createApplication(options: ApplicationOptions): Application {
     },
 
     async setClientSecret(secret: string) {
-      // Déclaré au rédacteur **avant** d'être écrit : à partir de cet instant, il
-      // ne peut plus apparaître dans un journal, quel que soit le chemin emprunté.
       redactor.registerSecret(secret);
       await secrets.write(CLIENT_SECRET_KEY, secret);
     },
@@ -755,7 +487,7 @@ export function createApplication(options: ApplicationOptions): Application {
       history,
       logs: ringBuffer,
       twitch: twitchApi,
-      update: updateService,
+      system,
       getPort: currentPort,
       appVersion,
       applyManualEvent: (event) => applyDomainEvent(event),
@@ -784,25 +516,15 @@ export function createApplication(options: ApplicationOptions): Application {
     maxPayloadBytes: 4_096,
   });
 
-  /* ---------------------------------------------------------------------- */
-  /* Cycle de vie                                                            */
-  /* ---------------------------------------------------------------------- */
-
   async function startTwitch(): Promise<void> {
     const twitch = configService.get().twitch;
     const credentials = await tokenStore.load();
 
     if (credentials === null || twitch.broadcasterUserId === '') {
-      // Installation neuve : l'assistant de la Phase 5 conduira l'utilisateur.
-      // Le compteur, lui, fonctionne déjà — il décompte, simplement rien ne le
-      // fait monter.
       scoped.info('Twitch non configuré : le compteur fonctionne sans événements');
       return;
     }
 
-    // L'identité du compte connecté peut différer de celle de la chaîne : c'est
-    // le cas d'un modérateur ou d'un bot. La validation fait foi ; à défaut, on
-    // retombe sur la chaîne elle-même.
     const validation = await oauth.validate(credentials.accessToken).catch(() => null);
 
     eventSub = createEventSubClient({
@@ -817,9 +539,6 @@ export function createApplication(options: ApplicationOptions): Application {
         userId: validation?.userId ?? twitch.broadcasterUserId,
       },
       onNotification: (context, payload) => {
-        // Le pipeline est asynchrone, le rappel ne l'est pas : l'échec est
-        // neutralisé ici, sinon un rejet non traité abattrait le processus — et
-        // donc le subathon — sur un seul événement mal formé.
         void ingestNotification(context, payload).catch((error: unknown) => {
           scoped.error('événement non traité', { cause: error });
         });
@@ -834,7 +553,6 @@ export function createApplication(options: ApplicationOptions): Application {
     config: configService,
     counter: counterService,
     history,
-    update: updateService,
 
     getCsrfToken: () => csrfToken,
     getPort: currentPort,
@@ -844,19 +562,37 @@ export function createApplication(options: ApplicationOptions): Application {
     ingestNotification,
 
     async start(): Promise<number> {
-      // Les magasins savent créer leur répertoire, mais un échec de création est
-      // bien plus lisible au démarrage qu'à la première écriture, six heures plus tard.
+      if (options.legacyDataDirectory !== undefined) {
+        const outcome = await migrateDataDirectory({
+          source: options.legacyDataDirectory,
+          target: paths.dataDirectory,
+        });
+
+        switch (outcome.kind) {
+          case 'migrated':
+            scoped.info('données reprises de l’installation précédente', {
+              source: options.legacyDataDirectory,
+              fichiers: outcome.fileCount,
+            });
+            break;
+          case 'failed':
+            scoped.error('reprise des données impossible', {
+              source: options.legacyDataDirectory,
+              cause: outcome.cause,
+            });
+            break;
+          case 'skipped':
+            scoped.debug('aucune reprise de données', { motif: outcome.reason });
+            break;
+        }
+      }
+
       await mkdir(paths.dataDirectory, { recursive: true });
       await mkdir(paths.logsDirectory, { recursive: true });
       await mkdir(paths.historyDirectory, { recursive: true });
 
       const config = await configService.load();
 
-      // Réécrite immédiatement, même inchangée. Trois effets, tous voulus : le
-      // répertoire de données décrit l'application dès le premier lancement,
-      // une migration de schéma est matérialisée sur le disque au lieu de rester
-      // latente, et un répertoire non inscriptible se signale au démarrage
-      // plutôt qu'au premier réglage modifié, six heures plus tard.
       await configService.update({});
 
       logger.setLevel(config.logging.level);
@@ -864,9 +600,6 @@ export function createApplication(options: ApplicationOptions): Application {
         logger.addSink(createConsoleSink());
       }
 
-      // Les journaux sont poussés au panneau d'administration en direct : c'est
-      // le seul moyen pour l'utilisateur de voir une reconnexion Twitch se
-      // produire sans aller ouvrir un fichier.
       logger.addSink({
         name: 'ws',
         write: (record) => {
@@ -879,8 +612,6 @@ export function createApplication(options: ApplicationOptions): Application {
         ttlMs: config.history.dedupTtlMs,
       });
 
-      // Fenêtre plus courte : deux flux décrivant le même fait arrivent à
-      // quelques secondes d'intervalle, pas à quelques minutes.
       semanticDedup = createDedupCache({
         maxEntries: config.history.dedupCacheSize,
         ttlMs: config.history.crossSourceWindowMs,
@@ -889,10 +620,6 @@ export function createApplication(options: ApplicationOptions): Application {
       configService.onChange(() => {
         logger.setLevel(configService.get().logging.level);
         hub.publishConfig();
-        // Le réglage de mise à jour se coupe et se rallume à chaud : sans ce
-        // rappel, décocher la case laisserait le minuteur armé et cocher ne
-        // relancerait rien avant le prochain démarrage.
-        updateService.refresh();
       });
 
       await counterService.start();
@@ -910,16 +637,9 @@ export function createApplication(options: ApplicationOptions): Application {
 
       const port = await httpServer.start();
 
-      // Twitch en dernier, et sans faire échouer le démarrage : c'est justement
-      // quand Twitch ne répond pas que le streamer doit pouvoir ouvrir son panneau.
       await startTwitch().catch((error: unknown) => {
         scoped.error('chaîne Twitch non démarrée', { cause: error });
       });
-
-      // En dernier, et sans rien attendre : la première vérification est de
-      // toute façon différée, et le service ne doit disputer le démarrage ni à
-      // l'overlay ni au panneau.
-      updateService.start();
 
       scoped.info('ChronoCast démarré', {
         port,
@@ -930,10 +650,7 @@ export function createApplication(options: ApplicationOptions): Application {
     },
 
     async stop(): Promise<void> {
-      // Un port de rappel laissé ouvert après extinction est une surface
-      // offerte pour rien : plus personne n'attend de rappel.
       await oauthCallbackServer.disarm();
-      updateService.stop();
       await stopTwitch();
       await wsAdapter.close();
       hub.stop();
@@ -941,8 +658,6 @@ export function createApplication(options: ApplicationOptions): Application {
       httpServer = null;
       await counterService.stop();
 
-      // La vidange vient en dernier : tout ce qui précède journalise, et ces
-      // lignes-là sont précisément celles qu'on relira après un arrêt anormal.
       await jsonlSink.flush();
     },
   };

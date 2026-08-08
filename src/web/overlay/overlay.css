@@ -1,16 +1,3 @@
-/*
- * Feuille de l'overlay.
- *
- * Servie en fichier et jamais en ligne : `style-src 'self'` ne tolère ni la
- * balise `<style>` ni l'attribut `style=`. Toute la personnalisation passe donc
- * par les variables `--cc-*`, posées sur `:root` par le CSSOM depuis
- * `overlay-style.ts` — seule voie que la CSP laisse ouverte.
- *
- * Les valeurs déclarées ici sont des **replis**, utilisés le temps que la
- * première configuration arrive par le WebSocket. Sans elles, l'overlay
- * clignoterait en noir sur transparent au démarrage de la scène OBS.
- */
-
 :root {
   --cc-font-family: Inter, "Segoe UI", system-ui, sans-serif;
   --cc-font-size: 96px;
@@ -21,7 +8,6 @@
   --cc-text-background: none;
   --cc-text-align: center;
 
-  /* Cadre éteint : sans épaisseur et sans couleur, donc sans effet. */
   --cc-frame-width: 0px;
   --cc-frame-radius: 0px;
   --cc-frame-padding-x: 0px;
@@ -37,12 +23,6 @@
   --cc-toast-duration: 4000ms;
 }
 
-/*
- * Fond transparent, sur toute la chaîne.
- *
- * Une Browser Source OBS compose la page par-dessus la scène : la moindre
- * couleur de fond héritée poserait un rectangle opaque sur le direct.
- */
 html,
 body {
   margin: 0;
@@ -59,33 +39,10 @@ body {
   gap: 0.25em;
   min-height: 100vh;
 
-  /* Le curseur n'a rien à faire ici, et un clic ne doit pas atteindre la page. */
   user-select: none;
   pointer-events: none;
 }
 
-/*
- * Cadre.
- *
- * L'enveloppe porte le remplissage — qui peut être parfaitement transparent —
- * et c'est un **pseudo-élément** qui peint le trait.
- *
- * Cette séparation n'est pas un raffinement. La première version peignait le
- * dégradé sur le fond de l'enveloppe et comptait sur un `padding` pour n'en
- * laisser voir que le pourtour : c'est faux, le fond d'un élément peint toute
- * sa boîte, marge intérieure comprise. Le trait n'apparaissait donc que si
- * l'intérieur était masqué par un remplissage opaque — autrement dit, le cadre
- * ne pouvait pas être un cadre et laisser voir la scène en même temps.
- *
- * `border-image` réglerait le problème d'un trait, mais ferait perdre
- * `border-radius`. Reste le masque : le pseudo-élément peint le dégradé sur
- * toute sa surface, puis on en **soustrait la boîte intérieure**. Les rayons
- * intérieurs sont alors calculés par le moteur, ce qui vaut mieux que de les
- * calculer nous-mêmes.
- *
- * Le masque est posé sur le pseudo-élément et non sur l'enveloppe : appliqué à
- * celle-ci, il effacerait aussi les chiffres, qui en sont un descendant.
- */
 .frame {
   position: relative;
   padding: var(--cc-frame-padding-y) var(--cc-frame-padding-x);
@@ -98,29 +55,9 @@ body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  /* La marge intérieure du pseudo-élément **est** l'épaisseur du trait. */
   padding: var(--cc-frame-width);
   background: var(--cc-frame-background);
 
-  /*
-   * Deux couches de masque : la boîte de contenu, et la boîte entière. Leur
-   * soustraction ne laisse que le pourtour, c'est-à-dire le trait.
-   *
-   * **`content-box`, et surtout pas `padding-box`.** Le nom trompe : la boîte
-   * de remplissage n'est pas la boîte diminuée de la marge intérieure, mais la
-   * boîte diminuée des **bordures**. Le trait étant ici exprimé par un
-   * `padding` et non par une bordure, les deux couches auraient exactement la
-   * même taille et ne différeraient que par leurs rayons de coin — leur
-   * soustraction ne laisserait que les arcs des quatre angles. C'est
-   * précisément ce qui s'est vu à l'écran. La boîte de contenu, elle, est
-   * diminuée des bordures **et** de la marge intérieure.
-   *
-   * La forme préfixée est conservée pour les Chromium plus anciens — une
-   * Browser Source OBS n'est pas toujours à jour, et `mask-composite` n'est
-   * arrivé que tardivement. La forme standard est déclarée après, elle
-   * l'emporte là où elle existe. L'ordre compte : la propriété raccourcie
-   * réinitialise la composition, elle doit donc précéder.
-   */
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -135,14 +72,6 @@ body {
   text-align: var(--cc-text-align);
   text-shadow: var(--cc-text-shadow);
 
-  /*
-   * Peinture du texte.
-   *
-   * `color` n'accepte pas d'image : un dégradé ne peut être appliqué qu'en
-   * découpant un fond à la forme des glyphes. Le découpage est toujours actif —
-   * sans fond, il ne peint rien — et c'est `--cc-text-fill` qui décide : la
-   * couleur unie, ou `transparent` pour laisser voir le dégradé dessous.
-   */
   color: var(--cc-text-fill);
   background-image: var(--cc-text-background);
   -webkit-background-clip: text;
@@ -150,19 +79,9 @@ body {
 
   -webkit-text-stroke: var(--cc-outline-width) var(--cc-outline-color);
 
-  /*
-   * Chiffres à chasse fixe.
-   *
-   * Sans cela, la largeur du compteur change à chaque seconde — un « 1 » est
-   * plus étroit qu'un « 8 » — et le texte tressaute latéralement en permanence.
-   */
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-
-/* -------------------------------------------------------------------------- */
-/* Animations d'ajout de temps                                                 */
-/* -------------------------------------------------------------------------- */
 
 .countdown.is-flash {
   animation: cc-flash var(--cc-animation-duration) ease-out;
@@ -209,13 +128,6 @@ body {
   }
 }
 
-/*
- * Respect du réglage système de réduction des animations.
- *
- * Sans intérêt dans OBS, qui n'en porte pas — mais l'aperçu d'apparence du
- * panneau d'administration affiche cette même page dans un navigateur, où le
- * réglage existe et doit être honoré.
- */
 @media (prefers-reduced-motion: reduce) {
   .countdown.is-flash,
   .countdown.is-pulse,
@@ -223,10 +135,6 @@ body {
     animation: none;
   }
 }
-
-/* -------------------------------------------------------------------------- */
-/* Bulle d'événement                                                           */
-/* -------------------------------------------------------------------------- */
 
 .toast {
   display: flex;
@@ -246,13 +154,6 @@ body {
   display: none;
 }
 
-/*
- * Libellé de la bulle, renseigné pour les commandes de chat.
- *
- * Il annonce la nature de l'ajout avant de dire qui en est l'auteur, et se
- * distingue du pseudo par un léger retrait d'opacité — le même que la
- * récompense, dont il partage le rôle d'annotation.
- */
 .toast__label {
   opacity: 0.85;
 }
@@ -262,12 +163,6 @@ body {
 }
 
 .toast__user {
-  /*
-   * Garde-fou de mise en page contre un pseudonyme démesuré.
-   *
-   * `safe-dom` tronque déjà à soixante-quatre graphèmes, mais rien n'empêche
-   * soixante-quatre idéogrammes pleine chasse de déborder de l'écran.
-   */
   max-width: 60vw;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -6,19 +6,6 @@ import { createRedactor, REDACTED } from '../../../src/core/logging/redaction.js
 import { createTokenStore } from '../../../src/core/twitch/token-store.js';
 import type { TwitchCredentials } from '../../../src/core/twitch/token-store.js';
 
-/**
- * Le magasin de jetons est le point de convergence des trois secrets de
- * ChronoCast : le secret client de l'application Twitch, le jeton d'accès et le
- * jeton de rafraîchissement.
- *
- * Il porte deux responsabilités que rien d'autre ne couvre. La première est le
- * chiffrement au repos, délégué au port `SecretStore` — sous Windows,
- * `safeStorage` s'adosse à DPAPI, si bien qu'un autre compte de la même machine
- * ne peut pas déchiffrer les jetons. La seconde est l'enregistrement des valeurs
- * auprès du rédacteur : dès qu'un jeton est connu, il devient impossible de le
- * faire apparaître dans un log, où qu'il se glisse.
- */
-
 const CREDENTIALS: TwitchCredentials = {
   clientSecret: 'secret-client-tres-long-abc123',
   accessToken: 'jeton-acces-abcdef123456',
@@ -128,8 +115,6 @@ describe('createTokenStore', () => {
     });
 
     it('protège les jetons relus au démarrage', async () => {
-      // Au lancement suivant, les jetons viennent du disque et non d'un appel à
-      // save : ils doivent être protégés tout autant.
       const premier = createStore();
       await premier.store.save(CREDENTIALS);
       const serialise = [...premier.double.values.entries()];
@@ -151,8 +136,6 @@ describe('createTokenStore', () => {
       await store.clear();
       logger.info(CREDENTIALS.accessToken);
 
-      // Un jeton révoqué n'est plus un secret : continuer à le masquer
-      // encombrerait inutilement les logs.
       expect(sink.records.at(-1)?.message).toBe(CREDENTIALS.accessToken);
     });
   });
@@ -185,9 +168,6 @@ describe('createTokenStore', () => {
     });
 
     it('propage un échec d\'écriture du magasin de secrets', async () => {
-      // Ne pas pouvoir enregistrer un jeton fraîchement obtenu doit être visible
-      // de l'appelant : l'utilisateur devra sinon se réauthentifier sans le
-      // comprendre au prochain démarrage.
       const { store, double } = createStore();
       vi.spyOn(double.secretStore, 'write').mockRejectedValueOnce(new Error('trousseau verrouillé'));
 
@@ -206,8 +186,6 @@ describe('createTokenStore', () => {
     });
 
     it('enregistre malgré tout les identifiants', async () => {
-      // Refuser d'enregistrer rendrait l'application inutilisable ; l'utilisateur
-      // est averti et décide.
       const { store } = createStore({ encryptionAvailable: false });
 
       await store.save(CREDENTIALS);
