@@ -6,7 +6,7 @@ Ce document permet de reprendre le développement depuis une fenêtre de context
 
 **Rappel du chantier 3**, livré le même jour : ChronoCast passe au **Microsoft Store**, seul canal de distribution — plus aucune release GitHub, plus aucun `.exe` publié. **Le chantier 1 — la mise à jour automatique — est retiré**, le Store s'en chargeant.
 
-**Éprouvé sur poste Windows le 8 août 2026**, par chargement latéral d'un paquet signé pour l'essai : le chiffrement DPAPI des secrets et le rappel OAuth sur `localhost:37771` fonctionnent dans le conteneur MSIX. **La reprise des données et la tâche de démarrage restent à vérifier** — voir la section 7.
+**Éprouvé sur poste Windows le 8 août 2026**, par chargement latéral d'un paquet signé pour l'essai : le chiffrement DPAPI des secrets et le rappel OAuth sur `localhost:37771` fonctionnent dans le conteneur MSIX, et les liens sortants du chantier 4 partent bien au navigateur système. **La reprise des données et la tâche de démarrage restent à vérifier** — voir la section 7.
 
 **La V1 est terminée et publiée.** Son document de reprise, [REPRISE.md](REPRISE.md), est **clos** : il reste l'archive complète des huit phases, de la release `v0.4.0` et de tout ce qui a été décidé en chemin. On y va pour comprendre pourquoi une chose est construite comme elle l'est — les trois pièges du protocole EventSub, les quatre tentatives du cadre de l'overlay, la leçon de la Phase 7. Rien de tout cela n'est répété ici.
 
@@ -279,7 +279,7 @@ Rien de ce chantier n'est éprouvé sur Windows, et il touche précisément ce q
 1. **La lecture de `%APPDATA%\ChronoCast` depuis un paquet MSIX.** La documentation dit que les lectures d'AppData tombent sur le vrai répertoire quand le conteneur n'a rien écrit. Le choix de `%USERPROFILE%` contourne la question **en écriture**, mais la reprise, elle, doit bien **lire** l'ancien emplacement. Si cela ne fonctionne pas, le repli est de lire le chemin non redirigé explicitement.
 2. **La tâche de démarrage.** Elle n'existe qu'une fois le paquet installé, et rien avant ne dit qu'elle apparaîtra dans les paramètres.
 
-### Chantier 4 — Paternité, licence et soutien — **livré, un point de vérification ouvert**
+### Chantier 4 — Paternité, licence et soutien — **livré et éprouvé**
 
 ChronoCast ne disait nulle part qui l'avait écrit, et `package.json` annonçait une licence MIT dont le texte n'existait pas. Le chantier ajoute une vue « À propos » au panneau, un remerciement en fin d'assistant, un lien de soutien PayPal, et le fichier [LICENSE](../LICENSE).
 
@@ -297,7 +297,7 @@ ChronoCast ne disait nulle part qui l'avait écrit, et `package.json` annonçait
 
 **Le point ouvert : la politique du Microsoft Store.** Les politiques de certification encadrent les mécanismes de paiement et les liens sortants, et elles changent sans prévenir. **Aucun numéro de politique n'est cité nulle part dans le dépôt, volontairement.** À revérifier avant chaque soumission — voir [STORE-SUBMISSION.md](STORE-SUBMISSION.md), qui décrit aussi le repli : `DONATION_URL` étant à un seul endroit, retirer le lien des pages est mécanique.
 
-**Reste à faire sur poste Windows :** vérifier qu'un clic sur le lien de soutien ouvre bien le navigateur système **sans rien charger dans la fenêtre de l'application**. C'est le seul comportement du chantier que ni Vitest ni le conteneur ne peuvent constater, puisqu'il traverse `shell.openExternal`.
+**Éprouvé sur poste Windows le 8 août 2026.** Le clic sur le lien de soutien ouvre bien le navigateur système sans rien charger dans la fenêtre de l'application — le seul comportement du chantier que ni Vitest ni le conteneur ne peuvent constater, puisqu'il traverse `shell.openExternal`. **Il n'y a plus rien d'ouvert sur ce chantier**, hormis la politique du Store, qui ne dépend pas de nous.
 
 ### Chantiers suivants
 
@@ -316,7 +316,7 @@ Restent hors de portée de la suite :
 - **la lecture de `%APPDATA%\ChronoCast` à travers la virtualisation MSIX**, dont dépend toute la reprise des données ;
 - **la tâche `windows.startupTask`**, qui n'existe qu'une fois le paquet installé ;
 - le paquet lui-même : installation, raccourcis, **désinstallation puis réinstallation** ;
-- **`shell.openExternal`**, donc le fait qu'un clic sur le lien du dépôt ou celui du soutien ouvre le navigateur système **sans rien charger dans la fenêtre**. `decideNavigation` est intégralement vérifiée en conteneur, mais ce qu'Electron fait de sa réponse ne l'est pas.
+- **`shell.openExternal`**, donc le fait qu'un clic sur le lien du dépôt ou celui du soutien ouvre le navigateur système **sans rien charger dans la fenêtre**. `decideNavigation` est intégralement vérifiée en conteneur, mais ce qu'Electron fait de sa réponse ne l'est pas. *Éprouvé sur poste le 8 août 2026 — ce qui ne le fait pas rentrer dans la portée de la suite : toute modification de la politique de navigation le remet à vérifier à la main.*
 
 ### Comment éprouver tout cela sans publier
 
