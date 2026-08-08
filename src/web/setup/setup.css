@@ -240,6 +240,13 @@
   border-left: 3px solid var(--cc-warning);
 }
 
+/* Remerciement de fin d'assistant : présent, mais nettement en retrait du bouton d'action. */
+.thanks {
+  margin: var(--cc-space-4) 0 0;
+  color: var(--cc-text-faint);
+  font-size: var(--cc-text-sm);
+}
+
 .detected__login {
   color: var(--cc-accent-hover);
   font-family: var(--cc-font-mono);
