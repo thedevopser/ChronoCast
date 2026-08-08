@@ -100,7 +100,7 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 ## 8. La distribution par le Microsoft Store
 
-Depuis la `0.7.0`, ChronoCast n'est distribué que par le Microsoft Store, et **la mise à jour automatique maison a été retirée**. C'est le Store qui met à jour, sans que l'application n'ait rien à télécharger ni à lancer.
+Depuis la `0.8.0`, ChronoCast n'est distribué que par le Microsoft Store, et **la mise à jour automatique maison a été retirée**. C'est le Store qui met à jour, sans que l'application n'ait rien à télécharger ni à lancer.
 
 ### Ce que cela retire de la surface
 

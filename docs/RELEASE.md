@@ -36,13 +36,13 @@ Le workflow la relance de toute façon, sur Windows. Autant le savoir avant.
 ```bash
 git checkout main
 git pull --ff-only origin main
-git tag v0.7.0
-git push origin v0.7.0
+git tag v0.8.0
+git push origin v0.8.0
 ```
 
 Le workflow démarre seul. À la fin, l'artefact `chronocast-msix` de l'exécution porte :
 
-- `ChronoCast-0.7.0-x64.appx`
+- `ChronoCast-0.8.0-x64.appx`
 - `wack-report.xml`, le rapport du kit de certification
 
 **Lisez le rapport avant de déposer.** Il attrape une bonne part des motifs de rejet, et le lire coûte deux minutes là où un rejet coûte un à trois jours.
@@ -96,8 +96,8 @@ Liste d'essai, dans l'ordre :
 **Sur la vérification du tag** — le tag et `package.json` divergent. Corrigez `package.json` sur `main`, supprimez le tag, retaguez :
 
 ```bash
-git tag -d v0.7.0
-git push origin :refs/tags/v0.7.0
+git tag -d v0.8.0
+git push origin :refs/tags/v0.8.0
 ```
 
 **Sur la vérification de l'identité** — `electron-builder.yml` porte encore le marqueur `IDENTITE-PARTNER-CENTER` sur une ligne de valeur. Relevez les trois valeurs dans Partner Center → Identité du produit.

@@ -2,7 +2,9 @@
 
 Ce document permet de reprendre le développement depuis une fenêtre de contexte vierge, sans aucune analyse préalable ni question à poser. Il est **vivant** : il est mis à jour à chaque lot, et il fait foi.
 
-**Dernière mise à jour :** 8 août 2026, chantier 3 écrit et vert en conteneur, **non encore éprouvé sur poste Windows**. ChronoCast passe au **Microsoft Store**, seul canal de distribution : plus aucune release GitHub, plus aucun `.exe` publié. **Le chantier 1 — la mise à jour automatique — est retiré**, le Store s'en chargeant. La version passe à **`0.7.0`**.
+**Dernière mise à jour :** 8 août 2026, chantier 3 livré. ChronoCast passe au **Microsoft Store**, seul canal de distribution : plus aucune release GitHub, plus aucun `.exe` publié. **Le chantier 1 — la mise à jour automatique — est retiré**, le Store s'en chargeant. La version passe à **`0.8.0`**.
+
+**Éprouvé sur poste Windows le 8 août 2026**, par chargement latéral d'un paquet signé pour l'essai : le chiffrement DPAPI des secrets et le rappel OAuth sur `localhost:37771` fonctionnent dans le conteneur MSIX. **La reprise des données et la tâche de démarrage restent à vérifier** — voir la section 7.
 
 **La V1 est terminée et publiée.** Son document de reprise, [REPRISE.md](REPRISE.md), est **clos** : il reste l'archive complète des huit phases, de la release `v0.4.0` et de tout ce qui a été décidé en chemin. On y va pour comprendre pourquoi une chose est construite comme elle l'est — les trois pièges du protocole EventSub, les quatre tentatives du cadre de l'overlay, la leçon de la Phase 7. Rien de tout cela n'est répété ici.
 
