@@ -1,0 +1,43 @@
+appId: dev.thedevopser.chronocast
+
+productName: ChronoCast
+
+copyright: © ChronoCast
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - dist/**/*
+  - assets/**/*
+  - package.json
+  - '!**/*.map'
+
+asar: true
+
+publish: null
+
+win:
+  target:
+    - target: appx
+      arch:
+        - x64
+  icon: assets/icon.ico
+  forceCodeSigning: false
+
+appx:
+  identityName: TheDevOpser.ChronoCast
+  publisher: CN=33DC4855-2DBC-41EE-ABD5-0605A97F5AD5
+  publisherDisplayName: TheDevOpser
+
+  displayName: ChronoCast
+
+  applicationId: ChronoCast
+
+  backgroundColor: '#1a1626'
+
+  languages:
+    - fr-FR
+
+  customExtensionsPath: assets/appx/extensions.xml

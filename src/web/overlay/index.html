@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChronoCast — Overlay</title>
+
+    <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
+
+    <link rel="stylesheet" href="/overlay/overlay.css" />
+
+    <link rel="stylesheet" href="/custom.css" />
+  </head>
+
+  <body>
+    <div class="overlay" id="overlay">
+      <div class="frame">
+        <div class="countdown" id="countdown">--:--:--</div>
+      </div>
+
+      <div class="toast" id="toast" hidden>
+        <span class="toast__label" id="toast-label" hidden></span>
+        <span class="toast__user" id="toast-user"></span>
+        <span class="toast__reward" id="toast-reward"></span>
+      </div>
+    </div>
+
+    <script type="module" src="/overlay/main.js"></script>
+  </body>
+</html>

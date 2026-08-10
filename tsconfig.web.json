@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": [
+    "Cible navigateur : overlay OBS et panneau d'administration.",
+    "`types: []` retire les typages Node, ce qui interdit par construction",
+    "l'appel d'une API serveur (fs, path, process) depuis le code servi au client.",
+    "Le module est ESNext : les pages chargent les modules ES nativement, sans bundler.",
+    "L'outDir est distinct de celui de la cible Node afin que les deux compilations",
+    "n'écrivent jamais dans le même fichier."
+  ],
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": "src/web",
+    "outDir": "dist/public"
+  },
+  "include": ["src/web/**/*.ts"]
+}

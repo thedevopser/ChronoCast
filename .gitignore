@@ -1,0 +1,45 @@
+# Dépendances — jamais versionnées, reconstruites via ./scripts/dc.sh install
+node_modules/
+
+# Artefacts de compilation TypeScript et de packaging electron-builder
+dist/
+release/
+*.tsbuildinfo
+
+# Rapports de couverture
+coverage/
+
+# Données locales produites par une exécution de développement.
+# Ces fichiers contiennent potentiellement des jetons OAuth : ils ne doivent
+# sous aucun prétexte se retrouver dans l'historique Git.
+.chronocast-data/
+*.enc
+
+# Secrets d'environnement
+.env
+.env.*
+!.env.example
+
+# Brouillons de description de pull request, générés après chaque commit.
+# Destinés au copier-coller dans GitHub, ils n'ont pas à être versionnés.
+PR-*.md
+
+# Certaines configurations Git globales excluent « docs/* ». Or la documentation
+# est un livrable du projet : architecture, guide utilisateur, personnalisation
+# de l'overlay, modèle de menace. On la réintègre explicitement, sans quoi elle
+# ne serait jamais versionnée et disparaîtrait au premier clone ailleurs.
+!docs/
+!docs/**
+
+# Documentation interne : état d'avancement, chantiers, procédures de build et
+# de publication, textes Partner Center, archives. Utile au mainteneur, sans
+# valeur pour un lecteur du dépôt — et le dépôt est public.
+.travail/
+
+# Fichiers propres aux éditeurs et aux systèmes d'exploitation
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

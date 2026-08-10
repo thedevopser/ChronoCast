@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": [
+    "Configuration par défaut : elle sert à l'éditeur et au typage des tests.",
+    "Elle couvre l'ensemble des sources et de la suite de tests, avec les",
+    "bibliothèques Node ET DOM, car un test peut porter aussi bien sur un service",
+    "backend que sur un module destiné au navigateur.",
+    "Elle n'émet rien : la séparation stricte des frontières est vérifiée par",
+    "tsconfig.node.json et tsconfig.web.json, exécutés par `npm run typecheck`."
+  ],
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "*.ts", "*.mjs", "scripts/**/*.mjs"]
+}

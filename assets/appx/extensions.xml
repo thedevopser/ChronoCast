@@ -1,0 +1,31 @@
+<!--
+  Fragment fusionné dans l'`AppxManifest.xml` par electron-builder, via
+  `appx.customExtensionsPath`.
+
+  Trois contraintes, chacune tenue par un test :
+
+    - **pas de balise `<Extensions>` racine** : electron-builder l'écrit lui-même
+      et concatène ce fichier à l'intérieur ;
+    - **préfixe `desktop:`** : le gabarit ne déclare que `uap`, `desktop` et
+      `rescap` ;
+    - **`Executable` préfixé par `app\`** : le chemin est relatif à la racine du
+      paquet, où electron-builder place l'application.
+
+  La tâche remplace `app.launchAtStartup`, retiré : sous MSIX,
+  `setLoginItemSettings` écrit dans un registre virtualisé, et la case aurait
+  coché sans que rien ne démarre. `Enabled="false"` reprend l'ancien défaut ;
+  c'est l'utilisateur qui active la tâche depuis les paramètres de Windows.
+
+  `EntryPoint="Windows.FullTrustApplication"` fait tourner l'application en
+  pleine confiance et non en AppContainer, dont les restrictions de bouclage
+  empêcheraient OBS d'atteindre l'overlay.
+-->
+<desktop:Extension
+  Category="windows.startupTask"
+  Executable="app\ChronoCast.exe"
+  EntryPoint="Windows.FullTrustApplication">
+  <desktop:StartupTask
+    TaskId="ChronoCastStartupTask"
+    Enabled="false"
+    DisplayName="ChronoCast" />
+</desktop:Extension>
