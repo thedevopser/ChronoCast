@@ -8,7 +8,9 @@ Lire [ARCHITECTURE.md](ARCHITECTURE.md) d'abord si le découpage du code n'est p
 
 ## 1. L'environnement tient en une dépendance : Docker
 
-**Aucun binaire Node n'est installé sur la machine hôte.** Ni Node, ni npm, ni npx, ni CLI tierce. Tout passe par un conteneur, piloté par `./scripts/dc.sh`.
+**Le seul prérequis est Docker.** Toute la chaîne d'outillage — Node, npm, la Twitch CLI — vit dans le conteneur décrit par `docker/Dockerfile.dev`, et `./scripts/dc.sh` exécute chaque commande à l'intérieur. Rien n'a besoin d'être installé sur votre poste, et rien n'y est supposé.
+
+Ce n'est pas une préférence de confort : le conteneur part de `node:22-bookworm-slim`, la même version majeure que celle qu'utilise la CI et que déclare `engines` dans `package.json`. Un test qui passe chez vous passe sur le runner, et une divergence de version ne peut pas se glisser entre les deux.
 
 ```bash
 ./scripts/dc.sh install     # npm ci --ignore-scripts
