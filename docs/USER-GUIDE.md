@@ -1,6 +1,6 @@
 # Guide utilisateur
 
-ChronoCast affiche sur votre stream un compte à rebours qui s'allonge à chaque sub, resub, gift sub, sub Prime ou don de bits. Tout tourne sur votre machine : aucun compte à créer chez nous, aucun abonnement, aucune donnée qui sort ailleurs que vers Twitch.
+ChronoCast affiche sur votre stream un compte à rebours qui s'allonge à chaque sub, resub, sub offert, sub Prime ou don de bits. Tout tourne sur votre machine : aucun compte à créer chez nous, aucun abonnement, aucune donnée qui sort ailleurs que vers Twitch.
 
 Ce guide couvre l'installation, la connexion à Twitch, l'ajout dans OBS et l'usage au quotidien. Comptez un quart d'heure la première fois, dont l'essentiel passe chez Twitch à créer une application.
 
@@ -10,7 +10,7 @@ Ce guide couvre l'installation, la connexion à Twitch, l'ajout dans OBS et l'us
 
 ChronoCast s'installe depuis le **Microsoft Store** : [Installer ChronoCast](https://apps.microsoft.com/detail/9MT0NZV7KXGV). Cherchez « ChronoCast » dans l'application Store si vous préférez.
 
-L'installation se fait **pour votre compte utilisateur uniquement** : elle ne demande pas les droits administrateur. Les mises à jour sont gérées par le Store et s'appliquent quand ChronoCast n'est pas en cours d'exécution — aucune fermeture surprise en plein direct.
+L'installation se fait **pour votre compte utilisateur uniquement** : elle ne demande pas les droits administrateur.
 
 ## 2. Créer une application Twitch
 
@@ -76,9 +76,11 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | **Barème** | Combien de secondes ajoute chaque événement, avec les plafonds |
 | **Apparence** | Police, taille, couleurs, ombre, contour, halo, cadre, dégradé, bulles d'annonce — avec un aperçu qui est l'overlay réel |
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
-| **Historique** | Tous les événements crédités, avec leur montant |
+| **Historique** | Tous les événements reçus, avec leur montant — **y compris ceux qui n'ont rien crédité**, et la raison |
 | **Journaux** | Ce que fait l'application, utile en cas de problème |
-| **Paramètres** | Port, journalisation, rétention, lancement au démarrage |
+| **Paramètres** | Port, journalisation, rétention, et un bouton vers les réglages de démarrage de Windows |
+| **Import / export** | Sauvegarder votre configuration dans un fichier, ou en recharger une |
+| **À propos** | Version, licence, lien vers le code source |
 
 Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre réseau local, ni depuis Internet.
 
@@ -127,7 +129,7 @@ Désinstaller ChronoCast **ne supprime pas ce répertoire** : réinstaller vous 
 
 **Les mises à jour** sont gérées par le Microsoft Store et s'appliquent toutes seules. Le Store attend que ChronoCast ne soit pas en cours d'exécution : **aucune fermeture surprise en plein direct**. Si vous voulez forcer une vérification, ouvrez le Store → **Bibliothèque** → *Obtenir les mises à jour*.
 
-**Lancer ChronoCast à l'ouverture de la session** se règle désormais dans Windows, et non dans ChronoCast : *Paramètres* → *Applications* → *Démarrage*. Le bouton de la vue *Paramètres* vous y emmène directement. ChronoCast y figure sous son propre nom, désactivé par défaut.
+**Lancer ChronoCast à l'ouverture de la session** se règle dans Windows, et non dans ChronoCast : *Paramètres* → *Applications* → *Démarrage*. Le bouton de la vue *Paramètres* vous y emmène directement. ChronoCast y figure sous son propre nom, désactivé par défaut.
 
 ## 8. Quand quelque chose ne va pas
 
