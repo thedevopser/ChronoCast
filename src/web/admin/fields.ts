@@ -48,7 +48,7 @@ const REWARD_FIELDS: readonly AdminField[] = [
     selector: '#reward-gift-max',
     path: 'rewards.gift.maxPerEvent',
     label: 'Plafond par événement',
-    hint: 'Un don de cent abonnements créditerait autrement cinq heures d’un coup.',
+    hint: 'Cent sub offerts d’un coup créditeraient autrement cinq heures.',
     view: 'rewards',
     kind: 'integer',
     min: 1,
@@ -566,7 +566,7 @@ export function fieldsOf(view: FieldViewId): readonly AdminField[] {
 const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.sub.', 'Abonnements'],
   ['rewards.resub.', 'Réabonnements'],
-  ['rewards.gift.', 'Dons d’abonnement'],
+  ['rewards.gift.', 'Sub offerts'],
   ['rewards.bits.', 'Bits'],
   ['rewards.raid.', 'Raids'],
   ['rewards.follow.', 'Follows'],

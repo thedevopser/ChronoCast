@@ -160,6 +160,8 @@ Deux implémentations, deux comportements assumés et opposés.
 
 **EventSub WebSocket, jamais de webhooks.** Un webhook exigerait un nom de domaine et un port ouvert sur Internet — impensable pour une application qui tourne sur le PC d'un streamer.
 
+**Aucune plateforme de dons tierce**, corollaire direct du choix précédent. Streamlabs, StreamElements, Ko-fi et les autres notifient par webhook, ou exigent une connexion sortante permanente vers leurs serveurs avec un jeton de compte. La première voie est fermée par le choix ci-dessus ; la seconde romprait la promesse « la seule communication sortante va vers Twitch », et ajouterait un protocole propriétaire par plateforme, chacun à suivre dans le temps. La commande de chat `!addtime`, réservée au diffuseur et aux modérateurs, couvre le besoin sans rien de tout cela : c'est le seul chemin où le nombre de secondes vient de l'extérieur plutôt que du barème, et il est borné par un plafond.
+
 **Aucune valeur métier codée en dur.** Tout passe par le schéma Zod de `core/config/schema.ts`, ce qui rend tout réglable depuis le panneau. Le schéma est en mode `strip` : une clé inconnue est écartée silencieusement, ce qui permet à une configuration d'une autre version d'être acceptée plutôt que rejetée — et neutralise au passage la pollution de prototype.
 
 **Le compteur est une machine à état pure.** Les réducteurs de `core/counter/` ne connaissent ni le temps réel, ni le disque, ni le réseau : ils prennent un état et une action, ils rendent un état. C'est ce qui permet de tester des scénarios de plusieurs heures en quelques millisecondes.

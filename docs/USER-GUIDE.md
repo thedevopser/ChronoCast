@@ -10,9 +10,7 @@ Ce guide couvre l'installation, la connexion à Twitch, l'ajout dans OBS et l'us
 
 ChronoCast s'installe depuis le **Microsoft Store** : [Installer ChronoCast](https://apps.microsoft.com/detail/9MT0NZV7KXGV). Cherchez « ChronoCast » dans l'application Store si vous préférez.
 
-C'est le seul canal de distribution, et il n'y a pas de `.exe` à télécharger. Le paquet est **signé par Microsoft**, ce qui vous épargne l'avertissement SmartScreen et les faux positifs d'antivirus qu'un binaire non signé provoque.
-
-L'installation se fait **pour votre compte utilisateur uniquement** : elle ne demande pas les droits administrateur.
+L'installation se fait **pour votre compte utilisateur uniquement** : elle ne demande pas les droits administrateur. Les mises à jour sont gérées par le Store et s'appliquent quand ChronoCast n'est pas en cours d'exécution — aucune fermeture surprise en plein direct.
 
 ## 2. Créer une application Twitch
 
@@ -44,9 +42,9 @@ Le secret est chiffré sur votre machine par Windows, lié à votre compte, et n
 
 | Autorisation | Sert à |
 | --- | --- |
-| `channel:read:subscriptions` | Les subs, resubs et gift subs |
+| `channel:read:subscriptions` | Les subs, resubs et sub offerts |
 | `bits:read` | Les dons de bits |
-| `user:read:chat`, `user:bot` | Distinguer un sub Prime d'un Tier 1 |
+| `user:read:chat`, `user:bot` | Distinguer un sub Prime d'un Tier 1, et lire la commande `!addtime` |
 | `moderator:read:followers` | Les follows, si vous les activez |
 
 Un raid n'exige aucune autorisation : c'est une information publique.
@@ -84,7 +82,31 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 
 Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre réseau local, ni depuis Internet.
 
-## 6. Au quotidien
+## 6. Les dons hors Twitch
+
+ChronoCast crédite ce que **Twitch** lui rapporte : subs, resubs, sub offerts, sub Prime, bits, raids et follows. C'est tout.
+
+**Aucune plateforme de dons tierce n'est prise en charge** — ni Streamlabs, ni StreamElements, ni Ko-fi, ni Tipeee, ni PayPal. Ce n'est pas un oubli. Recevoir un don depuis une de ces plateformes suppose soit un port ouvert sur Internet pour accueillir leurs notifications, soit une connexion sortante permanente vers leurs serveurs. ChronoCast s'interdit les deux : c'est ce qui lui permet de ne parler qu'à Twitch et de ne rien exposer de votre machine.
+
+### La voie prévue : `!addtime`
+
+Pour créditer du temps depuis le direct, une commande de chat existe.
+
+1. Vue **Twitch** du panneau : cochez **Lire le chat pour les commandes**.
+2. **Redémarrez ChronoCast.** Cocher la case ne suffit pas : la souscription au chat se crée au démarrage.
+3. Dans votre chat, tapez `!addtime 300` pour ajouter cinq minutes.
+
+Trois règles :
+
+- **Seuls le diffuseur et les modérateurs** sont obéis. Un viewer ordinaire est ignoré en silence.
+- La valeur est un **nombre entier de secondes**, strictement positif.
+- Au-delà du **plafond par commande** — une heure par défaut, réglable dans la vue *Barème* —, la commande est refusée plutôt qu'écrêtée.
+
+Rien n'empêche votre bot d'alerte, s'il est modérateur de votre chaîne, d'envoyer lui-même `!addtime` quand un don arrive sur votre plateforme habituelle. **Sachez alors ce que vous faites** : c'est votre plateforme qui décide combien de secondes valent combien d'euros, pas ChronoCast. Si les deux barèmes divergent, rien ne le détectera — ni vous, ni l'application, ni vos viewers.
+
+Et si vous préférez ne rien automatiser, la vue *Tableau de bord* a toujours ses champs **Ajouter** et **Retirer**, avec un motif libre qui se retrouve dans l'historique.
+
+## 7. Au quotidien
 
 **Fermer la fenêtre n'arrête pas le compteur.** L'application se replie près de l'horloge et continue de tourner — c'est délibéré : un compteur de subathon ne doit pas pouvoir être tué par réflexe en plein direct. Un clic droit sur l'icône donne l'état du compteur, l'ouverture du panneau, la copie de l'URL de l'overlay, et **Quitter ChronoCast**, seul chemin qui arrête vraiment.
 
@@ -107,7 +129,7 @@ Désinstaller ChronoCast **ne supprime pas ce répertoire** : réinstaller vous 
 
 **Lancer ChronoCast à l'ouverture de la session** se règle désormais dans Windows, et non dans ChronoCast : *Paramètres* → *Applications* → *Démarrage*. Le bouton de la vue *Paramètres* vous y emmène directement. ChronoCast y figure sous son propre nom, désactivé par défaut.
 
-## 7. Quand quelque chose ne va pas
+## 8. Quand quelque chose ne va pas
 
 **Le compteur ne bouge pas alors qu'un sub vient de tomber.** Regardez la vue *Twitch* : si une souscription manque, c'est presque toujours une autorisation oubliée. Reconnectez-vous depuis cette vue, ce qui redemande les portées manquantes.
 
