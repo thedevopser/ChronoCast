@@ -43,12 +43,12 @@ Aucune dépendance à installer : Node.js, le serveur HTTP et le serveur WebSock
 sont embarqués dans l'application. Lancez-la, puis suivez l'assistant de
 première configuration.
 
-Le Store est le **seul** canal de distribution, et aucun `.exe` n'est plus
-publié sur GitHub. C'est un choix, pour une raison simple : un binaire non signé
-faisait afficher un avertissement SmartScreen au premier lancement, se faisait
-mettre en quarantaine par certains antivirus, et n'était trouvable que par qui
-savait déjà où chercher. Le paquet du Store est **signé par Microsoft**, ce qui
-règle les trois d'un coup.
+Le Store est le **seul** canal de distribution : il n'y a pas de `.exe` à
+télécharger. C'est un choix, pour une raison simple : un binaire non signé fait
+afficher un avertissement SmartScreen au premier lancement, se fait mettre en
+quarantaine par certains antivirus, et n'est trouvable que par qui sait déjà où
+chercher. Le paquet du Store est **signé par Microsoft**, ce qui règle les trois
+d'un coup.
 
 Les mises à jour sont **automatiques**, gérées par le Store, et s'appliquent
 quand l'application n'est pas en cours d'exécution : aucune fermeture surprise
@@ -56,11 +56,6 @@ en plein direct.
 
 Plateforme prise en charge : **Windows**. Linux et macOS sont envisagés pour une
 version ultérieure.
-
-> **Vous veniez d'une version installée depuis GitHub ?** Vos données —
-> compteur en cours, configuration, jetons Twitch — sont **reprises
-> automatiquement** au premier lancement de la version du Store. L'ancienne
-> installation reste intacte ; vous pouvez la désinstaller ensuite.
 
 ## Documentation
 

@@ -10,15 +10,9 @@ Ce guide couvre l'installation, la connexion à Twitch, l'ajout dans OBS et l'us
 
 ChronoCast s'installe depuis le **Microsoft Store** : [Installer ChronoCast](https://apps.microsoft.com/detail/9MT0NZV7KXGV). Cherchez « ChronoCast » dans l'application Store si vous préférez.
 
-C'est le seul canal de distribution, et il n'y a plus de `.exe` à télécharger. Le paquet est **signé par Microsoft**, ce qui vous épargne l'avertissement SmartScreen et les faux positifs d'antivirus qu'un binaire non signé provoquait.
+C'est le seul canal de distribution, et il n'y a pas de `.exe` à télécharger. Le paquet est **signé par Microsoft**, ce qui vous épargne l'avertissement SmartScreen et les faux positifs d'antivirus qu'un binaire non signé provoque.
 
 L'installation se fait **pour votre compte utilisateur uniquement** : elle ne demande pas les droits administrateur.
-
-### Vous veniez d'une version téléchargée sur GitHub ?
-
-**Vos données sont reprises automatiquement** au premier lancement : compteur en cours, réglages, jetons Twitch. Vous n'avez rien à refaire, pas même l'autorisation Twitch.
-
-L'ancienne installation reste intacte et ses fichiers ne sont pas touchés — la reprise copie, elle ne déplace pas. Une fois que vous avez vérifié que tout est en place, vous pouvez désinstaller l'ancienne version depuis *Applications installées*.
 
 ## 2. Créer une application Twitch
 

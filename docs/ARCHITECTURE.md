@@ -10,13 +10,11 @@ Ce document décrit les couches, les flux et les décisions qui les expliquent. 
 
 **`src/core/**` n'importe jamais `electron`, et une règle ESLint le refuse.**
 
-Tout ce qui touche à la plateforme passe par des ports injectés, déclarés dans `src/core/app/ports.ts` : `PathProvider` (où sont les données), `SecretStore` (comment on chiffre), `Clock`, `Ticker`, `BrowserOpener`, et `UpdateInstaller` (comment on lance un installeur et on s'arrête). Le noyau reçoit des implémentations, il n'en choisit aucune.
+Tout ce qui touche à la plateforme passe par des ports injectés, déclarés dans `src/core/app/ports.ts` : `PathProvider` (où sont les données), `SecretStore` (comment on chiffre), `Clock`, `BrowserOpener` (ouvrir une page dans le navigateur système) et `SystemSettingsOpener` (mener l'utilisateur aux réglages de démarrage de Windows). Le noyau reçoit des implémentations, il n'en choisit aucune.
 
-Ce n'est pas de la pureté d'architecture pour elle-même. C'est ce qui rend le produit **testable dans un conteneur Linux sans Chromium**, alors que sa cible est un `.exe` Windows. Sans cette séparation, l'immense majorité du code ne pourrait être éprouvée qu'à la main, sur un poste, après un build de plusieurs minutes.
+Ce n'est pas de la pureté d'architecture pour elle-même. C'est ce qui rend le produit **testable dans un conteneur Linux sans Chromium**, alors que sa cible est un paquet MSIX Windows. Sans cette séparation, l'immense majorité du code ne pourrait être éprouvée qu'à la main, sur un poste, après un build de plusieurs minutes.
 
-La Phase 6 a poussé le principe jusqu'au bout : **trois fichiers seulement importent `electron`** — `main/main.ts`, `main/windows.ts`, `main/tray.ts` — et **aucun ne prend de décision**. Quelle navigation aboutit, ce que propose le menu du tray, quelle page recharger après une autorisation : tout cela vit dans des modules purs, testés. Ces trois fichiers sont nommément exclus de la couverture, ce qui rend la discipline mécanique plutôt que déclarative.
-
-Le pari a été vérifié : quand l'application a enfin tourné sur un vrai poste Windows, **rien n'a dû être corrigé dans ces trois fichiers**.
+Le principe est poussé jusqu'au bout : **trois fichiers seulement importent `electron`** — `main/main.ts`, `main/windows.ts`, `main/tray.ts` — et **aucun ne prend de décision**. Quelle navigation aboutit, ce que propose le menu du tray, quelle page recharger après une autorisation : tout cela vit dans des modules purs, testés. Ces trois fichiers sont nommément exclus de la couverture, ce qui rend la discipline mécanique plutôt que déclarative.
 
 ## 2. Les couches
 
@@ -35,7 +33,8 @@ graph TD
         STORAGE["storage/ — écriture atomique"]
         CONFIG["config/ — schéma Zod"]
         LOG["logging/ — journalisation, rédaction"]
-        UPDATE["update/ — mise à jour, vérification"]
+        CHAT["chat/ — commandes de chat"]
+        HISTORY["history/ — historique des événements"]
     end
 
     subgraph "web/ — servi au navigateur"
@@ -52,7 +51,8 @@ graph TD
     APP --> STORAGE
     APP --> CONFIG
     APP --> LOG
-    APP --> UPDATE
+    APP --> CHAT
+    APP --> HISTORY
     SERVER -.sert.-> OVERLAY
     SERVER -.sert.-> ADMIN
     SERVER -.sert.-> SETUP
@@ -60,7 +60,7 @@ graph TD
 
 **`core/app/application.ts` est la racine de composition** : le seul endroit qui connaît tout le monde. Il fabrique les services, les câble entre eux, et rend un objet dont l'interface tient en quelques méthodes. Les deux points d'entrée — Electron et headless — ne diffèrent que par les ports qu'ils lui passent.
 
-**`core/update/` illustre le principe jusqu'au bout.** Comparer deux versions, valider une charge utile de l'API GitHub, vérifier une empreinte, décider s'il faut télécharger : tout cela est pur et se vérifie en conteneur. Un seul geste ne s'y vérifie pas — lancer l'installeur téléchargé puis terminer l'application — et il passe donc par un port, `UpdateInstaller`, dont l'implémentation reçoit `spawn` et `quit` par injection. **Le port est facultatif** : sans lui, le service reste inerte, ce qui est le cas du point d'entrée headless, qui n'est ni packagé ni installé.
+**`core/chat/` illustre le principe jusqu'au bout.** Reconnaître un préfixe `!`, lire un nombre de secondes, décider si l'auteur est diffuseur ou modérateur, refuser une durée au-delà du plafond : tout cela est pur, sans horloge ni réseau, et se vérifie en conteneur. Le service ne connaît ni le WebSocket qui lui a apporté le message, ni le compteur qu'il fera bouger — il rend un événement de domaine, ou une raison de l'avoir écarté.
 
 **`web/` est du code navigateur.** Il n'importe du noyau que des **types**, jamais de valeur : une règle ESLint le garantit, et `src/web/shared/protocol.ts` redéclare le contrat du WebSocket plutôt que de le ré-exporter — contrainte de `rootDir` en TypeScript, tenue par un test qui fait échouer la compilation dès qu'un champ diverge.
 

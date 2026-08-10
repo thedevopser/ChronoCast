@@ -86,7 +86,7 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Politique de navigation en liste blanche.** L'origine locale est la seule autorisée *dans* la fenêtre. Les pages Twitch sont renvoyées au **navigateur système** — le flux OAuth y passe, la fenêtre n'a aucune raison d'afficher une page Twitch. Tout le reste est bloqué. La comparaison d'hôte est exacte : `id.twitch.tv.evil.com` se termine par `twitch.tv` sans rien avoir de commun avec Twitch, et `https://id.twitch.tv@evil.com` pointe vers `evil.example`.
 
-Depuis la `0.9.0`, la liste admet également `github.com` et `paypal.me`, pour le lien vers le code source et celui de soutien. Ces deux hôtes sont **renvoyés au navigateur système au même titre que Twitch** : la fenêtre ne les affiche jamais. Ils sont dérivés des constantes de [about.ts](../src/core/app/about.ts) et **jamais d'une valeur de configuration** — une liste blanche réglable transformerait un réglage en choix de destination.
+La liste admet également `github.com` et `paypal.me`, pour le lien vers le code source et celui de soutien. Ces deux hôtes sont **renvoyés au navigateur système au même titre que Twitch** : la fenêtre ne les affiche jamais. Ils sont dérivés des constantes de [about.ts](../src/core/app/about.ts) et **jamais d'une valeur de configuration** — une liste blanche réglable transformerait un réglage en choix de destination.
 
 **Les outils de développement sont fermés dans une application packagée.** Ils donneraient accès au panneau et à tout ce qu'il peut faire.
 
@@ -102,33 +102,33 @@ Depuis la `0.9.0`, la liste admet également `github.com` et `paypal.me`, pour l
 
 ## 8. La distribution par le Microsoft Store
 
-Depuis la `0.8.0`, ChronoCast n'est distribué que par le Microsoft Store, et **la mise à jour automatique maison a été retirée**. C'est le Store qui met à jour, sans que l'application n'ait rien à télécharger ni à lancer.
+ChronoCast n'est distribué que par le Microsoft Store, et **il ne se met pas à jour lui-même**. C'est le Store qui met à jour, sans que l'application n'ait rien à télécharger ni à lancer.
 
 ### Ce que cela retire de la surface
 
-**La promesse « la seule communication sortante va vers Twitch » redevient vraie.** `api.github.com` et `objects.githubusercontent.com` disparaissent du trafic ; le réglage qui permettait de les couper disparaît avec eux, n'ayant plus d'objet.
+**L'application ne télécharge aucun fichier et ne lance aucun processus.** Il n'y a donc ni exécutable écrit sur le disque par ChronoCast, ni condensat à vérifier, ni URL de téléchargement à valider, ni processus détaché à surveiller. C'est la surface la plus délicate d'un mécanisme de mise à jour, et elle n'existe pas ici.
 
-Disparaissent également, et ce sont les parties les plus délicates de l'ancien chantier : le téléchargement d'un exécutable par l'application, sa vérification par condensat, le contrôle d'URL qui empêchait une réponse d'API contrefaite d'envoyer le téléchargement ailleurs, et le lancement d'un processus détaché. **Le code qui n'existe plus n'a pas de faille.**
+**Cela tient aussi la promesse « la seule communication sortante va vers Twitch ».** Un mécanisme de mise à jour maison exigerait d'interroger un service de distribution ; le Store le fait à la place de l'application, en dehors d'elle.
 
 ### Ce que la signature du Store apporte
 
-Le paquet est **signé par Microsoft** à la certification. Trois effets concrets, qui étaient les trois symptômes du binaire non signé : plus d'avertissement SmartScreen au premier lancement, moins de mises en quarantaine par les antivirus, et une provenance vérifiable qui ne repose plus sur un condensat que personne ne comparait.
+Le paquet est **signé par Microsoft** à la certification. Trois effets concrets, qui sont les trois symptômes d'un binaire non signé : pas d'avertissement SmartScreen au premier lancement, moins de mises en quarantaine par les antivirus, et une provenance vérifiable qui ne repose pas sur un condensat que personne ne compare.
 
-L'utilisateur installe depuis le Store, qui vérifie lui-même la signature du paquet. Il n'y a plus de fichier à télécharger à la main, donc plus de fichier à vérifier à la main.
+L'utilisateur installe depuis le Store, qui vérifie lui-même la signature du paquet. Il n'y a aucun fichier à télécharger à la main, donc aucun fichier à vérifier à la main.
 
 ### Ce que le conteneur MSIX change pour les données
 
-Un paquet MSIX **virtualise ce que l'application écrit dans `%APPDATA%`**, dans un conteneur que la désinstallation emporte. Les données de ChronoCast vivent donc dans `%USERPROFILE%\ChronoCast`, hors du conteneur : c'est ce qui fait qu'un subathon en cours survit à une réinstallation, comme c'était le cas auparavant.
+Un paquet MSIX **virtualise ce que l'application écrit dans `%APPDATA%`**, dans un conteneur que la désinstallation emporte. Les données de ChronoCast vivent donc dans `%USERPROFILE%\ChronoCast`, hors du conteneur : c'est ce qui fait qu'un subathon en cours survit à une réinstallation.
 
-Les jetons Twitch y restent chiffrés par DPAPI, liés au compte Windows. Le changement d'emplacement ne change rien à cela : `safeStorage` chiffre pour l'utilisateur, pas pour le répertoire.
+Les jetons Twitch y sont chiffrés par DPAPI, liés au compte Windows. L'emplacement n'y change rien : `safeStorage` chiffre pour l'utilisateur, pas pour le répertoire.
 
-Au premier lancement, les données d'une installation antérieure sont **reprises** depuis `%APPDATA%\ChronoCast`. La reprise copie, ne déplace jamais, et n'écrase aucun fichier existant.
+Au premier lancement, si `%APPDATA%\ChronoCast` contient les données d'une installation antérieure, elles sont **reprises**. C'est le seul endroit du code qui lise ce répertoire, en lecture seule : la reprise copie, ne déplace jamais, et n'écrase aucun fichier existant.
 
 ### Ce que le conteneur MSIX change pour le démarrage
 
-`app.setLoginItemSettings` écrit dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, que le conteneur virtualise également : la valeur n'atteint jamais le vrai registre. Le réglage a donc été retiré, et le manifeste du paquet déclare une tâche `windows.startupTask` dont **Windows détient l'état**, dans Paramètres → Applications → Démarrage.
+`app.setLoginItemSettings` écrit dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, que le conteneur virtualise également : la valeur n'atteindrait jamais le vrai registre. ChronoCast n'expose donc aucun réglage de démarrage ; le manifeste du paquet déclare une tâche `windows.startupTask` dont **Windows détient l'état**, dans Paramètres → Applications → Démarrage.
 
-Le panneau n'a plus qu'un bouton qui y mène. **Aucune adresse ne traverse cette route** : elle ne porte pas de charge utile, et la destination est une constante de la coquille. Faire voyager l'adresse, même sur la boucle locale, transformerait un renvoi en capacité d'ouvrir un schéma arbitraire — ce que la garde `https:` de l'ouverture de navigateur refuse précisément ailleurs.
+Le panneau n'a qu'un bouton qui y mène. **Aucune adresse ne traverse cette route** : elle ne porte pas de charge utile, et la destination est une constante de la coquille. Faire voyager l'adresse, même sur la boucle locale, transformerait un renvoi en capacité d'ouvrir un schéma arbitraire — ce que la garde `https:` de l'ouverture de navigateur refuse précisément ailleurs.
 
 ## 9. Ce que ChronoCast ne fait pas
 
