@@ -158,7 +158,7 @@ export function twitchLabel(status: TwitchConnectionStatus): string {
 export const EVENT_LABELS: Readonly<Record<DomainEventType, string>> = {
   sub: 'Abonnement',
   resub: 'Réabonnement',
-  gift: 'Dons d’abonnement',
+  gift: 'Sub offerts',
   bits: 'Bits',
   raid: 'Raid',
   follow: 'Follow',

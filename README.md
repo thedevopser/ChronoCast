@@ -57,6 +57,18 @@ en plein direct.
 Plateforme prise en charge : **Windows**. Linux et macOS sont envisagés pour une
 version ultérieure.
 
+## Les dons hors Twitch
+
+ChronoCast crédite ce que Twitch lui rapporte — subs, resubs, sub offerts,
+sub Prime, bits, raids, follows — et **aucune plateforme de dons tierce n'est
+prise en charge**. Ce n'est pas un oubli : les recevoir supposerait un port
+ouvert sur Internet ou une connexion sortante permanente vers un tiers, deux
+choses que ChronoCast s'interdit.
+
+Pour créditer du temps depuis le direct, la commande de chat `!addtime`,
+réservée au diffuseur et aux modérateurs, fait le travail. Voir
+[docs/USER-GUIDE.md](docs/USER-GUIDE.md).
+
 ## Documentation
 
 | Document | Contenu |
