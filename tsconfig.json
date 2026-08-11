@@ -6,7 +6,12 @@
     "bibliothèques Node ET DOM, car un test peut porter aussi bien sur un service",
     "backend que sur un module destiné au navigateur.",
     "Elle n'émet rien : la séparation stricte des frontières est vérifiée par",
-    "tsconfig.node.json et tsconfig.web.json, exécutés par `npm run typecheck`."
+    "tsconfig.node.json et tsconfig.web.json, exécutés par `npm run typecheck`.",
+    "allowJs y est nécessaire : les scripts d'outillage sont du JavaScript, mais",
+    "un test peut en importer un module — la géométrie de l'affiche du Store, par",
+    "exemple. Sans cette option, l'inclusion des scripts ci-dessous reste lettre",
+    "morte et ces imports arrivent en `any`. Leur contenu n'est pas vérifié pour",
+    "autant : `checkJs` reste absent."
   ],
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
@@ -14,7 +19,8 @@
     "types": ["node"],
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "noEmit": true
+    "noEmit": true,
+    "allowJs": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "*.ts", "*.mjs", "scripts/**/*.mjs"]
 }
