@@ -53,7 +53,7 @@ Et remettez `eventsubUrl` à sa valeur d'origine — sans quoi ChronoCast tenter
 | --- | --- | --- |
 | `trigger subscribe` | Un nouvel abonnement | Le palier crédite le bon nombre de secondes |
 | `trigger subscription-message` | Un réabonnement | Barème `resub`, distinct de `sub` |
-| `trigger subscription-gift` | Un don d'abonnements | Le plafond par événement s'applique |
+| `trigger subscription-gift` | Un don d'abonnements | Le tarif du palier, multiplié par le nombre d'abonnements |
 | `trigger cheer` | Un don de bits | Le mode linéaire ou par paliers |
 
 `--transport=websocket` est ajouté par le script, et il est **indispensable** : sans lui la CLI vise les webhooks, que ChronoCast n'implémente pas et n'implémentera pas.
@@ -73,7 +73,7 @@ Pour tout le reste de la CLI :
 
 ## 3. Ce que ce montage permet de vérifier, et rien d'autre
 
-**Ce qu'il prouve :** le barème, les plafonds, la persistance, l'historique, la diffusion vers l'overlay, l'affichage, les animations. C'est-à-dire toute la chaîne à partir de la notification.
+**Ce qu'il prouve :** le barème, la persistance, l'historique, la diffusion vers l'overlay, l'affichage, les animations. C'est-à-dire toute la chaîne à partir de la notification.
 
 **Ce qu'il ne prouve pas :** OAuth, le rafraîchissement de jeton, la création de souscriptions par Helix, la reconnexion sur `session_reconnect`. Le serveur factice ne fait pas d'authentification, et ChronoCast le rejoint sans jeton valide.
 

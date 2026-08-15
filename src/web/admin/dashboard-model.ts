@@ -160,7 +160,5 @@ export const EVENT_LABELS: Readonly<Record<DomainEventType, string>> = {
   resub: 'Réabonnement',
   gift: 'Sub offerts',
   bits: 'Bits',
-  raid: 'Raid',
-  follow: 'Follow',
   command: 'Commande de chat',
 };

@@ -15,10 +15,14 @@ function errorIdOf(selector: string): string {
   return `${selector.replace(/^#/, '')}-error`;
 }
 
+function classOf(field: AdminField): string {
+  return field.readOnly === true ? 'field__input field__input--locked' : 'field__input';
+}
+
 function createControl(source: Document, field: AdminField): HTMLElement {
   if (field.kind === 'enum') {
     const select = source.createElement('select');
-    select.className = 'field__input';
+    select.className = classOf(field);
     select.id = field.selector.replace(/^#/, '');
 
     for (const option of field.options ?? []) {
@@ -28,14 +32,17 @@ function createControl(source: Document, field: AdminField): HTMLElement {
       select.append(element);
     }
 
+    select.disabled = field.readOnly === true;
+
     return select;
   }
 
   const input = source.createElement('input');
-  input.className = 'field__input';
+  input.className = classOf(field);
   input.id = field.selector.replace(/^#/, '');
   input.type = INPUT_TYPES[field.kind] ?? 'text';
   input.autocomplete = 'off';
+  input.readOnly = field.readOnly === true;
 
   if (field.kind === 'integer' || field.kind === 'number') {
     if (field.min !== undefined) {

@@ -103,7 +103,7 @@ C'est le point d'extension le mieux balisé de l'application, et il tient en deu
 
 Ni le client WebSocket, ni le service compteur, ni l'interface n'ont à changer. Les portées OAuth demandées à l'utilisateur sont **calculées** depuis ce plan : elles suivent d'elles-mêmes.
 
-Pensez à `required` : une souscription facultative qui échoue est signalée sans interrompre la connexion. Un raid qui ne se souscrit pas ne doit pas arrêter le subathon.
+Pensez à `required` : une souscription facultative qui échoue est signalée sans interrompre la connexion. `channel.chat.notification` sert à distinguer un sub Prime d'un Tier 1 — c'est un confort, pas une raison d'arrêter le subathon.
 
 ## 5. Ajouter un réglage
 

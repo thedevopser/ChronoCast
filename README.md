@@ -60,7 +60,7 @@ version ultérieure.
 ## Les dons hors Twitch
 
 ChronoCast crédite ce que Twitch lui rapporte — subs, resubs, sub offerts,
-sub Prime, bits, raids, follows — et **aucune plateforme de dons tierce n'est
+sub Prime, bits — et **aucune plateforme de dons tierce n'est
 prise en charge**. Ce n'est pas un oubli : les recevoir supposerait un port
 ouvert sur Internet ou une connexion sortante permanente vers un tiers, deux
 choses que ChronoCast s'interdit.

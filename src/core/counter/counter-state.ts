@@ -24,8 +24,6 @@ export interface CounterState {
 
 export interface CounterBounds {
   readonly minRemainingMs: number;
-
-  readonly maxRemainingMs: number;
 }
 
 export interface CreateInitialStateParams {
@@ -56,13 +54,7 @@ export interface SetInitialParams {
 }
 
 function clamp(value: number, bounds: CounterBounds): number {
-  if (value < bounds.minRemainingMs) {
-    return bounds.minRemainingMs;
-  }
-  if (value > bounds.maxRemainingMs) {
-    return bounds.maxRemainingMs;
-  }
-  return value;
+  return value < bounds.minRemainingMs ? bounds.minRemainingMs : value;
 }
 
 export function createInitialState(params: CreateInitialStateParams): CounterState {

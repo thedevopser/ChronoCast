@@ -36,6 +36,57 @@ beforeEach(() => {
   renderFieldGroups(document, root, FIELDS, GROUPS);
 });
 
+describe('champs en lecture seule', () => {
+  const READ_ONLY: readonly AdminField[] = [
+    {
+      selector: '#r-text',
+      path: 'rewards.chatCommand.name',
+      label: 'Nom',
+      view: 'rewards',
+      kind: 'text',
+      readOnly: true,
+    },
+    {
+      selector: '#r-enum',
+      path: 'overlay.textAlign',
+      label: 'Alignement',
+      view: 'rewards',
+      kind: 'enum',
+      options: ['left', 'right'],
+      readOnly: true,
+    },
+  ];
+
+  beforeEach(() => {
+    renderFieldGroups(document, root, READ_ONLY, ['Commande de chat', 'Texte du compteur']);
+  });
+
+  it('rend l’entrée non modifiable tout en la laissant lisible', () => {
+    const input = root.querySelector<HTMLInputElement>('#r-text');
+
+    expect(input?.readOnly).toBe(true);
+    expect(input?.disabled).toBe(false);
+  });
+
+  it('désactive une liste déroulante en lecture seule', () => {
+    expect(root.querySelector<HTMLSelectElement>('#r-enum')?.disabled).toBe(true);
+  });
+
+  it('marque le champ pour que le style le distingue', () => {
+    expect(root.querySelector('#r-text')?.classList.contains('field__input--locked')).toBe(true);
+    expect(root.querySelector('#r-enum')?.classList.contains('field__input--locked')).toBe(true);
+  });
+
+  it('laisse modifiable un champ ordinaire', () => {
+    renderFieldGroups(document, root, FIELDS, [...GROUPS]);
+    const input = root.querySelector<HTMLInputElement>('#a-text');
+
+    expect(input?.readOnly).toBe(false);
+    expect(input?.disabled).toBe(false);
+    expect(input?.classList.contains('field__input--locked')).toBe(false);
+  });
+});
+
 describe('renderFieldGroups', () => {
   it('crée un champ par descripteur, à son sélecteur', () => {
     for (const field of FIELDS) {

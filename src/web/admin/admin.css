@@ -393,6 +393,12 @@
   border-color: var(--cc-danger);
 }
 
+.field__input--locked {
+  background: var(--cc-surface);
+  color: var(--cc-text-muted);
+  cursor: default;
+}
+
 .field__input[type="color"] {
   height: 2.4rem;
   padding: var(--cc-space-1);

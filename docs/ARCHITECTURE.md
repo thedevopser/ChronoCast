@@ -87,7 +87,7 @@ sequenceDiagram
         D-->>C: écarté, aucun crédit
     else nouveau
         D->>S: DomainEvent
-        S->>S: barème → secondes, plafonds
+        S->>S: barème → secondes
         S->>S: persistance immédiate
         S->>B: counter:changed, counter:event-applied
         B->>W: diffusion

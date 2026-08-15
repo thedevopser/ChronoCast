@@ -121,6 +121,27 @@ describe('valuesFrom', () => {
   });
 });
 
+describe('patchFrom sur un champ en lecture seule', () => {
+  const LOCKED: readonly FieldDescriptor[] = [
+    { selector: '#name', path: 'rewards.chatCommand.name', kind: 'text', readOnly: true },
+    { selector: '#tier1', path: 'rewards.sub.tier1', kind: 'integer', min: 0 },
+  ];
+
+  it('ignore une valeur modifiée', () => {
+    const { patch, errors } = patchFrom(LOCKED, { '#name': 'autre', '#tier1': '180' }, CONFIG);
+
+    expect(patch).toEqual({});
+    expect(errors).toEqual([]);
+  });
+
+  it('ne signale pas d’erreur sur une saisie invalide', () => {
+    const { patch, errors } = patchFrom(LOCKED, { '#name': '', '#tier1': '240' }, CONFIG);
+
+    expect(errors).toEqual([]);
+    expect(patch).toEqual({ rewards: { sub: { tier1: 240 } } });
+  });
+});
+
 describe('patchFrom', () => {
   it('ne renvoie rien quand rien n’a changé', () => {
     const { patch, errors } = patchFrom(FIELDS, pristine(), CONFIG);

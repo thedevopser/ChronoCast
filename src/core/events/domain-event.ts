@@ -1,4 +1,4 @@
-export type DomainEventType = 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow' | 'command';
+export type DomainEventType = 'sub' | 'resub' | 'gift' | 'bits' | 'command';
 
 export type SubscriptionTier = 'tier1' | 'tier2' | 'tier3' | 'prime';
 
@@ -41,15 +41,6 @@ export interface BitsEvent extends BaseDomainEvent {
   readonly bits: number;
 }
 
-export interface RaidEvent extends BaseDomainEvent {
-  readonly type: 'raid';
-  readonly viewers: number;
-}
-
-export interface FollowEvent extends BaseDomainEvent {
-  readonly type: 'follow';
-}
-
 export interface CommandEvent extends BaseDomainEvent {
   readonly command: string;
 
@@ -58,11 +49,4 @@ export interface CommandEvent extends BaseDomainEvent {
   readonly seconds: number;
 }
 
-export type DomainEvent =
-  | SubEvent
-  | ResubEvent
-  | GiftEvent
-  | BitsEvent
-  | RaidEvent
-  | FollowEvent
-  | CommandEvent;
+export type DomainEvent = SubEvent | ResubEvent | GiftEvent | BitsEvent | CommandEvent;

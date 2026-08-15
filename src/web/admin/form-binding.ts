@@ -9,6 +9,8 @@ export interface FieldDescriptor {
   readonly options?: readonly string[];
 
   readonly allowEmpty?: boolean;
+
+  readonly readOnly?: boolean;
 }
 
 export type RawValue = string | boolean;
@@ -171,7 +173,7 @@ export function patchFrom(
   for (const descriptor of descriptors) {
     const value = raw[descriptor.selector];
 
-    if (value === undefined) {
+    if (value === undefined || descriptor.readOnly === true) {
       continue;
     }
 

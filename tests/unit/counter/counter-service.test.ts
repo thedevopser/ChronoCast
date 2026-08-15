@@ -7,7 +7,7 @@ import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import { configSchema, type ChronoCastConfig } from '../../../src/core/config/schema.js';
 import { createCounterService } from '../../../src/core/counter/counter-service.js';
 import type { CounterState } from '../../../src/core/counter/counter-state.js';
-import type { SubEvent, FollowEvent } from '../../../src/core/events/domain-event.js';
+import type { GiftEvent, SubEvent } from '../../../src/core/events/domain-event.js';
 import { createLogger, type LogRecord, type LogSink } from '../../../src/core/logging/logger.js';
 import { StoreWriteError, type AtomicJsonStore } from '../../../src/core/storage/atomic-json-store.js';
 
@@ -366,16 +366,14 @@ describe('createCounterService', () => {
       expect(changed).not.toHaveBeenCalled();
     });
 
-    it('respecte le plafond configuré', async () => {
-      const config = configSchema.parse({
-        counter: { initialSeconds: 100, maxRemainingSeconds: 120 },
-      });
+    it('ne plafonne pas le temps crédité', async () => {
+      const config = configSchema.parse({ counter: { initialSeconds: 100 } });
       const { service } = createService({ config });
       await service.start();
 
-      await service.addTime(10_000, 'salve');
+      await service.addTime(300_000, 'salve');
 
-      expect(service.getState().remainingMs).toBe(120_000);
+      expect(service.getState().remainingMs).toBe(300_100_000);
     });
   });
 
@@ -422,64 +420,44 @@ describe('createCounterService', () => {
       const { service } = createService();
       await service.start();
       const avant = service.getState().remainingMs;
-      const follow: FollowEvent = {
+      const gift: GiftEvent = {
         id: 'msg-2',
-        type: 'follow',
+        type: 'gift',
+        tier: 'tier1',
+        total: 0,
+        isAnonymous: false,
         occurredAt: START_EPOCH,
         userId: '43',
-        userName: 'Suiveur',
+        userName: 'Donateur',
         source: 'eventsub',
       };
 
-      const outcome = await service.applyEvent(follow);
+      const outcome = await service.applyEvent(gift);
 
       expect(outcome.reward.applied).toBe(false);
       expect(service.getState().remainingMs).toBe(avant);
     });
 
-    it('applique le quota horaire des follows', async () => {
-      const config = configSchema.parse({
-        rewards: { follow: { enabled: true, seconds: 10, maxPerHour: 2 } },
-      });
-      const { service } = createService({ config });
+    it('crédite intégralement une salve massive d\'abonnements offerts', async () => {
+      const { service } = createService();
       await service.start();
-
-      const results = [];
-      for (let index = 0; index < 4; index += 1) {
-        const follow: FollowEvent = {
-          id: `msg-${String(index)}`,
-          type: 'follow',
-          occurredAt: START_EPOCH,
-          userId: String(index),
-          userName: 'Suiveur',
-          source: 'eventsub',
-        };
-        results.push(await service.applyEvent(follow));
-      }
-
-      expect(results.map((result) => result.reward.applied)).toEqual([true, true, false, false]);
-    });
-
-    it('oublie les follows sortis de la fenêtre horaire', async () => {
-      const config = configSchema.parse({
-        rewards: { follow: { enabled: true, seconds: 10, maxPerHour: 1 } },
-      });
-      const { service } = createService({ config });
-      await service.start();
-      const follow = (id: string): FollowEvent => ({
-        id,
-        type: 'follow',
+      const gift: GiftEvent = {
+        id: 'msg-3',
+        type: 'gift',
+        tier: 'tier1',
+        total: 1_000,
+        isAnonymous: false,
         occurredAt: START_EPOCH,
-        userId: id,
-        userName: 'Suiveur',
+        userId: '43',
+        userName: 'Donateur',
         source: 'eventsub',
-      });
+      };
 
-      await service.applyEvent(follow('a'));
-      clock.advance(3_600_001);
-      const second = await service.applyEvent(follow('b'));
+      await service.applyEvent(gift);
 
-      expect(second.reward.applied).toBe(true);
+      expect(service.getState().remainingMs).toBe(
+        DEFAULT_CONFIG.counter.initialSeconds * 1_000 + 180_000_000,
+      );
     });
   });
 

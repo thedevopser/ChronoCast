@@ -13,7 +13,7 @@ import {
   type CounterState,
 } from '../../../src/core/counter/counter-state.js';
 
-const BOUNDS: CounterBounds = { minRemainingMs: 0, maxRemainingMs: 86_400_000 };
+const BOUNDS: CounterBounds = { minRemainingMs: 0 };
 const NOW = 1_754_000_000_000;
 
 function runningState(remainingMs = 43_200_000): CounterState {
@@ -77,7 +77,7 @@ describe('applyTick', () => {
   });
 
   it('respecte un plancher configuré au-dessus de zéro', () => {
-    const bounds: CounterBounds = { minRemainingMs: 600_000, maxRemainingMs: 86_400_000 };
+    const bounds: CounterBounds = { minRemainingMs: 600_000 };
     const state = runningState(700_000);
 
     const next = applyTick(state, { elapsedMs: 500_000, bounds, now: NOW });
@@ -120,22 +120,20 @@ describe('applyAdd', () => {
     expect(next.totalAddedMs).toBe(240_000);
   });
 
-  it('n\'excède jamais le plafond', () => {
-    const bounds: CounterBounds = { minRemainingMs: 0, maxRemainingMs: 20_000 };
+  it('ne plafonne jamais le temps crédité', () => {
     const state = runningState(15_000);
 
-    const next = applyAdd(state, { deltaMs: 30_000, bounds, now: NOW });
+    const next = applyAdd(state, { deltaMs: 300_000_000, bounds: BOUNDS, now: NOW });
 
-    expect(next.remainingMs).toBe(20_000);
+    expect(next.remainingMs).toBe(300_015_000);
   });
 
-  it('ne comptabilise que le temps réellement crédité après plafonnement', () => {
-    const bounds: CounterBounds = { minRemainingMs: 0, maxRemainingMs: 20_000 };
+  it('comptabilise l\'intégralité du temps crédité', () => {
     const state = runningState(15_000);
 
-    const next = applyAdd(state, { deltaMs: 30_000, bounds, now: NOW });
+    const next = applyAdd(state, { deltaMs: 300_000_000, bounds: BOUNDS, now: NOW });
 
-    expect(next.totalAddedMs).toBe(5_000);
+    expect(next.totalAddedMs).toBe(300_000_000);
   });
 
   it('relance un compteur achevé', () => {

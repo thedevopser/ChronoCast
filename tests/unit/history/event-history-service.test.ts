@@ -154,6 +154,35 @@ describe('createEventHistoryService', () => {
     expect((await service.list(10)).map((entry) => entry.id)).toEqual(['evt-2', 'evt-1']);
   });
 
+  it('écarte une entrée héritée de raid sans perdre les autres', async () => {
+    await service.record(makeEvent(), { seconds: 60, applied: true, reason: 'sub' }, state);
+
+    const [file] = await readdir(directory);
+    const legacy = {
+      id: 'evt-raid',
+      type: 'raid',
+      occurredAt: 1,
+      recordedAt: 1,
+      userId: '1',
+      userName: 'Raideur',
+      source: 'eventsub',
+      detail: 42,
+      rewardSeconds: 84,
+      applied: true,
+      reason: 'raid',
+      remainingMsAfter: 1_000,
+    };
+    await writeFile(join(directory, file ?? ''), `${JSON.stringify(legacy)}\n`, { flag: 'a' });
+
+    await service.record(
+      makeEvent({ id: 'evt-2' }),
+      { seconds: 60, applied: true, reason: 'sub' },
+      state,
+    );
+
+    expect((await service.list(10)).map((entry) => entry.id)).toEqual(['evt-2', 'evt-1']);
+  });
+
   it("n'interrompt jamais le subathon si l'écriture échoue", async () => {
     const broken = createEventHistoryService({
       directory: join(directory, 'fichier-occupant'),

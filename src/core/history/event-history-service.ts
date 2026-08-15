@@ -11,7 +11,7 @@ const BASE_NAME = 'events';
 const historyEntrySchema = z
   .object({
     id: z.string(),
-    type: z.enum(['sub', 'resub', 'gift', 'bits', 'raid', 'follow', 'command']),
+    type: z.enum(['sub', 'resub', 'gift', 'bits', 'command']),
     occurredAt: z.number(),
     recordedAt: z.number(),
     userId: z.string(),
@@ -51,10 +51,6 @@ function detailOf(event: DomainEvent): string | number | null {
       return event.total;
     case 'bits':
       return event.bits;
-    case 'raid':
-      return event.viewers;
-    case 'follow':
-      return null;
     case 'command':
       return event.command;
   }

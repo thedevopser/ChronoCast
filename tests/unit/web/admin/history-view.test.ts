@@ -29,7 +29,7 @@ const ENTRIES: readonly HistoryEntry[] = [
   entry({ id: 'a', type: 'sub', userName: 'alice', applied: true }),
   entry({ id: 'b', type: 'bits', userName: 'Bob', applied: true, detail: 500, rewardSeconds: 360 }),
   entry({ id: 'c', type: 'gift', userName: 'carol', applied: false, rewardSeconds: 0, detail: 10 }),
-  entry({ id: 'd', type: 'follow', userName: 'dave', applied: false, rewardSeconds: 0, detail: null }),
+  entry({ id: 'd', type: 'command', userName: 'dave', applied: false, rewardSeconds: 0, detail: 'addtime' }),
 ];
 
 describe('filterHistory', () => {
@@ -130,12 +130,12 @@ describe('formatDetail', () => {
     expect(formatDetail(entry({ type: 'gift', detail: 10 }))).toContain('10');
   });
 
-  it('compte les spectateurs d’un raid', () => {
-    expect(formatDetail(entry({ type: 'raid', detail: 42 }))).toContain('42');
+  it('nomme la commande de chat', () => {
+    expect(formatDetail(entry({ type: 'command', detail: 'addtime' }))).toContain('addtime');
   });
 
   it('rend une chaîne vide quand il n’y a rien à dire', () => {
-    expect(formatDetail(entry({ type: 'follow', detail: null }))).toBe('');
+    expect(formatDetail(entry({ type: 'sub', detail: null }))).toBe('');
   });
 
   it('n’invente rien pour un palier inconnu', () => {
