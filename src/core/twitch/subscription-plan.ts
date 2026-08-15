@@ -86,25 +86,6 @@ export const SUBSCRIPTION_PLAN: readonly SubscriptionDefinition[] = [
     isEnabled: () => true,
     buildCondition: broadcasterCondition,
   },
-  {
-    type: 'channel.raid',
-    version: '1',
-    scopes: [],
-    required: false,
-    isEnabled: (config) => config.enableRaid,
-    buildCondition: (context) => ({ to_broadcaster_user_id: context.broadcasterUserId }),
-  },
-  {
-    type: 'channel.follow',
-    version: '2',
-    scopes: ['moderator:read:followers'],
-    required: false,
-    isEnabled: (config) => config.enableFollow,
-    buildCondition: (context) => ({
-      broadcaster_user_id: context.broadcasterUserId,
-      moderator_user_id: context.userId,
-    }),
-  },
 ];
 
 export function resolveSubscriptions(

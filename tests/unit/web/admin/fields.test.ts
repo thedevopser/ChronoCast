@@ -123,6 +123,24 @@ describe('cohérence des descripteurs', () => {
       expect(field.label.trim(), field.path).not.toBe('');
     }
   });
+
+  it('fige les réglages de la commande de chat', () => {
+    const locked = ADMIN_FIELDS.filter((field) => field.readOnly === true).map(
+      (field) => field.path,
+    );
+
+    expect(locked.toSorted()).toEqual([
+      'rewards.chatCommand.maxSeconds',
+      'rewards.chatCommand.name',
+      'rewards.chatCommand.overlayText',
+    ]);
+  });
+
+  it('laisse modifiable l’activation des commandes de chat', () => {
+    const toggle = ADMIN_FIELDS.find((field) => field.path === 'twitch.enableChatCommands');
+
+    expect(toggle?.readOnly).toBeUndefined();
+  });
 });
 
 describe('fieldsOf', () => {

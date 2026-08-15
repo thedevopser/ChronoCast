@@ -81,26 +81,6 @@ export const channelCheerAnonymous: unknown = {
   bits: 500,
 };
 
-export const channelRaid: unknown = {
-  from_broadcaster_user_id: '1234',
-  from_broadcaster_user_login: 'cool_user',
-  from_broadcaster_user_name: 'Cool_User',
-  to_broadcaster_user_id: '1337',
-  to_broadcaster_user_login: 'cooler_user',
-  to_broadcaster_user_name: 'Cooler_User',
-  viewers: 9001,
-};
-
-export const channelFollow: unknown = {
-  user_id: '1234',
-  user_login: 'cool_user',
-  user_name: 'Cool_User',
-  broadcaster_user_id: '1337',
-  broadcaster_user_login: 'cooler_user',
-  broadcaster_user_name: 'Cooler_User',
-  followed_at: '2026-08-01T18:16:11.17106713Z',
-};
-
 const chatNotificationBase = {
   broadcaster_user_id: '1337',
   broadcaster_user_login: 'cooler_user',

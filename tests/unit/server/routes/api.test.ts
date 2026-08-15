@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { CONFIG_SCHEMA_VERSION } from '../../../../src/core/config/schema.js';
 import type { HttpResponse } from '../../../../src/core/server/http-types.js';
 import { createApiRoutes } from '../../../../src/core/server/routes/api.js';
 import type { Route } from '../../../../src/core/server/router.js';
@@ -54,7 +55,7 @@ describe('createApiRoutes', () => {
       const response = await call('GET', '/api/config');
 
       expect(response.status).toBe(200);
-      expect(body(response)['config']).toMatchObject({ schemaVersion: 1 });
+      expect(body(response)['config']).toMatchObject({ schemaVersion: CONFIG_SCHEMA_VERSION });
     });
 
     it('indique si un secret client est enregistré, sans le renvoyer', async () => {
@@ -306,7 +307,7 @@ describe('createApiRoutes', () => {
       expect(body(response)['event']).toMatchObject({ source: 'manual', type: 'bits' });
     });
 
-    it.each(['sub', 'resub', 'gift', 'bits', 'raid', 'follow'])('accepte le type %s', async (type) => {
+    it.each(['sub', 'resub', 'gift', 'bits', 'command'])('accepte le type %s', async (type) => {
       expect((await call('POST', '/api/overlay/test', { body: JSON.stringify({ type }) })).status).toBe(
         200,
       );
@@ -318,6 +319,12 @@ describe('createApiRoutes', () => {
       });
 
       expect(response.status).toBe(400);
+    });
+
+    it.each(['raid', 'follow'])('refuse le type %s, retiré du barème', async (type) => {
+      expect((await call('POST', '/api/overlay/test', { body: JSON.stringify({ type }) })).status).toBe(
+        400,
+      );
     });
 
     it('tronque un pseudo démesuré plutôt que de le refuser', async () => {

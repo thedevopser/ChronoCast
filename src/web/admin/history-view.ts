@@ -1,6 +1,6 @@
 export interface HistoryEntry {
   readonly id: string;
-  readonly type: 'sub' | 'resub' | 'gift' | 'bits' | 'raid' | 'follow' | 'command';
+  readonly type: 'sub' | 'resub' | 'gift' | 'bits' | 'command';
   readonly occurredAt: number;
   readonly recordedAt: number;
   readonly userId: string;
@@ -72,10 +72,6 @@ export function formatDetail(entry: HistoryEntry): string {
       return `${String(entry.detail)} bits`;
     case 'gift':
       return `${String(entry.detail)} abonnements offerts`;
-    case 'raid':
-      return `${String(entry.detail)} spectateurs`;
-    case 'follow':
-      return String(entry.detail);
     case 'command':
       return `!${String(entry.detail)}`;
   }

@@ -89,7 +89,7 @@ const importSchema = z.object({ content: z.string().min(1).max(1_048_576) }).str
 
 const overlayTestSchema = z
   .object({
-    type: z.enum(['sub', 'resub', 'gift', 'bits', 'raid', 'follow', 'command']),
+    type: z.enum(['sub', 'resub', 'gift', 'bits', 'command']),
     userName: z.string().min(1).optional(),
   })
   .strip();
@@ -140,10 +140,6 @@ function buildTestEvent(type: DomainEventType, userName: string, now: number): D
       return { ...base, type: 'gift', tier: 'tier1', total: 5, isAnonymous: false };
     case 'bits':
       return { ...base, type: 'bits', bits: 500 };
-    case 'raid':
-      return { ...base, type: 'raid', viewers: 42 };
-    case 'follow':
-      return { ...base, type: 'follow' };
     case 'command':
       return { ...base, type: 'command', command: 'addtime', seconds: 300 };
   }

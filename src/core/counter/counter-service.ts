@@ -19,8 +19,6 @@ import {
 } from './counter-state.js';
 import { computeReward, type RewardComputation } from './reward-engine.js';
 
-const ONE_HOUR_MS = 3_600_000;
-
 export interface Ticker {
   start(intervalMs: number, onTick: () => void): void;
   stop(): void;
@@ -69,8 +67,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
 
   let lastPersistAt = 0;
 
-  let rewardedFollows: number[] = [];
-
   function requireState(): CounterState {
     if (state === undefined) {
       throw new Error('service compteur non démarré : appelez start() en premier');
@@ -79,11 +75,7 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
   }
 
   function currentBounds(): CounterBounds {
-    const counter = getConfig().counter;
-    return {
-      minRemainingMs: counter.minRemainingSeconds * 1_000,
-      maxRemainingMs: counter.maxRemainingSeconds * 1_000,
-    };
+    return { minRemainingMs: getConfig().counter.minRemainingSeconds * 1_000 };
   }
 
   async function persist(next: CounterState): Promise<void> {
@@ -188,7 +180,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
 
       lastTickAt = clock.monotonicMs();
       lastPersistAt = clock.monotonicMs();
-      rewardedFollows = [];
 
       ticker.start(config.counter.tickIntervalMs, onTick);
 
@@ -220,7 +211,6 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
     },
 
     async reset(): Promise<CounterState> {
-      rewardedFollows = [];
       return commit(applyReset(requireState(), { now: clock.now() }), 'manual', 'réinitialisation');
     },
 
@@ -263,22 +253,13 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
     async applyEvent(event: DomainEvent): Promise<CounterEventOutcome> {
       const config = getConfig();
 
-      const threshold = clock.now() - ONE_HOUR_MS;
-      rewardedFollows = rewardedFollows.filter((instant) => instant > threshold);
-
-      const reward = computeReward(event, config.rewards, {
-        followsInLastHour: rewardedFollows.length,
-      });
+      const reward = computeReward(event, config.rewards);
 
       if (!reward.applied) {
         logger.debug('événement sans récompense', { type: event.type, reason: reward.reason });
         const unchanged = requireState();
         bus.emit('counter:event-applied', { event, reward, state: unchanged });
         return { reward, state: unchanged };
-      }
-
-      if (event.type === 'follow') {
-        rewardedFollows.push(clock.now());
       }
 
       const next = await commit(

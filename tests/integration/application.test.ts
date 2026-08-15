@@ -12,6 +12,7 @@ import {
   type Application,
 } from '../../src/core/app/application.js';
 import type { SecretStore } from '../../src/core/app/ports.js';
+import { CONFIG_SCHEMA_VERSION } from '../../src/core/config/schema.js';
 import { createSystemClock } from '../../src/core/app/system-clock.js';
 import type { Ticker } from '../../src/core/counter/counter-service.js';
 import type { Router } from '../../src/core/server/router.js';
@@ -244,7 +245,7 @@ describe('application complète', () => {
     it('écrit sa configuration sur le disque', async () => {
       const raw = await readFile(join(dataDirectory, 'config.json'), 'utf8');
 
-      expect(JSON.parse(raw)).toMatchObject({ schemaVersion: 1 });
+      expect(JSON.parse(raw)).toMatchObject({ schemaVersion: CONFIG_SCHEMA_VERSION });
     });
   });
 

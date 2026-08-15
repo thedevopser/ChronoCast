@@ -45,9 +45,6 @@ Le secret est chiffré sur votre machine par Windows, lié à votre compte, et n
 | `channel:read:subscriptions` | Les subs, resubs et sub offerts |
 | `bits:read` | Les dons de bits |
 | `user:read:chat`, `user:bot` | Distinguer un sub Prime d'un Tier 1, et lire la commande `!addtime` |
-| `moderator:read:followers` | Les follows, si vous les activez |
-
-Un raid n'exige aucune autorisation : c'est une information publique.
 
 ## 4. Ajouter l'overlay dans OBS
 
@@ -73,7 +70,7 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | Vue | Contenu |
 | --- | --- |
 | **Tableau de bord** | Le compteur, l'état de la connexion Twitch, les derniers événements, et les commandes : pause, reprise, ajout ou retrait de temps |
-| **Barème** | Combien de secondes ajoute chaque événement, avec les plafonds |
+| **Barème** | Combien de secondes ajoute chaque événement |
 | **Apparence** | Police, taille, couleurs, ombre, contour, halo, cadre, dégradé, bulles d'annonce — avec un aperçu qui est l'overlay réel |
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
 | **Historique** | Tous les événements reçus, avec leur montant — **y compris ceux qui n'ont rien crédité**, et la raison |
@@ -86,7 +83,9 @@ Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre 
 
 ## 6. Les dons hors Twitch
 
-ChronoCast crédite ce que **Twitch** lui rapporte : subs, resubs, sub offerts, sub Prime, bits, raids et follows. C'est tout.
+ChronoCast crédite ce que **Twitch** lui rapporte : subs, resubs, sub offerts, sub Prime, bits. C'est tout.
+
+Rien n'est plafonné. Mille abonnements offerts d'un coup valent mille fois le tarif du palier, et le compteur peut monter aussi haut que votre communauté le décide.
 
 **Aucune plateforme de dons tierce n'est prise en charge** — ni Streamlabs, ni StreamElements, ni Ko-fi, ni Tipeee, ni PayPal. Ce n'est pas un oubli. Recevoir un don depuis une de ces plateformes suppose soit un port ouvert sur Internet pour accueillir leurs notifications, soit une connexion sortante permanente vers leurs serveurs. ChronoCast s'interdit les deux : c'est ce qui lui permet de ne parler qu'à Twitch et de ne rien exposer de votre machine.
 
@@ -102,7 +101,7 @@ Trois règles :
 
 - **Seuls le diffuseur et les modérateurs** sont obéis. Un viewer ordinaire est ignoré en silence.
 - La valeur est un **nombre entier de secondes**, strictement positif.
-- Au-delà du **plafond par commande** — une heure par défaut, réglable dans la vue *Barème* —, la commande est refusée plutôt qu'écrêtée.
+- Au-delà d'**une heure en une seule commande**, elle est refusée plutôt qu'écrêtée : à cette échelle, c'est une faute de frappe bien plus souvent qu'une intention. Les réglages de la commande apparaissent dans la vue *Barème*, en lecture seule.
 
 Rien n'empêche votre bot d'alerte, s'il est modérateur de votre chaîne, d'envoyer lui-même `!addtime` quand un don arrive sur votre plateforme habituelle. **Sachez alors ce que vous faites** : c'est votre plateforme qui décide combien de secondes valent combien d'euros, pas ChronoCast. Si les deux barèmes divergent, rien ne le détectera — ni vous, ni l'application, ni vos viewers.
 

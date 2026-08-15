@@ -111,17 +111,11 @@ describe('mapNotification', () => {
     });
   });
 
-  describe('channel.raid et channel.follow', () => {
-    it('convertit un raid en retenant le raideur', () => {
-      const event = expectEvent(mapNotification(context('channel.raid'), fixtures.channelRaid));
+  describe('souscriptions retirées du barème', () => {
+    it.each(['channel.raid', 'channel.follow'])('ignore une notification %s', (type) => {
+      const result = mapNotification(context(type), { viewers: 9001, user_id: '1234' });
 
-      expect(event).toMatchObject({ type: 'raid', viewers: 9001, userId: '1234' });
-    });
-
-    it('convertit un follow', () => {
-      const event = expectEvent(mapNotification(context('channel.follow'), fixtures.channelFollow));
-
-      expect(event).toMatchObject({ type: 'follow', userId: '1234' });
+      expect(result.kind).toBe('ignored');
     });
   });
 
@@ -271,8 +265,8 @@ describe('semanticKey', () => {
 
   it('distingue deux types d\'événements du même spectateur', () => {
     const sub = expectEvent(mapNotification(context('channel.subscribe'), fixtures.channelSubscribe));
-    const follow = expectEvent(mapNotification(context('channel.follow'), fixtures.channelFollow));
+    const cheer = expectEvent(mapNotification(context('channel.cheer'), fixtures.channelCheer));
 
-    expect(semanticKey(sub)).not.toBe(semanticKey(follow));
+    expect(semanticKey(sub)).not.toBe(semanticKey(cheer));
   });
 });

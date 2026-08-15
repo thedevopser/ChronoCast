@@ -30,24 +30,21 @@ describe('SUBSCRIPTION_PLAN', () => {
   it('couvre les événements du barème par défaut', () => {
     const types = SUBSCRIPTION_PLAN.map((definition) => definition.type);
 
-    expect(types).toEqual(
-      expect.arrayContaining([
-        'channel.subscribe',
-        'channel.subscription.message',
-        'channel.subscription.gift',
-        'channel.cheer',
-        'channel.chat.notification',
-        'channel.raid',
-        'channel.follow',
-        'channel.chat.message',
-      ]),
-    );
+    expect(types.toSorted()).toEqual([
+      'channel.chat.message',
+      'channel.chat.notification',
+      'channel.cheer',
+      'channel.subscribe',
+      'channel.subscription.gift',
+      'channel.subscription.message',
+    ]);
   });
 
-  it('utilise la version 2 pour le follow', () => {
-    const follow = SUBSCRIPTION_PLAN.find((definition) => definition.type === 'channel.follow');
+  it('ne souscrit à rien qui ne soit pas un don', () => {
+    const types = SUBSCRIPTION_PLAN.map((definition) => definition.type);
 
-    expect(follow?.version).toBe('2');
+    expect(types).not.toContain('channel.raid');
+    expect(types).not.toContain('channel.follow');
   });
 });
 
@@ -65,31 +62,6 @@ describe('resolveSubscriptions', () => {
         'channel.cheer',
       ]),
     );
-  });
-
-  it('écarte raid et follow tant qu\'ils sont désactivés', () => {
-    const types = resolveSubscriptions(DEFAULT_CONFIG.twitch, CONTEXT).map(
-      (resolved) => resolved.type,
-    );
-
-    expect(types).not.toContain('channel.raid');
-    expect(types).not.toContain('channel.follow');
-  });
-
-  it('retient le raid une fois activé', () => {
-    const types = resolveSubscriptions(twitchConfig({ enableRaid: true }), CONTEXT).map(
-      (resolved) => resolved.type,
-    );
-
-    expect(types).toContain('channel.raid');
-  });
-
-  it('retient le follow une fois activé', () => {
-    const types = resolveSubscriptions(twitchConfig({ enableFollow: true }), CONTEXT).map(
-      (resolved) => resolved.type,
-    );
-
-    expect(types).toContain('channel.follow');
   });
 
   it('écarte la lecture du chat tant que les commandes sont désactivées', () => {
@@ -142,24 +114,6 @@ describe('resolveSubscriptions', () => {
       expect(resolved?.condition).toEqual({ broadcaster_user_id: '1337', user_id: '1337' });
     });
 
-    it('utilise la chaîne de destination pour un raid', () => {
-      const resolved = resolveSubscriptions(twitchConfig({ enableRaid: true }), CONTEXT).find(
-        (item) => item.type === 'channel.raid',
-      );
-
-      expect(resolved?.condition).toEqual({ to_broadcaster_user_id: '1337' });
-    });
-
-    it('ajoute le modérateur pour un follow', () => {
-      const resolved = resolveSubscriptions(twitchConfig({ enableFollow: true }), CONTEXT).find(
-        (item) => item.type === 'channel.follow',
-      );
-
-      expect(resolved?.condition).toEqual({
-        broadcaster_user_id: '1337',
-        moderator_user_id: '1337',
-      });
-    });
   });
 
   describe('criticité', () => {
@@ -179,9 +133,9 @@ describe('resolveSubscriptions', () => {
       expect(resolved?.required).toBe(false);
     });
 
-    it('marque le raid comme facultatif', () => {
-      const resolved = resolveSubscriptions(twitchConfig({ enableRaid: true }), CONTEXT).find(
-        (item) => item.type === 'channel.raid',
+    it('marque les notifications de chat comme facultatives', () => {
+      const resolved = resolveSubscriptions(DEFAULT_CONFIG.twitch, CONTEXT).find(
+        (item) => item.type === 'channel.chat.notification',
       );
 
       expect(resolved?.required).toBe(false);
@@ -225,21 +179,18 @@ describe('requiredScopes', () => {
     expect(new Set(avec)).toEqual(new Set(sans));
   });
 
-  it('ajoute la lecture des suiveurs lorsque le follow est activé', () => {
-    const scopes = requiredScopes(twitchConfig({ enableFollow: true }));
+  it('ne demande plus la lecture des suiveurs', () => {
+    const scopes = requiredScopes(
+      twitchConfig({ enableChatNotifications: true, enableChatCommands: true }),
+    );
 
-    expect(scopes).toContain('moderator:read:followers');
-  });
-
-  it('ne demande pas de portée pour le raid', () => {
-    const sans = requiredScopes(DEFAULT_CONFIG.twitch);
-    const avec = requiredScopes(twitchConfig({ enableRaid: true }));
-
-    expect(avec).toEqual(sans);
+    expect(scopes).not.toContain('moderator:read:followers');
   });
 
   it('ne renvoie jamais deux fois la même portée', () => {
-    const scopes = requiredScopes(twitchConfig({ enableFollow: true, enableRaid: true }));
+    const scopes = requiredScopes(
+      twitchConfig({ enableChatNotifications: true, enableChatCommands: true }),
+    );
 
     expect(new Set(scopes).size).toBe(scopes.length);
   });

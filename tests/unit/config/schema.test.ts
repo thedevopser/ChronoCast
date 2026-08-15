@@ -26,11 +26,21 @@ describe('configSchema', () => {
       expect(DEFAULT_CONFIG.server.host).toBe('127.0.0.1');
     });
 
-    it('désactive raid et follow tout en les gardant configurables', () => {
-      expect(DEFAULT_CONFIG.rewards.raid.enabled).toBe(false);
-      expect(DEFAULT_CONFIG.rewards.follow.enabled).toBe(false);
-      expect(DEFAULT_CONFIG.rewards.raid.secondsPerViewer).toBeGreaterThan(0);
-      expect(DEFAULT_CONFIG.rewards.follow.seconds).toBeGreaterThan(0);
+    it('ne crédite que les événements payants', () => {
+      expect(Object.keys(DEFAULT_CONFIG.rewards).sort()).toEqual([
+        'bits',
+        'chatCommand',
+        'gift',
+        'resub',
+        'sub',
+      ]);
+    });
+
+    it('ne plafonne plus aucune récompense hors commande de chat', () => {
+      expect(DEFAULT_CONFIG.rewards.gift).not.toHaveProperty('maxPerEvent');
+      expect(DEFAULT_CONFIG.rewards.bits).not.toHaveProperty('maxPerEvent');
+      expect(DEFAULT_CONFIG.counter).not.toHaveProperty('maxRemainingSeconds');
+      expect(DEFAULT_CONFIG.rewards.chatCommand.maxSeconds).toBeGreaterThan(0);
     });
 
     it('laisse le cadre et le dégradé éteints, tout en les gardant réglables', () => {
@@ -102,12 +112,8 @@ describe('configSchema', () => {
       expect(() => configSchema.parse({ logging: { level: 'verbeux' } })).toThrow();
     });
 
-    it('refuse une durée maximale inférieure à la durée minimale', () => {
-      expect(() =>
-        configSchema.parse({
-          counter: { minRemainingSeconds: 100, maxRemainingSeconds: 50 },
-        }),
-      ).toThrow();
+    it('refuse un plancher négatif', () => {
+      expect(() => configSchema.parse({ counter: { minRemainingSeconds: -1 } })).toThrow();
     });
 
     it('refuse un mode de barème de bits inconnu', () => {
@@ -136,6 +142,27 @@ describe('configSchema', () => {
       const parsed = configSchema.parse({ counter: { initialSeconds: 60, inconnu: 'valeur' } });
 
       expect(parsed.counter).not.toHaveProperty('inconnu');
+    });
+
+    it('écarte les réglages hérités sans rejeter la configuration', () => {
+      const parsed = configSchema.parse({
+        schemaVersion: 1,
+        counter: { initialSeconds: 60, maxRemainingSeconds: 86_400 },
+        rewards: {
+          gift: { tier1: 240, maxPerEvent: 3_600 },
+          bits: { maxPerEvent: 3_600 },
+          raid: { enabled: true, secondsPerViewer: 2 },
+          follow: { enabled: true, seconds: 10 },
+        },
+        twitch: { enableRaid: true, enableFollow: true },
+      });
+
+      expect(parsed.counter.initialSeconds).toBe(60);
+      expect(parsed.rewards.gift.tier1).toBe(240);
+      expect(parsed.counter).not.toHaveProperty('maxRemainingSeconds');
+      expect(parsed.rewards).not.toHaveProperty('raid');
+      expect(parsed.rewards).not.toHaveProperty('follow');
+      expect(parsed.twitch).not.toHaveProperty('enableRaid');
     });
 
     it('ne laisse pas une clé __proto__ polluer le prototype', () => {

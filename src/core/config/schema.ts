@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 1;
+export const CONFIG_SCHEMA_VERSION = 2;
 
 const hexColor = z
   .string()
@@ -20,19 +20,13 @@ const counterSchema = z
 
     minRemainingSeconds: seconds.default(0),
 
-    maxRemainingSeconds: positiveSeconds.default(86_400),
-
     tickIntervalMs: millisecondsAboveZero.default(250),
 
     persistIntervalMs: millisecondsAboveZero.default(5_000),
 
     resumeOnStartup: z.boolean().default(true),
   })
-  .strip()
-  .refine((value) => value.maxRemainingSeconds > value.minRemainingSeconds, {
-    message: 'maxRemainingSeconds doit être strictement supérieur à minRemainingSeconds',
-    path: ['maxRemainingSeconds'],
-  });
+  .strip();
 
 const tieredRewardSchema = z
   .object({
@@ -48,8 +42,6 @@ const giftRewardSchema = z
     tier1: seconds.default(180),
     tier2: seconds.default(240),
     tier3: seconds.default(300),
-
-    maxPerEvent: positiveSeconds.default(3_600),
   })
   .strip();
 
@@ -80,31 +72,12 @@ const bitsRewardSchema = z
         { minBits: 500, seconds: 360 },
         { minBits: 1_000, seconds: 900 },
       ]),
-
-    maxPerEvent: positiveSeconds.default(3_600),
   })
   .strip()
   .refine((value) => value.mode !== 'tiers' || value.tiers.length > 0, {
     message: 'le mode « tiers » exige au moins un palier',
     path: ['tiers'],
   });
-
-const raidRewardSchema = z
-  .object({
-    enabled: z.boolean().default(false),
-    secondsPerViewer: seconds.default(2),
-    minViewers: z.number().int().positive().default(5),
-    maxSeconds: positiveSeconds.default(600),
-  })
-  .strip();
-
-const followRewardSchema = z
-  .object({
-    enabled: z.boolean().default(false),
-    seconds: seconds.default(10),
-    maxPerHour: z.number().int().positive().default(60),
-  })
-  .strip();
 
 const chatCommandSchema = z
   .object({
@@ -128,8 +101,6 @@ const rewardsSchema = z
     resub: tieredRewardSchema.default({}),
     gift: giftRewardSchema.default({}),
     bits: bitsRewardSchema.default({}),
-    raid: raidRewardSchema.default({}),
-    follow: followRewardSchema.default({}),
   })
   .strip();
 
@@ -141,9 +112,6 @@ const twitchSchema = z
     broadcasterLogin: z.string().default(''),
 
     enableChatNotifications: z.boolean().default(true),
-
-    enableRaid: z.boolean().default(false),
-    enableFollow: z.boolean().default(false),
 
     enableChatCommands: z.boolean().default(false),
 

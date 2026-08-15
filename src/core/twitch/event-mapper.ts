@@ -166,45 +166,6 @@ function mapCheer(context: MapContext, payload: Record<string, unknown>): MapRes
   );
 }
 
-function mapRaid(context: MapContext, payload: Record<string, unknown>): MapResult {
-  const viewers = readNumber(payload, 'viewers');
-  if (viewers === undefined) {
-    return invalid('nombre de spectateurs absent');
-  }
-
-  const actor = readActor(payload, 'from_broadcaster_user_id', 'from_broadcaster_user_name');
-  return produced(
-    {
-      id: context.messageId,
-      type: 'raid',
-      viewers,
-      occurredAt: context.receivedAt,
-      source: 'eventsub',
-      ...actor,
-    },
-    'raid',
-  );
-}
-
-function mapFollow(context: MapContext, payload: Record<string, unknown>): MapResult {
-  const userId = readString(payload, 'user_id');
-  if (userId === undefined) {
-    return invalid('identifiant du suiveur absent');
-  }
-
-  return produced(
-    {
-      id: context.messageId,
-      type: 'follow',
-      occurredAt: context.receivedAt,
-      source: 'eventsub',
-      userId,
-      userName: readString(payload, 'user_name') ?? userId,
-    },
-    'follow',
-  );
-}
-
 function readChatTier(source: Record<string, unknown>): SubscriptionTier | undefined {
   const tier = readTier(source, 'sub_tier');
   if (tier === undefined) {
@@ -318,10 +279,6 @@ export function mapNotification(context: MapContext, payload: unknown): MapResul
       return mapSubscriptionGift(context, payload);
     case 'channel.cheer':
       return mapCheer(context, payload);
-    case 'channel.raid':
-      return mapRaid(context, payload);
-    case 'channel.follow':
-      return mapFollow(context, payload);
     case 'channel.chat.notification':
       return mapChatNotification(context, payload);
     default:
@@ -339,10 +296,6 @@ export function semanticKey(event: DomainEvent): string {
       return `gift:${event.userId}:${event.tier}:${String(event.total)}`;
     case 'bits':
       return `bits:${event.userId}:${String(event.bits)}`;
-    case 'raid':
-      return `raid:${event.userId}:${String(event.viewers)}`;
-    case 'follow':
-      return `follow:${event.userId}`;
     case 'command':
       return `command:${event.id}`;
   }

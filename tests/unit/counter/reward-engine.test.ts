@@ -6,9 +6,7 @@ import { computeReward } from '../../../src/core/counter/reward-engine.js';
 import type {
   BitsEvent,
   CommandEvent,
-  FollowEvent,
   GiftEvent,
-  RaidEvent,
   ResubEvent,
   SubEvent,
 } from '../../../src/core/events/domain-event.js';
@@ -82,17 +80,44 @@ describe('computeReward', () => {
       expect(computeReward(event, REWARDS).seconds).toBe(900);
     });
 
-    it('plafonne une salve massive', () => {
-      const rewards = rewardsWith({ gift: { tier1: 180, maxPerEvent: 600 } });
+    it.each([
+      [20, 3_600],
+      [200, 36_000],
+      [1_000, 180_000],
+    ])('crédite intégralement une salve de %i abonnements', (total, expected) => {
       const event: GiftEvent = {
         ...baseEvent(),
         type: 'gift',
         tier: 'tier1',
-        total: 100,
+        total,
         isAnonymous: false,
       };
 
-      expect(computeReward(event, rewards).seconds).toBe(600);
+      expect(computeReward(event, REWARDS).seconds).toBe(expected);
+    });
+
+    it('crédite intégralement une salve massive de Tier 3', () => {
+      const event: GiftEvent = {
+        ...baseEvent(),
+        type: 'gift',
+        tier: 'tier3',
+        total: 1_000,
+        isAnonymous: false,
+      };
+
+      expect(computeReward(event, REWARDS).seconds).toBe(300_000);
+    });
+
+    it('ne mentionne aucun plafonnement dans le motif', () => {
+      const event: GiftEvent = {
+        ...baseEvent(),
+        type: 'gift',
+        tier: 'tier1',
+        total: 1_000,
+        isAnonymous: false,
+      };
+
+      expect(computeReward(event, REWARDS).reason).not.toContain('plafonné');
     });
 
     it('applique le palier des abonnements offerts', () => {
@@ -149,13 +174,13 @@ describe('computeReward', () => {
       expect(computeReward(event, rewards).applied).toBe(false);
     });
 
-    it('plafonne un don massif', () => {
+    it('crédite intégralement un don massif', () => {
       const rewards = rewardsWith({
-        bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60 }, maxPerEvent: 300 },
+        bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60 } },
       });
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100_000 };
 
-      expect(computeReward(event, rewards).seconds).toBe(300);
+      expect(computeReward(event, rewards).seconds).toBe(60_000);
     });
   });
 
@@ -199,67 +224,14 @@ describe('computeReward', () => {
 
       expect(computeReward(event, rewards).seconds).toBe(900);
     });
-  });
 
-  describe('raid', () => {
-    it('ne crédite rien tant que le raid est désactivé', () => {
-      const event: RaidEvent = { ...baseEvent(), type: 'raid', viewers: 100 };
-
-      expect(computeReward(event, REWARDS).applied).toBe(false);
-    });
-
-    it('crédite proportionnellement aux spectateurs une fois activé', () => {
+    it('crédite intégralement un palier de plus d\'une heure', () => {
       const rewards = rewardsWith({
-        raid: { enabled: true, secondsPerViewer: 2, minViewers: 5, maxSeconds: 600 },
+        bits: { mode: 'tiers', tiers: [{ minBits: 10_000, seconds: 36_000 }] },
       });
-      const event: RaidEvent = { ...baseEvent(), type: 'raid', viewers: 50 };
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50_000 };
 
-      expect(computeReward(event, rewards).seconds).toBe(100);
-    });
-
-    it('ignore un raid sous le seuil de spectateurs', () => {
-      const rewards = rewardsWith({ raid: { enabled: true, minViewers: 10 } });
-      const event: RaidEvent = { ...baseEvent(), type: 'raid', viewers: 3 };
-
-      expect(computeReward(event, rewards).applied).toBe(false);
-    });
-
-    it('plafonne un raid massif', () => {
-      const rewards = rewardsWith({
-        raid: { enabled: true, secondsPerViewer: 2, minViewers: 1, maxSeconds: 60 },
-      });
-      const event: RaidEvent = { ...baseEvent(), type: 'raid', viewers: 10_000 };
-
-      expect(computeReward(event, rewards).seconds).toBe(60);
-    });
-  });
-
-  describe('follow', () => {
-    it('ne crédite rien tant que le follow est désactivé', () => {
-      const event: FollowEvent = { ...baseEvent(), type: 'follow' };
-
-      expect(computeReward(event, REWARDS).applied).toBe(false);
-    });
-
-    it('crédite le montant configuré une fois activé', () => {
-      const rewards = rewardsWith({ follow: { enabled: true, seconds: 10, maxPerHour: 60 } });
-      const event: FollowEvent = { ...baseEvent(), type: 'follow' };
-
-      expect(computeReward(event, rewards, { followsInLastHour: 0 }).seconds).toBe(10);
-    });
-
-    it('cesse de créditer au-delà du quota horaire', () => {
-      const rewards = rewardsWith({ follow: { enabled: true, seconds: 10, maxPerHour: 5 } });
-      const event: FollowEvent = { ...baseEvent(), type: 'follow' };
-
-      expect(computeReward(event, rewards, { followsInLastHour: 5 }).applied).toBe(false);
-    });
-
-    it('crédite encore juste sous le quota horaire', () => {
-      const rewards = rewardsWith({ follow: { enabled: true, seconds: 10, maxPerHour: 5 } });
-      const event: FollowEvent = { ...baseEvent(), type: 'follow' };
-
-      expect(computeReward(event, rewards, { followsInLastHour: 4 }).applied).toBe(true);
+      expect(computeReward(event, rewards).seconds).toBe(36_000);
     });
   });
 
@@ -283,8 +255,15 @@ describe('computeReward', () => {
     });
 
     it('explique pourquoi rien n\'a été crédité', () => {
-      const event: FollowEvent = { ...baseEvent(), type: 'follow' };
+      const event: GiftEvent = {
+        ...baseEvent(),
+        type: 'gift',
+        tier: 'tier1',
+        total: 0,
+        isAnonymous: false,
+      };
 
+      expect(computeReward(event, REWARDS).applied).toBe(false);
       expect(computeReward(event, REWARDS).reason).not.toBe('');
     });
   });

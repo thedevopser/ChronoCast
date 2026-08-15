@@ -9,10 +9,6 @@ export interface RewardComputation {
   readonly reason: string;
 }
 
-export interface RewardContext {
-  readonly followsInLastHour?: number;
-}
-
 function refused(reason: string): RewardComputation {
   return { seconds: 0, applied: false, reason };
 }
@@ -73,11 +69,7 @@ function computeBitsReward(bits: number, config: RewardsConfig['bits']): RewardC
       candidate.minBits > highest.minBits ? candidate : highest,
     );
 
-    return capped(
-      best.seconds,
-      config.maxPerEvent,
-      `${String(bits)} bits, palier ${String(best.minBits)}`,
-    );
+    return granted(best.seconds, `${String(bits)} bits, palier ${String(best.minBits)}`);
   }
 
   if (bits < config.linear.minBits) {
@@ -89,18 +81,13 @@ function computeBitsReward(bits: number, config: RewardsConfig['bits']): RewardC
     return refused(`${String(bits)} bits, moins d'une unité de ${String(config.linear.unit)}`);
   }
 
-  return capped(
+  return granted(
     units * config.linear.secondsPerUnit,
-    config.maxPerEvent,
     `${String(bits)} bits, ${String(units)} unité(s)`,
   );
 }
 
-export function computeReward(
-  event: DomainEvent,
-  rewards: RewardsConfig,
-  context: RewardContext = {},
-): RewardComputation {
+export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
   switch (event.type) {
     case 'sub':
       return granted(tierSeconds(rewards.sub, event.tier), `abonnement ${event.tier}`);
@@ -117,45 +104,14 @@ export function computeReward(
       }
 
       const unitSeconds = giftTierSeconds(rewards.gift, event.tier);
-      return capped(
+      return granted(
         unitSeconds * event.total,
-        rewards.gift.maxPerEvent,
         `${String(event.total)} abonnement(s) offert(s) ${event.tier}`,
       );
     }
 
     case 'bits':
       return computeBitsReward(event.bits, rewards.bits);
-
-    case 'raid': {
-      if (!rewards.raid.enabled) {
-        return refused('récompense de raid désactivée');
-      }
-      if (event.viewers < rewards.raid.minViewers) {
-        return refused(
-          `raid de ${String(event.viewers)} spectateur(s), sous le seuil de ${String(rewards.raid.minViewers)}`,
-        );
-      }
-
-      return capped(
-        event.viewers * rewards.raid.secondsPerViewer,
-        rewards.raid.maxSeconds,
-        `raid de ${String(event.viewers)} spectateur(s)`,
-      );
-    }
-
-    case 'follow': {
-      if (!rewards.follow.enabled) {
-        return refused('récompense de follow désactivée');
-      }
-
-      const recent = context.followsInLastHour ?? 0;
-      if (recent >= rewards.follow.maxPerHour) {
-        return refused(`quota horaire de ${String(rewards.follow.maxPerHour)} follow(s) atteint`);
-      }
-
-      return granted(rewards.follow.seconds, 'follow');
-    }
 
     case 'command': {
       if (!Number.isFinite(event.seconds) || event.seconds <= 0) {
