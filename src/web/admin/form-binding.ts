@@ -11,6 +11,12 @@ export interface FieldDescriptor {
   readonly allowEmpty?: boolean;
 
   readonly readOnly?: boolean;
+
+  /** Double le champ chiffré d'un curseur. Exige `min` et `max`, sans quoi il n'a pas de course. */
+  readonly slider?: true;
+
+  /** Unité affichée à côté du champ : `px`, `ms`, `°`. */
+  readonly unit?: string;
 }
 
 export type RawValue = string | boolean;
@@ -103,7 +109,7 @@ const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 const INTEGER = /^-?\d+$/;
 
-type Converted = { ok: true; value: unknown } | { ok: false; message: string };
+export type Converted = { ok: true; value: unknown } | { ok: false; message: string };
 
 function withinBounds(value: number, descriptor: FieldDescriptor): Converted {
   if (descriptor.min !== undefined && value < descriptor.min) {
@@ -115,7 +121,9 @@ function withinBounds(value: number, descriptor: FieldDescriptor): Converted {
   return { ok: true, value };
 }
 
-function convert(descriptor: FieldDescriptor, raw: RawValue): Converted {
+// Source unique de conversion : `patchFrom` l'emploie pour enregistrer, le brouillon d'aperçu pour
+// afficher. Deux implémentations divergeraient, et l'aperçu mentirait sur ce qui sera écrit.
+export function convertField(descriptor: FieldDescriptor, raw: RawValue): Converted {
   if (descriptor.kind === 'boolean') {
     return typeof raw === 'boolean'
       ? { ok: true, value: raw }
@@ -177,7 +185,7 @@ export function patchFrom(
       continue;
     }
 
-    const converted = convert(descriptor, value);
+    const converted = convertField(descriptor, value);
 
     if (!converted.ok) {
       errors.push({

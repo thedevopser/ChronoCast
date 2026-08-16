@@ -124,6 +124,27 @@ describe('cohérence des descripteurs', () => {
     }
   });
 
+  it('borne tout champ à curseur, qui n’aurait sinon aucune course', () => {
+    for (const field of ADMIN_FIELDS.filter((candidate) => candidate.slider === true)) {
+      expect(field.min, `${field.path} min`).toBeTypeOf('number');
+      expect(field.max, `${field.path} max`).toBeTypeOf('number');
+      expect(field.max ?? 0, field.path).toBeGreaterThan(field.min ?? 0);
+    }
+  });
+
+  it('ne pose de curseur que sur une valeur numérique', () => {
+    for (const field of ADMIN_FIELDS.filter((candidate) => candidate.slider === true)) {
+      expect(['integer', 'number'], field.path).toContain(field.kind);
+    }
+  });
+
+  it('emploie des unités courtes et non vides', () => {
+    for (const field of ADMIN_FIELDS.filter((candidate) => candidate.unit !== undefined)) {
+      expect(field.unit?.trim(), field.path).not.toBe('');
+      expect(field.unit?.length ?? 0, field.path).toBeLessThanOrEqual(4);
+    }
+  });
+
   it('fige les réglages de la commande de chat', () => {
     const locked = ADMIN_FIELDS.filter((field) => field.readOnly === true).map(
       (field) => field.path,

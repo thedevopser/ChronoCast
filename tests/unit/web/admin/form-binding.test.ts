@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  convertField,
   patchFrom,
   readAtPath,
   valuesFrom,
@@ -256,5 +257,66 @@ describe('patchFrom', () => {
     const { patch } = patchFrom(FIELDS, { ...pristine(), '#font': hostile }, CONFIG);
 
     expect(patch).toEqual({ overlay: { fontFamily: hostile } });
+  });
+});
+
+describe('convertField', () => {
+  const descriptor = (patch: Partial<FieldDescriptor>): FieldDescriptor => ({
+    selector: '#champ',
+    path: 'overlay.valeur',
+    kind: 'text',
+    ...patch,
+  });
+
+  it('convertit un entier et refuse ce qui n’en est pas un', () => {
+    const field = descriptor({ kind: 'integer', min: 0, max: 100 });
+
+    expect(convertField(field, '42')).toStrictEqual({ ok: true, value: 42 });
+    expect(convertField(field, '4.2').ok).toBe(false);
+    expect(convertField(field, '101').ok).toBe(false);
+    expect(convertField(field, '-1').ok).toBe(false);
+  });
+
+  it('accepte la virgule décimale sur un nombre', () => {
+    expect(convertField(descriptor({ kind: 'number' }), '1,5')).toStrictEqual({
+      ok: true,
+      value: 1.5,
+    });
+  });
+
+  it('rend la case à cocher telle quelle', () => {
+    expect(convertField(descriptor({ kind: 'boolean' }), true)).toStrictEqual({
+      ok: true,
+      value: true,
+    });
+    expect(convertField(descriptor({ kind: 'boolean' }), 'oui').ok).toBe(false);
+  });
+
+  it('exige une couleur hexadécimale', () => {
+    const field = descriptor({ kind: 'color' });
+
+    expect(convertField(field, '#FFCC00')).toStrictEqual({ ok: true, value: '#FFCC00' });
+    expect(convertField(field, 'rouge').ok).toBe(false);
+  });
+
+  it('borne une énumération à ses choix', () => {
+    const field = descriptor({ kind: 'enum', options: ['left', 'center'] });
+
+    expect(convertField(field, 'center')).toStrictEqual({ ok: true, value: 'center' });
+    expect(convertField(field, 'droite').ok).toBe(false);
+  });
+
+  it('refuse un texte vide sauf autorisation explicite', () => {
+    expect(convertField(descriptor({ kind: 'text' }), '').ok).toBe(false);
+    expect(convertField(descriptor({ kind: 'text', allowEmpty: true }), '')).toStrictEqual({
+      ok: true,
+      value: '',
+    });
+  });
+
+  it('énonce une raison à chaque refus', () => {
+    const outcome = convertField(descriptor({ kind: 'integer' }), 'abc');
+
+    expect(!outcome.ok && outcome.message.length).toBeGreaterThan(0);
   });
 });

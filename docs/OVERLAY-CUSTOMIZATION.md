@@ -1,6 +1,6 @@
 # Personnaliser l'overlay
 
-Tout se règle depuis la vue **Apparence** du panneau, dont l'aperçu **est l'overlay réel** : ce que vous y voyez est ce qu'OBS affichera. Quand les réglages ne suffisent plus, une feuille de style personnelle prend le relais.
+Tout se règle depuis la vue **Apparence** du panneau, dont l'aperçu **est l'overlay réel** : ce que vous y voyez est ce qu'OBS affichera. Il suit votre saisie **sans que vous ayez à enregistrer**. Quand les réglages ne suffisent plus, une feuille de style personnelle prend le relais.
 
 ---
 
@@ -17,9 +17,19 @@ Tout se règle depuis la vue **Apparence** du panneau, dont l'aperçu **est l'ov
 | **Animation** | Effet joué à chaque ajout de temps : aucun, flash, pulsation, secousse |
 | **Bulles d'annonce** | Durée, couleur et taille de la bulle qui annonce l'auteur d'un ajout |
 
+Chaque groupe se replie d'un clic sur son titre, et ceux dont l'interrupteur est éteint arrivent repliés. Un réglage que rien n'active plus — la couleur d'une ombre désactivée, l'arrondi d'un cadre absent — est **grisé et marqué « sans effet »**. Il reste modifiable : vous pouvez préparer une valeur avant d'allumer l'effet.
+
 **Les polices doivent être installées sur votre machine.** ChronoCast ne télécharge rien : une police venue d'Internet ferait un compteur vide pendant plusieurs secondes au démarrage de la scène, et casserait le fonctionnement hors ligne. Indiquez une liste de repli, comme `Bebas Neue, Impact, sans-serif`.
 
-**Après chaque changement, rechargez la source dans OBS** : *Propriétés* de la source → **Actualiser le cache de la page actuelle**. L'aperçu du panneau, lui, se met à jour tout seul.
+### L'aperçu et l'overlay d'OBS ne changent pas au même moment
+
+C'est la distinction à retenir, et elle est voulue.
+
+- **L'aperçu du panneau suit chaque frappe**, sans enregistrement. Bougez un curseur, il bouge avec vous. Une valeur invalide ou un champ vidé en cours de saisie ne le fait pas clignoter : il garde la dernière valeur valable.
+- **L'overlay d'OBS ne change qu'à l'enregistrement.** Vos tâtonnements ne passent donc jamais à l'antenne, même si vous réglez l'apparence en plein direct.
+- Le bouton **« Voir une bulle »** joue une bulle d'annonce et l'effet d'ajout dans l'aperçu seul. Il ne crédite aucun temps et n'atteint pas vos spectateurs.
+
+**Après enregistrement, rechargez la source dans OBS** : *Propriétés* de la source → **Actualiser le cache de la page actuelle**.
 
 ## 2. Le cadre et le dégradé
 
