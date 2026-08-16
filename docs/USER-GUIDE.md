@@ -107,6 +107,19 @@ Rien n'empêche votre bot d'alerte, s'il est modérateur de votre chaîne, d'env
 
 Et si vous préférez ne rien automatiser, la vue *Tableau de bord* a toujours ses champs **Ajouter** et **Retirer**, avec un motif libre qui se retrouve dans l'historique.
 
+### Mettre en pause depuis le chat : `!pause` et `!reprendre`
+
+La même case **Lire le chat pour les commandes** active deux autres commandes, qui ne créditent rien mais arrêtent et relancent le décompte.
+
+- `!pause` fige le compteur. Le temps restant ne bouge plus.
+- `!reprendre` le relance là où il s'était arrêté.
+
+**Elles sont réservées au diffuseur.** Un modérateur est ignoré, contrairement à `!addtime` : ajouter du temps est une faveur qu'on peut déléguer, arrêter le subathon n'en est pas une.
+
+Leurs noms ne se règlent pas, et elles n'apparaissent nulle part dans le barème : il n'y a rien à configurer. Une pause déjà en cours ne se remet pas en pause, une reprise déjà en cours ne fait rien — vous pouvez taper deux fois sans conséquence. **Rien ne s'affiche sur l'overlay et rien n'entre dans l'historique** : le compteur qui se fige est le retour, et la vue *Tableau de bord* affiche **En pause**.
+
+Une fois le subathon terminé, `!reprendre` ne le relance pas : passez par le *Tableau de bord*.
+
 ## 7. Au quotidien
 
 **Fermer la fenêtre n'arrête pas le compteur.** L'application se replie près de l'horloge et continue de tourner — c'est délibéré : un compteur de subathon ne doit pas pouvoir être tué par réflexe en plein direct. Un clic droit sur l'icône donne l'état du compteur, l'ouverture du panneau, la copie de l'URL de l'overlay, et **Quitter ChronoCast**, seul chemin qui arrête vraiment.

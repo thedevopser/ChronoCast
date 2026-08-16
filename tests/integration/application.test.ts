@@ -23,8 +23,11 @@ import {
   channelSubscribe,
   channelSubscribeGifted,
   channelSubscriptionGift,
+  chatMessageBroadcasterPause,
+  chatMessageBroadcasterResume,
   chatMessageModeratorAddTime,
   chatMessageModeratorNotANumber,
+  chatMessageModeratorPause,
   chatMessageModeratorTooMuch,
   chatMessageSmallTalk,
   chatMessageViewerAddTime,
@@ -435,6 +438,60 @@ describe('application complète', () => {
 
       await notify('channel.chat.message', { n_importe: 'quoi' });
 
+      expect((await api('/api/state')).status).toBe(200);
+    });
+
+    it('met le compteur en pause à la demande du diffuseur, sans rien inscrire à l’historique', async () => {
+      await enableChatCommands();
+      await mutate('/api/counter/resume');
+
+      await notify('channel.chat.message', chatMessageBroadcasterPause);
+
+      expect((await readPersistedCounter()).status).toBe('paused');
+      expect(await historyEntries()).toHaveLength(0);
+    });
+
+    it('fige réellement le décompte', async () => {
+      await enableChatCommands();
+      await mutate('/api/counter/resume');
+
+      await notify('channel.chat.message', chatMessageBroadcasterPause);
+      const frozen = await remainingMs();
+      ticker.tick();
+      ticker.tick();
+
+      expect(await remainingMs()).toBe(frozen);
+    });
+
+    it('relance le compteur à la demande du diffuseur', async () => {
+      await enableChatCommands();
+      await mutate('/api/counter/resume');
+      await notify('channel.chat.message', chatMessageBroadcasterPause, 'msg-pause');
+
+      await notify('channel.chat.message', chatMessageBroadcasterResume, 'msg-reprise');
+
+      expect((await readPersistedCounter()).status).toBe('running');
+      expect(await historyEntries()).toHaveLength(0);
+    });
+
+    it('refuse la pause à un modérateur', async () => {
+      await enableChatCommands();
+      await mutate('/api/counter/resume');
+
+      await notify('channel.chat.message', chatMessageModeratorPause);
+
+      expect((await readPersistedCounter()).status).toBe('running');
+      expect(await historyEntries()).toHaveLength(0);
+    });
+
+    it('reste inerte sur une seconde pause', async () => {
+      await enableChatCommands();
+      await mutate('/api/counter/resume');
+
+      await notify('channel.chat.message', chatMessageBroadcasterPause, 'msg-pause-1');
+      await notify('channel.chat.message', chatMessageBroadcasterPause, 'msg-pause-2');
+
+      expect((await readPersistedCounter()).status).toBe('paused');
       expect((await api('/api/state')).status).toBe(200);
     });
   });

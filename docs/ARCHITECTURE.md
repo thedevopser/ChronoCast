@@ -60,7 +60,9 @@ graph TD
 
 **`core/app/application.ts` est la racine de composition** : le seul endroit qui connaît tout le monde. Il fabrique les services, les câble entre eux, et rend un objet dont l'interface tient en quelques méthodes. Les deux points d'entrée — Electron et headless — ne diffèrent que par les ports qu'ils lui passent.
 
-**`core/chat/` illustre le principe jusqu'au bout.** Reconnaître un préfixe `!`, lire un nombre de secondes, décider si l'auteur est diffuseur ou modérateur, refuser une durée au-delà du plafond : tout cela est pur, sans horloge ni réseau, et se vérifie en conteneur. Le service ne connaît ni le WebSocket qui lui a apporté le message, ni le compteur qu'il fera bouger — il rend un événement de domaine, ou une raison de l'avoir écarté.
+**`core/chat/` illustre le principe jusqu'au bout.** Reconnaître un préfixe `!`, lire un nombre de secondes, décider si l'auteur est diffuseur ou modérateur, refuser une durée au-delà du plafond : tout cela est pur, sans horloge ni réseau, et se vérifie en conteneur. Le service ne connaît ni le WebSocket qui lui a apporté le message, ni le compteur qu'il fera bouger — il rend un événement de domaine, une action à exécuter, ou une raison d'avoir écarté le message.
+
+**Toutes les commandes ne créditent pas du temps.** `!pause` et `!reprendre` sont des **actions d'état** : elles n'ont ni récompense ni entrée d'historique, et ne traversent donc ni le barème ni l'historique. C'est la raison pour laquelle le service rend une union à trois branches plutôt qu'un événement de domaine forcé qui ne créditerait rien. Elles se lisent aussi sur une porte d'autorisation plus étroite : le badge `broadcaster` seul, là où `!addtime` accepte aussi les modérateurs.
 
 **`web/` est du code navigateur.** Il n'importe du noyau que des **types**, jamais de valeur : une règle ESLint le garantit, et `src/web/shared/protocol.ts` redéclare le contrat du WebSocket plutôt que de le ré-exporter — contrainte de `rootDir` en TypeScript, tenue par un test qui fait échouer la compilation dès qu'un champ diverge.
 
