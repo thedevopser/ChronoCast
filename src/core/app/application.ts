@@ -302,6 +302,18 @@ export function createApplication(options: ApplicationOptions): Application {
         return;
       }
 
+      // Une action d'état ne crédite rien : ni récompense, ni ligne d'historique.
+      if (outcome.kind === 'action') {
+        const state =
+          outcome.action === 'pause' ? await counterService.pause() : await counterService.resume();
+
+        pipeline.info('compteur piloté depuis le chat', {
+          action: outcome.action,
+          status: state.status,
+        });
+        return;
+      }
+
       await applyDomainEvent(outcome.event);
       return;
     }

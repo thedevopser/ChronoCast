@@ -1,6 +1,6 @@
 import type { ChronoCastConfig } from '../config/schema.js';
 import type { CommandEvent } from '../events/domain-event.js';
-import { isPrivileged } from './chatter-badges.js';
+import { isBroadcaster, isPrivileged } from './chatter-badges.js';
 import { parseCommand } from './command-parser.js';
 
 export interface ChatMessageContext {
@@ -9,9 +9,18 @@ export interface ChatMessageContext {
   readonly receivedAt: number;
 }
 
+export type CounterAction = 'pause' | 'resume';
+
 export type CommandOutcome =
   | { readonly kind: 'event'; readonly event: CommandEvent }
+  | { readonly kind: 'action'; readonly action: CounterAction }
   | { readonly kind: 'ignored'; readonly reason: string };
+
+// Figés dans le code, comme le préfixe « ! » : un nom réglable serait une question de support de plus.
+const COUNTER_ACTIONS: Readonly<Record<string, CounterAction>> = {
+  pause: 'pause',
+  reprendre: 'resume',
+};
 
 const MAX_USER_NAME_LENGTH = 100;
 
@@ -66,6 +75,17 @@ export function evaluateChatMessage(
   const parsed = parseCommand(text);
   if (parsed === null) {
     return ignored('message ordinaire');
+  }
+
+  // Résolues avant le barème : l'import de configuration reste permissif, et un « name » valant
+  // « pause » ne doit pas pouvoir masquer la commande réservée.
+  const action = COUNTER_ACTIONS[parsed.name];
+  if (action !== undefined) {
+    if (!isBroadcaster(payload['badges'])) {
+      return ignored(`!${parsed.name} refusée : auteur autre que le diffuseur`);
+    }
+
+    return { kind: 'action', action };
   }
 
   const settings = config.rewards.chatCommand;

@@ -141,6 +141,78 @@ describe('evaluateChatMessage', () => {
     });
   });
 
+  describe('!pause et !reprendre', () => {
+    const BROADCASTER = [{ set_id: 'broadcaster', id: '1', info: '' }];
+
+    function asBroadcaster(text: string, config?: ChronoCastConfig) {
+      return evaluate(payload({ text, badges: BROADCASTER }), config);
+    }
+
+    it('met le compteur en pause à la demande du diffuseur', () => {
+      expect(asBroadcaster('!pause')).toStrictEqual({ kind: 'action', action: 'pause' });
+    });
+
+    it('relance le compteur à la demande du diffuseur', () => {
+      expect(asBroadcaster('!reprendre')).toStrictEqual({ kind: 'action', action: 'resume' });
+    });
+
+    it('refuse un modérateur', () => {
+      const moderator = [{ set_id: 'moderator', id: '1', info: '' }];
+
+      expect(evaluate(payload({ text: '!pause', badges: moderator })).kind).toBe('ignored');
+      expect(evaluate(payload({ text: '!reprendre', badges: moderator })).kind).toBe('ignored');
+    });
+
+    it('refuse un spectateur ordinaire', () => {
+      expect(evaluate(payload({ text: '!pause', badges: [] })).kind).toBe('ignored');
+      expect(
+        evaluate(payload({ text: '!reprendre', badges: [{ set_id: 'vip', id: '1', info: '' }] }))
+          .kind,
+      ).toBe('ignored');
+    });
+
+    it('se tait quand les commandes sont désactivées', () => {
+      const config = configSchema.parse({ twitch: { enableChatCommands: false } });
+
+      expect(asBroadcaster('!pause', config).kind).toBe('ignored');
+      expect(asBroadcaster('!reprendre', config).kind).toBe('ignored');
+    });
+
+    it('ignore la casse', () => {
+      expect(asBroadcaster('!PAUSE').kind).toBe('action');
+      expect(asBroadcaster('!Reprendre').kind).toBe('action');
+    });
+
+    it('normalise le caractère invisible que Twitch ajoute aux messages répétés', () => {
+      expect(asBroadcaster('!pause\u{E0000}')).toStrictEqual({ kind: 'action', action: 'pause' });
+    });
+
+    it('ignore un argument surnuméraire', () => {
+      expect(asBroadcaster('!pause maintenant').kind).toBe('action');
+    });
+
+    it('ne produit ni événement ni récompense', () => {
+      const outcome = asBroadcaster('!pause');
+
+      expect(outcome.kind).not.toBe('event');
+    });
+
+    it('reste réservée même si le barème nomme sa commande « pause »', () => {
+      const config = configWith({ rewards: { chatCommand: { name: 'pause' } } });
+
+      expect(asBroadcaster('!pause 300', config)).toStrictEqual({
+        kind: 'action',
+        action: 'pause',
+      });
+    });
+
+    it('énonce toujours une raison quand elle refuse', () => {
+      const outcome = evaluate(payload({ text: '!pause', badges: [] }));
+
+      expect(outcome.kind === 'ignored' && outcome.reason.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('charge utile hostile', () => {
     it('ne lève jamais', () => {
       for (const hostile of [null, undefined, 42, 'texte', [], {}, { message: 'texte' }]) {

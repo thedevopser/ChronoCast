@@ -213,3 +213,11 @@ export const chatMessageModeratorNotANumber: unknown = chatMessage(
   '!addtime beaucoup',
   MODERATOR_BADGES,
 );
+
+const BROADCASTER_BADGES: unknown[] = [{ set_id: 'broadcaster', id: '1', info: '' }];
+
+export const chatMessageBroadcasterPause: unknown = chatMessage('!pause', BROADCASTER_BADGES);
+
+export const chatMessageBroadcasterResume: unknown = chatMessage('!reprendre', BROADCASTER_BADGES);
+
+export const chatMessageModeratorPause: unknown = chatMessage('!pause', MODERATOR_BADGES);
