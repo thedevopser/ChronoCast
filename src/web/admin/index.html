@@ -196,18 +196,21 @@
             <aside class="workbench__preview">
               <div class="preview">
                 <p class="card__label">Aperçu</p>
-                <iframe
-                  class="preview__frame"
-                  id="overlay-preview"
-                  title="Aperçu de l'overlay"
-                ></iframe>
+                <div class="preview__stage" id="preview-stage">
+                  <iframe
+                    class="preview__frame"
+                    id="overlay-preview"
+                    title="Aperçu de l'overlay"
+                  ></iframe>
+                </div>
                 <div class="actions">
                   <button class="button button--ghost" type="button" id="preview-demo">
                     Voir une bulle
                   </button>
                 </div>
                 <p class="card__hint">
-                  Le damier marque la transparence : dans OBS, la scène apparaît à sa place.
+                  Toile de 1920 × 1080 réduite à l'échelle : les proportions sont celles qu'OBS
+                  affichera. Le damier marque la transparence.
                 </p>
               </div>
             </aside>
