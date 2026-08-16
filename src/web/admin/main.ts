@@ -3,6 +3,7 @@ import { createCountdown, type SyncMode } from '../shared/countdown.js';
 import {
   clearChildren,
   requireElement,
+  setCssVariables,
   setText,
   MAX_TEXT_LENGTH,
 } from '../shared/safe-dom.js';
@@ -30,6 +31,7 @@ import { inactiveGroups, mutedSelectors } from './field-dependencies.js';
 import { fieldsOf, groupsOf } from './fields.js';
 import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
 import { draftOverlayConfig } from './overlay-draft.js';
+import { previewScale } from './preview-stage.js';
 import { PREVIEW_MESSAGE_TYPE } from '../overlay/preview.js';
 import {
   filterHistory,
@@ -445,6 +447,16 @@ function start(): void {
   });
 
   const previewFrame = requireElement(document, '#overlay-preview') as HTMLIFrameElement;
+  const previewStage = requireElement(document, '#preview-stage');
+
+  function fitPreviewStage(): void {
+    setCssVariables(previewStage, {
+      '--cc-preview-scale': String(previewScale(previewStage.clientWidth)),
+    });
+  }
+
+  new ResizeObserver(fitPreviewStage).observe(previewStage);
+  fitPreviewStage();
 
   function postToPreview(payload: Record<string, unknown>): void {
     previewFrame.contentWindow?.postMessage(
