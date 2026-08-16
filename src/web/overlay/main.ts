@@ -16,6 +16,7 @@ import {
 import { createWsClient, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
 import { overlayCssVariables } from './overlay-style.js';
+import { readPreviewMessage } from './preview.js';
 import { createToastQueue } from './toast-queue.js';
 
 const OVERLAY_CHANNELS: readonly Channel[] = ['counter', 'event', 'config'];
@@ -94,6 +95,59 @@ function start(): void {
 
   function syncModeOf(origin: CounterChangeOrigin): SyncMode {
     return origin === 'tick' ? 'tick' : 'authoritative';
+  }
+
+  let demoCount = 0;
+
+  function playDemoToast(): void {
+    playAddAnimation();
+
+    if (!(overlayConfig?.toast.enabled ?? false)) {
+      return;
+    }
+
+    demoCount += 1;
+    toasts.push(
+      {
+        id: `apercu-${String(demoCount)}`,
+        userName: 'ChronoCast',
+        rewardSeconds: 300,
+        type: 'sub',
+      },
+      performance.now(),
+      overlayConfig?.toast.durationMs ?? 4_000,
+    );
+  }
+
+  /**
+   * Le panneau prévisualise ses réglages en poussant un brouillon dans l'iframe qu'il embarque.
+   *
+   * L'écouteur n'est posé que sur une page encadrée : une Browser Source OBS n'a pas de parent, et
+   * n'expose donc rien. Seule une page de même origine peut atteindre ce chemin, et la seule qui
+   * existe — le panneau — peut déjà écrire la configuration par `PATCH /api/config`.
+   */
+  function listenToPreview(): void {
+    if (window.parent === window) {
+      return;
+    }
+
+    window.addEventListener('message', (event: MessageEvent<unknown>) => {
+      const message = readPreviewMessage(
+        { origin: event.origin, data: event.data },
+        window.location.origin,
+      );
+
+      if (message === null) {
+        return;
+      }
+
+      if (message.kind === 'config') {
+        applyConfig(message.overlay);
+        return;
+      }
+
+      playDemoToast();
+    });
   }
 
   function handle(message: ServerMessage): void {
@@ -195,6 +249,7 @@ function start(): void {
   });
 
   client.start();
+  listenToPreview();
   window.requestAnimationFrame(render);
 }
 

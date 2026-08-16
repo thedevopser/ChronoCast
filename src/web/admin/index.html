@@ -177,21 +177,40 @@
           <header class="view__head">
             <h1 class="view__title">Apparence</h1>
             <p class="view__subtitle">
-              L'aperçu est l'overlay réel : il se met à jour tout seul dès que vous enregistrez.
+              L'aperçu est l'overlay réel et suit votre saisie. L'overlay ouvert dans OBS, lui, ne
+              change qu'à l'enregistrement.
             </p>
           </header>
 
-          <div class="preview">
-            <p class="card__label">Aperçu</p>
-            <iframe class="preview__frame" id="overlay-preview" title="Aperçu de l'overlay"></iframe>
-          </div>
+          <div class="workbench">
+            <div class="workbench__fields">
+              <div class="fields" id="fields-appearance"></div>
 
-          <div class="fields" id="fields-appearance"></div>
+              <div class="actions">
+                <button class="button button--primary" type="button" id="save-appearance">
+                  Enregistrer l'apparence
+                </button>
+              </div>
+            </div>
 
-          <div class="actions">
-            <button class="button button--primary" type="button" id="save-appearance">
-              Enregistrer l'apparence
-            </button>
+            <aside class="workbench__preview">
+              <div class="preview">
+                <p class="card__label">Aperçu</p>
+                <iframe
+                  class="preview__frame"
+                  id="overlay-preview"
+                  title="Aperçu de l'overlay"
+                ></iframe>
+                <div class="actions">
+                  <button class="button button--ghost" type="button" id="preview-demo">
+                    Voir une bulle
+                  </button>
+                </div>
+                <p class="card__hint">
+                  Le damier marque la transparence : dans OBS, la scène apparaît à sa place.
+                </p>
+              </div>
+            </aside>
           </div>
         </section>
 

@@ -26,8 +26,11 @@ import {
   twitchLabel,
   type DashboardModel,
 } from './dashboard-model.js';
+import { inactiveGroups, mutedSelectors } from './field-dependencies.js';
 import { fieldsOf, groupsOf } from './fields.js';
 import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
+import { draftOverlayConfig } from './overlay-draft.js';
+import { PREVIEW_MESSAGE_TYPE } from '../overlay/preview.js';
 import {
   filterHistory,
   formatDetail,
@@ -46,6 +49,8 @@ import {
   clearFieldErrors,
   readFieldValues,
   renderFieldGroups,
+  setGroupsCollapsed,
+  setMutedFields,
   showFieldErrors,
   writeFieldValues,
 } from './render-fields.js';
@@ -439,12 +444,73 @@ function start(): void {
     appendTierRow('', '');
   });
 
+  const previewFrame = requireElement(document, '#overlay-preview') as HTMLIFrameElement;
+
+  function postToPreview(payload: Record<string, unknown>): void {
+    previewFrame.contentWindow?.postMessage(
+      { type: PREVIEW_MESSAGE_TYPE, ...payload },
+      window.location.origin,
+    );
+  }
+
+  // L'aperçu reçoit le brouillon ; l'overlay ouvert dans OBS, lui, ne bouge qu'à l'enregistrement.
+  function pushPreviewConfig(): void {
+    const fields = fieldsOf('appearance');
+    const overlay = draftOverlayConfig(
+      fields,
+      readFieldValues(containerOf('appearance'), fields),
+      config,
+    );
+
+    if (overlay !== null) {
+      postToPreview({ kind: 'config', overlay });
+    }
+  }
+
+  function refreshAppearanceState(): void {
+    const fields = fieldsOf('appearance');
+    const container = containerOf('appearance');
+
+    setMutedFields(container, fields, mutedSelectors(fields, readFieldValues(container, fields)));
+    pushPreviewConfig();
+  }
+
+  let appearanceFrame: number | null = null;
+
+  containerOf('appearance').addEventListener('input', () => {
+    if (appearanceFrame !== null) {
+      return;
+    }
+    appearanceFrame = window.requestAnimationFrame(() => {
+      appearanceFrame = null;
+      refreshAppearanceState();
+    });
+  });
+
+  previewFrame.addEventListener('load', () => {
+    pushPreviewConfig();
+  });
+
+  requireElement(document, '#preview-demo').addEventListener('click', () => {
+    postToPreview({ kind: 'demo' });
+  });
+
   function paintFields(): void {
     for (const view of FIELD_VIEWS) {
       const fields = fieldsOf(view);
       writeFieldValues(containerOf(view), fields, valuesFrom(fields, config));
       clearFieldErrors(containerOf(view), fields);
     }
+
+    // Le repli ne se décide qu'ici : le recalculer à la frappe refermerait sous les doigts un
+    // groupe que l'utilisateur vient d'ouvrir.
+    const appearance = fieldsOf('appearance');
+    const container = containerOf('appearance');
+    setGroupsCollapsed(
+      container,
+      inactiveGroups(appearance, readFieldValues(container, appearance)),
+    );
+    refreshAppearanceState();
 
     const tiers = (config as { rewards?: { bits?: { tiers?: { minBits: number; seconds: number }[] } } })
       .rewards?.bits?.tiers;
@@ -846,7 +912,9 @@ function start(): void {
   });
 
   for (const view of FIELD_VIEWS) {
-    renderFieldGroups(document, containerOf(view), fieldsOf(view), groupsOf(view));
+    renderFieldGroups(document, containerOf(view), fieldsOf(view), groupsOf(view), {
+      collapsible: view === 'appearance',
+    });
   }
 
   buildNav();
