@@ -33,6 +33,10 @@ export type TwitchConnectionStatus =
 export interface TwitchStatusPayload {
   readonly status: TwitchConnectionStatus;
   readonly detail?: string;
+
+  // Renseignées par l'application au moment de composer l'état, jamais par les émetteurs du bus :
+  // une portée accordée ne se lit que dans le jeton.
+  readonly missingScopes?: readonly string[];
 }
 
 export interface TwitchRevocationPayload {

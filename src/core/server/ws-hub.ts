@@ -35,7 +35,11 @@ export interface HandshakeContext {
 
 export interface HubSnapshot {
   readonly counter: CounterState;
-  readonly twitch: { readonly status: AppEvents['twitch:status']['status']; readonly detail?: string };
+  readonly twitch: {
+    readonly status: AppEvents['twitch:status']['status'];
+    readonly detail?: string;
+    readonly missingScopes?: readonly string[];
+  };
 }
 
 export interface WsHub {

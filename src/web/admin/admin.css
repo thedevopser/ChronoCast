@@ -675,6 +675,11 @@ details.group > .group__title:hover {
   color: var(--cc-success);
 }
 
+.banner--warning {
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning);
+}
+
 .note {
   margin: var(--cc-space-2) 0 0;
   color: var(--cc-text-faint);

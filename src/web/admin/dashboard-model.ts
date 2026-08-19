@@ -26,6 +26,10 @@ export interface DashboardModel {
   readonly events: readonly RecentEvent[];
   readonly appVersion: string;
   readonly port: number;
+
+  // Non vide tant qu'une souscription activée exige une portée que le jeton n'a pas : seule une
+  // reconnexion peut l'accorder.
+  readonly missingScopes: readonly string[];
 }
 
 const EMPTY: DashboardModel = {
@@ -34,6 +38,7 @@ const EMPTY: DashboardModel = {
   events: [],
   appVersion: '',
   port: 0,
+  missingScopes: [],
 };
 
 export function createDashboardModel(): DashboardModel {
@@ -60,6 +65,10 @@ function sameTwitch(
   return current.status === status && current.detail === detail;
 }
 
+function sameScopes(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((scope, index) => scope === right[index]);
+}
+
 export function applyMessage(model: DashboardModel, message: ServerMessage): DashboardModel {
   switch (message.type) {
     case 'hello':
@@ -67,13 +76,19 @@ export function applyMessage(model: DashboardModel, message: ServerMessage): Das
 
     case 'state': {
       const detail = message.twitch.detail ?? '';
-      if (sameCounter(model.counter, message.counter) && sameTwitch(model.twitch, message.twitch.status, detail)) {
+      const missingScopes = message.twitch.missingScopes ?? [];
+      if (
+        sameCounter(model.counter, message.counter) &&
+        sameTwitch(model.twitch, message.twitch.status, detail) &&
+        sameScopes(model.missingScopes, missingScopes)
+      ) {
         return model;
       }
       return {
         ...model,
         counter: message.counter,
         twitch: { status: message.twitch.status, detail },
+        missingScopes,
       };
     }
 

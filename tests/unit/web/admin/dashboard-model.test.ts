@@ -152,6 +152,32 @@ describe('applyMessage', () => {
     expect(applyMessage(model, message)).toBe(model);
   });
 
+  it('retient les portées manquantes annoncées par l’instantané', () => {
+    const model = applyMessage(createDashboardModel(), {
+      type: 'state',
+      counter: counter('running'),
+      twitch: { status: 'ready', missingScopes: ['user:read:chat', 'user:bot'] },
+    });
+
+    expect(model.missingScopes).toEqual(['user:read:chat', 'user:bot']);
+  });
+
+  it('oublie les portées manquantes dès que l’instantané n’en annonce plus', () => {
+    const incomplet = applyMessage(createDashboardModel(), {
+      type: 'state',
+      counter: counter('running'),
+      twitch: { status: 'ready', missingScopes: ['user:read:chat'] },
+    });
+
+    const reconnecte = applyMessage(incomplet, {
+      type: 'state',
+      counter: counter('running'),
+      twitch: { status: 'ready' },
+    });
+
+    expect(reconnecte.missingScopes).toEqual([]);
+  });
+
   it('renvoie le même modèle quand l’instantané ne change rien', () => {
     const snapshot: ServerMessage = {
       type: 'state',
