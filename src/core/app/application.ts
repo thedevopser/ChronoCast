@@ -53,7 +53,7 @@ import {
   createOAuthService,
   type OAuthService,
 } from '../twitch/oauth-service.js';
-import { requiredScopes } from '../twitch/subscription-plan.js';
+import { requiredScopes, requiresRestart } from '../twitch/subscription-plan.js';
 import { createTokenStore, type TokenStore } from '../twitch/token-store.js';
 import type { AppEvents, TwitchStatusPayload } from './app-events.js';
 import { createEventBus, type EventBus } from './event-bus.js';
@@ -297,7 +297,11 @@ export function createApplication(options: ApplicationOptions): Application {
       );
 
       if (outcome.kind === 'ignored') {
-        pipeline.debug('message de chat sans effet', { reason: outcome.reason });
+        if (outcome.refused) {
+          pipeline.info('commande de chat refusée', { reason: outcome.reason });
+        } else {
+          pipeline.debug('message de chat sans effet', { reason: outcome.reason });
+        }
         return;
       }
 
@@ -374,6 +378,40 @@ export function createApplication(options: ApplicationOptions): Application {
   async function restartTwitch(): Promise<void> {
     await stopTwitch();
     await startTwitch();
+  }
+
+  let twitchRestarting = false;
+  let twitchRestartPending = false;
+
+  // Lu à travers un accesseur : le drapeau est armé pendant l'await, ce que l'analyse de flux
+  // ne peut pas voir depuis la boucle.
+  function isTwitchRestartPending(): boolean {
+    return twitchRestartPending;
+  }
+
+  // onChange est synchrone et restartTwitch ne l'est pas : deux PATCH rapprochés lanceraient
+  // deux redémarrages concurrents sur le même client EventSub.
+  function scheduleTwitchRestart(): void {
+    if (twitchRestarting) {
+      twitchRestartPending = true;
+      return;
+    }
+
+    twitchRestarting = true;
+
+    void (async () => {
+      try {
+        do {
+          twitchRestartPending = false;
+          scoped.info('réglages de souscription modifiés : redémarrage de la chaîne Twitch');
+          await restartTwitch();
+        } while (isTwitchRestartPending());
+      } catch (error: unknown) {
+        scoped.error('redémarrage de la chaîne Twitch impossible', { cause: error });
+      } finally {
+        twitchRestarting = false;
+      }
+    })();
   }
 
   const completeOAuth = createOAuthCompletion({
@@ -603,9 +641,21 @@ export function createApplication(options: ApplicationOptions): Application {
         ttlMs: config.history.crossSourceWindowMs,
       });
 
+      // onChange ne reçoit que la configuration nouvelle : l'ancienne se conserve ici pour
+      // pouvoir comparer.
+      let previousTwitch = configService.get().twitch;
+
       configService.onChange(() => {
         logger.setLevel(configService.get().logging.level);
         hub.publishConfig();
+
+        const nextTwitch = configService.get().twitch;
+        const restartNeeded = requiresRestart(previousTwitch, nextTwitch);
+        previousTwitch = nextTwitch;
+
+        if (restartNeeded) {
+          scheduleTwitchRestart();
+        }
       });
 
       await counterService.start();

@@ -1,9 +1,9 @@
 import { request as httpRequest, type IncomingMessage } from 'node:http';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import {
@@ -16,6 +16,10 @@ import { CONFIG_SCHEMA_VERSION } from '../../src/core/config/schema.js';
 import { createSystemClock } from '../../src/core/app/system-clock.js';
 import type { Ticker } from '../../src/core/counter/counter-service.js';
 import type { Router } from '../../src/core/server/router.js';
+import type {
+  EventSubSocket,
+  EventSubSocketFactory,
+} from '../../src/core/twitch/eventsub-client.js';
 import { CSRF_HEADER } from '../../src/core/server/security/csrf.js';
 import { makeRequest } from '../helpers/http-request.js';
 import {
@@ -49,8 +53,8 @@ function createManualTicker(): Ticker & { tick(): void } {
   };
 }
 
-function createMemorySecretStore(): SecretStore {
-  const entries = new Map<string, string>();
+function createMemorySecretStore(seed: ReadonlyMap<string, string>): SecretStore {
+  const entries = new Map<string, string>(seed);
   return {
     isEncryptionAvailable: () => false,
     read: (key) => Promise.resolve(entries.get(key) ?? null),
@@ -113,6 +117,9 @@ describe('application complète', () => {
   let oauthEvents: string[] = [];
   let oauthRouter: Router | null = null;
   let appFetch: typeof fetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
+  let seededSecrets: ReadonlyMap<string, string> = new Map();
+  let socketFactory: EventSubSocketFactory | null = null;
+  let openedSocketUrls: string[] = [];
 
   function build(): Application {
     ticker = createManualTicker();
@@ -125,7 +132,7 @@ describe('application complète', () => {
         webRootDirectory: join(dataDirectory, 'public'),
         resolveDataFile: (...segments) => join(dataDirectory, ...segments),
       },
-      secrets: createMemorySecretStore(),
+      secrets: createMemorySecretStore(seededSecrets),
       clock: createSystemClock(),
       browser: { open: () => Promise.resolve() },
       ticker,
@@ -152,8 +159,12 @@ describe('application complète', () => {
           },
         };
       },
-      createSocket: () => {
-        throw new Error('aucune socket EventSub ne doit être ouverte dans ces tests');
+      createSocket: (url) => {
+        if (socketFactory === null) {
+          throw new Error('aucune socket EventSub ne doit être ouverte dans ces tests');
+        }
+        openedSocketUrls.push(url);
+        return socketFactory(url);
       },
       fetch: (input, init) => appFetch(input, init),
       sleep: () => Promise.resolve(),
@@ -186,6 +197,9 @@ describe('application complète', () => {
 
   beforeEach(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-'));
+    seededSecrets = new Map();
+    socketFactory = null;
+    openedSocketUrls = [];
     oauthEvents = [];
     appFetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
     oauthRouter = null;
@@ -384,6 +398,15 @@ describe('application complète', () => {
       expect(await historyEntries()).toHaveLength(0);
     });
 
+    it('explique dans le journal pourquoi une commande est refusée', async () => {
+      await enableChatCommands();
+
+      await notify('channel.chat.message', chatMessageViewerAddTime);
+
+      const logs = await (await api('/api/logs')).text();
+      expect(logs).toContain('ni diffuseur ni modérateur');
+    });
+
     it('n’écrit rien pour un message ordinaire', async () => {
       await enableChatCommands();
 
@@ -531,6 +554,77 @@ describe('application complète', () => {
 
       const history = (await (await api('/api/history')).json()) as { entries: unknown[] };
       expect(history.entries).toHaveLength(1);
+    });
+  });
+
+  describe('réglages de souscription changés en cours de route', () => {
+    function silentSocket(url: string): EventSubSocket {
+      return {
+        url,
+        onOpen: () => undefined,
+        onMessage: () => undefined,
+        onClose: () => undefined,
+        onError: () => undefined,
+        close: () => undefined,
+      };
+    }
+
+    function patchConfig(config: unknown): Promise<Response> {
+      return api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config }),
+      });
+    }
+
+    beforeEach(async () => {
+      await application.stop();
+
+      await writeFile(
+        join(dataDirectory, 'config.json'),
+        JSON.stringify({
+          schemaVersion: CONFIG_SCHEMA_VERSION,
+          twitch: { broadcasterUserId: '1337', clientId: 'client-de-test' },
+        }),
+        'utf8',
+      );
+
+      seededSecrets = new Map([
+        [
+          'twitch-credentials',
+          JSON.stringify({
+            clientSecret: 'secret-de-test',
+            accessToken: 'jeton-de-test',
+            refreshToken: 'rafraichissement-de-test',
+            expiresAt: Date.now() + 3_600_000,
+            scopes: ['user:read:chat', 'user:bot', 'channel:read:subscriptions', 'bits:read'],
+          }),
+        ],
+      ]);
+
+      socketFactory = silentSocket;
+      openedSocketUrls = [];
+
+      application = build();
+      port = await application.start();
+
+      expect(openedSocketUrls).toHaveLength(1);
+    });
+
+    it('relance la chaîne Twitch quand on active les commandes de chat', async () => {
+      await patchConfig({ twitch: { enableChatCommands: true } });
+
+      await vi.waitFor(() => {
+        expect(openedSocketUrls).toHaveLength(2);
+      });
+    });
+
+    it('ne relance pas la chaîne Twitch quand on change une couleur d’overlay', async () => {
+      await patchConfig({ overlay: { color: '#123456' } });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(openedSocketUrls).toHaveLength(1);
     });
   });
 

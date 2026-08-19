@@ -5,6 +5,7 @@ import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import {
   SUBSCRIPTION_PLAN,
   requiredScopes,
+  requiresRestart,
   resolveSubscriptions,
 } from '../../../src/core/twitch/subscription-plan.js';
 
@@ -193,5 +194,48 @@ describe('requiredScopes', () => {
     );
 
     expect(new Set(scopes).size).toBe(scopes.length);
+  });
+});
+
+describe('requiresRestart', () => {
+  it('ne demande rien quand la configuration est identique', () => {
+    const config = twitchConfig({ broadcasterUserId: '1337' });
+
+    expect(requiresRestart(config, config)).toBe(false);
+  });
+
+  it('demande un redémarrage quand une souscription est activée', () => {
+    const previous = twitchConfig({ broadcasterUserId: '1337', enableChatCommands: false });
+    const next = twitchConfig({ broadcasterUserId: '1337', enableChatCommands: true });
+
+    expect(requiresRestart(previous, next)).toBe(true);
+  });
+
+  it('demande un redémarrage quand une souscription est désactivée', () => {
+    const previous = twitchConfig({ broadcasterUserId: '1337', enableChatNotifications: true });
+    const next = twitchConfig({ broadcasterUserId: '1337', enableChatNotifications: false });
+
+    expect(requiresRestart(previous, next)).toBe(true);
+  });
+
+  it('demande un redémarrage quand le diffuseur change', () => {
+    const previous = twitchConfig({ broadcasterUserId: '1337' });
+    const next = twitchConfig({ broadcasterUserId: '42' });
+
+    expect(requiresRestart(previous, next)).toBe(true);
+  });
+
+  it('demande un redémarrage quand l’URL EventSub change', () => {
+    const previous = twitchConfig({ broadcasterUserId: '1337' });
+    const next = twitchConfig({ broadcasterUserId: '1337', eventsubUrl: 'wss://127.0.0.1:8080/ws' });
+
+    expect(requiresRestart(previous, next)).toBe(true);
+  });
+
+  it('ne demande rien pour un réglage sans effet sur les souscriptions', () => {
+    const previous = twitchConfig({ broadcasterUserId: '1337', broadcasterLogin: 'ancien' });
+    const next = twitchConfig({ broadcasterUserId: '1337', broadcasterLogin: 'nouveau' });
+
+    expect(requiresRestart(previous, next)).toBe(false);
   });
 });

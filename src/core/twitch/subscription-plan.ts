@@ -102,6 +102,26 @@ export function resolveSubscriptions(
   );
 }
 
+// Dérivé du plan, jamais écrit à la main : une liste de réglages en dur pourrirait en silence
+// dès qu'une souscription serait ajoutée.
+function enabledTypes(config: TwitchConfig): string[] {
+  return SUBSCRIPTION_PLAN.filter((definition) => definition.isEnabled(config)).map(
+    (definition) => definition.type,
+  );
+}
+
+export function requiresRestart(previous: TwitchConfig, next: TwitchConfig): boolean {
+  if (previous.broadcasterUserId !== next.broadcasterUserId) {
+    return true;
+  }
+
+  if (previous.eventsubUrl !== next.eventsubUrl) {
+    return true;
+  }
+
+  return enabledTypes(previous).join('|') !== enabledTypes(next).join('|');
+}
+
 export function requiredScopes(config: TwitchConfig): string[] {
   const scopes = new Set<string>();
 
