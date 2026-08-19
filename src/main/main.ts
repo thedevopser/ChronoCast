@@ -77,7 +77,6 @@ function start(): void {
 
   application = createApplication({
     paths,
-    legacyDataDirectory: app.getPath('userData'),
     secrets: createSafeStorageSecretStore({
       directory: paths.dataDirectory,
       safeStorage,
