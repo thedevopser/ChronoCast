@@ -122,7 +122,7 @@ Un paquet MSIX **virtualise ce que l'application écrit dans `%APPDATA%`**, dans
 
 Les jetons Twitch y sont chiffrés par DPAPI, liés au compte Windows. L'emplacement n'y change rien : `safeStorage` chiffre pour l'utilisateur, pas pour le répertoire.
 
-Au premier lancement, si `%APPDATA%\ChronoCast` contient les données d'une installation antérieure, elles sont **reprises**. C'est le seul endroit du code qui lise ce répertoire, en lecture seule : la reprise copie, ne déplace jamais, et n'écrase aucun fichier existant.
+ChronoCast **ne lit ni n'écrit jamais `%APPDATA%`**, et n'accède à aucun fichier hors de `%USERPROFILE%\ChronoCast`.
 
 ### Ce que le conteneur MSIX change pour le démarrage
 

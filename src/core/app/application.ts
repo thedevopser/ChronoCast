@@ -56,7 +56,6 @@ import {
 import { requiredScopes } from '../twitch/subscription-plan.js';
 import { createTokenStore, type TokenStore } from '../twitch/token-store.js';
 import type { AppEvents, TwitchStatusPayload } from './app-events.js';
-import { CONFIG_FILE, migrateDataDirectory } from './data-migration.js';
 import { createEventBus, type EventBus } from './event-bus.js';
 import type {
   BrowserOpener,
@@ -72,6 +71,8 @@ const OAUTH_REDIRECT_HOST = 'localhost';
 export const OAUTH_REDIRECT_URI = `http://${OAUTH_REDIRECT_HOST}:${String(OAUTH_REDIRECT_PORT)}/callback`;
 
 const CLIENT_SECRET_KEY = 'twitch.clientSecret';
+
+const CONFIG_FILE = 'config.json';
 
 const COUNTER_FILE = 'counter.json';
 
@@ -99,8 +100,6 @@ export interface Application {
 
 export interface ApplicationOptions {
   readonly paths: PathProvider;
-
-  readonly legacyDataDirectory?: string;
 
   readonly secrets: SecretStore;
   readonly clock: Clock;
@@ -574,31 +573,6 @@ export function createApplication(options: ApplicationOptions): Application {
     ingestNotification,
 
     async start(): Promise<number> {
-      if (options.legacyDataDirectory !== undefined) {
-        const outcome = await migrateDataDirectory({
-          source: options.legacyDataDirectory,
-          target: paths.dataDirectory,
-        });
-
-        switch (outcome.kind) {
-          case 'migrated':
-            scoped.info('données reprises de l’installation précédente', {
-              source: options.legacyDataDirectory,
-              fichiers: outcome.fileCount,
-            });
-            break;
-          case 'failed':
-            scoped.error('reprise des données impossible', {
-              source: options.legacyDataDirectory,
-              cause: outcome.cause,
-            });
-            break;
-          case 'skipped':
-            scoped.debug('aucune reprise de données', { motif: outcome.reason });
-            break;
-        }
-      }
-
       await mkdir(paths.dataDirectory, { recursive: true });
       await mkdir(paths.logsDirectory, { recursive: true });
       await mkdir(paths.historyDirectory, { recursive: true });

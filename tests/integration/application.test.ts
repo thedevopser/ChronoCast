@@ -113,7 +113,6 @@ describe('application complète', () => {
   let oauthEvents: string[] = [];
   let oauthRouter: Router | null = null;
   let appFetch: typeof fetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
-  let legacyDataDirectory: string | undefined;
 
   function build(): Application {
     ticker = createManualTicker();
@@ -126,7 +125,6 @@ describe('application complète', () => {
         webRootDirectory: join(dataDirectory, 'public'),
         resolveDataFile: (...segments) => join(dataDirectory, ...segments),
       },
-      ...(legacyDataDirectory === undefined ? {} : { legacyDataDirectory }),
       secrets: createMemorySecretStore(),
       clock: createSystemClock(),
       browser: { open: () => Promise.resolve() },
@@ -188,7 +186,6 @@ describe('application complète', () => {
 
   beforeEach(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-'));
-    legacyDataDirectory = undefined;
     oauthEvents = [];
     appFetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
     oauthRouter = null;
@@ -205,9 +202,6 @@ describe('application complète', () => {
     }
     await application.stop();
     await rm(dataDirectory, { recursive: true, force: true });
-    if (legacyDataDirectory !== undefined) {
-      await rm(legacyDataDirectory, { recursive: true, force: true });
-    }
   });
 
   function connectOverlay(): WebSocket {
@@ -537,51 +531,6 @@ describe('application complète', () => {
 
       const history = (await (await api('/api/history')).json()) as { entries: unknown[] };
       expect(history.entries).toHaveLength(1);
-    });
-  });
-
-  describe('reprise d’une installation précédente', () => {
-    it('retrouve compteur et historique écrits à l’ancien emplacement', async () => {
-      await notify('channel.subscribe', channelSubscribe);
-      const before = (await readPersistedCounter()).remainingMs;
-      await application.stop();
-
-      legacyDataDirectory = dataDirectory;
-      dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-store-'));
-
-      application = build();
-      port = await application.start();
-
-      const state = (await (await api('/api/state')).json()) as {
-        counter: { remainingMs: number };
-      };
-      expect(state.counter.remainingMs).toBe(before);
-
-      const history = (await (await api('/api/history')).json()) as { entries: unknown[] };
-      expect(history.entries).toHaveLength(1);
-    });
-
-    it('ne réimpose pas l’ancien compteur à une installation qui a déjà tourné', async () => {
-      await notify('channel.subscribe', channelSubscribe);
-      const legacyRemaining = (await readPersistedCounter()).remainingMs;
-      await application.stop();
-
-      const previous = dataDirectory;
-      dataDirectory = await mkdtemp(join(tmpdir(), 'chronocast-app-store-'));
-      application = build();
-      port = await application.start();
-      const ownRemaining = (await readPersistedCounter()).remainingMs;
-      await application.stop();
-
-      expect(ownRemaining).not.toBe(legacyRemaining);
-      legacyDataDirectory = previous;
-      application = build();
-      port = await application.start();
-
-      const state = (await (await api('/api/state')).json()) as {
-        counter: { remainingMs: number };
-      };
-      expect(state.counter.remainingMs).toBe(ownRemaining);
     });
   });
 
