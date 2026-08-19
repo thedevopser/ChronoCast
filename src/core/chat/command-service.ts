@@ -14,7 +14,7 @@ export type CounterAction = 'pause' | 'resume';
 export type CommandOutcome =
   | { readonly kind: 'event'; readonly event: CommandEvent }
   | { readonly kind: 'action'; readonly action: CounterAction }
-  | { readonly kind: 'ignored'; readonly reason: string };
+  | { readonly kind: 'ignored'; readonly reason: string; readonly refused: boolean };
 
 // Figés dans le code, comme le préfixe « ! » : un nom réglable serait une question de support de plus.
 const COUNTER_ACTIONS: Readonly<Record<string, CounterAction>> = {
@@ -27,7 +27,13 @@ const MAX_USER_NAME_LENGTH = 100;
 const DECIMAL_INTEGER = /^-?\d+$/u;
 
 function ignored(reason: string): CommandOutcome {
-  return { kind: 'ignored', reason };
+  return { kind: 'ignored', reason, refused: false };
+}
+
+// Une commande reconnue puis écartée : le streamer doit pouvoir lire pourquoi sa commande n'a
+// rien fait. Le trafic ordinaire du chat, lui, ne doit pas remplir le journal.
+function refused(reason: string): CommandOutcome {
+  return { kind: 'ignored', reason, refused: true };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -82,7 +88,7 @@ export function evaluateChatMessage(
   const action = COUNTER_ACTIONS[parsed.name];
   if (action !== undefined) {
     if (!isBroadcaster(payload['badges'])) {
-      return ignored(`!${parsed.name} refusée : auteur autre que le diffuseur`);
+      return refused(`!${parsed.name} refusée : auteur autre que le diffuseur`);
     }
 
     return { kind: 'action', action };
@@ -94,24 +100,24 @@ export function evaluateChatMessage(
   }
 
   if (!isPrivileged(payload['badges'])) {
-    return ignored(`!${parsed.name} refusée : auteur ni diffuseur ni modérateur`);
+    return refused(`!${parsed.name} refusée : auteur ni diffuseur ni modérateur`);
   }
 
   if (parsed.argument === null) {
-    return ignored(`!${parsed.name} sans valeur`);
+    return refused(`!${parsed.name} sans valeur`);
   }
 
   const seconds = readSeconds(parsed.argument);
   if (seconds === null) {
-    return ignored(`!${parsed.name} : « ${parsed.argument} » n'est pas un nombre entier`);
+    return refused(`!${parsed.name} : « ${parsed.argument} » n'est pas un nombre entier`);
   }
 
   if (seconds <= 0) {
-    return ignored(`!${parsed.name} : une durée doit être strictement positive`);
+    return refused(`!${parsed.name} : une durée doit être strictement positive`);
   }
 
   if (seconds > settings.maxSeconds) {
-    return ignored(
+    return refused(
       `!${parsed.name} : ${String(seconds)} s au-delà du plafond de ${String(settings.maxSeconds)} s`,
     );
   }

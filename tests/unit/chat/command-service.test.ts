@@ -104,6 +104,23 @@ describe('evaluateChatMessage', () => {
       expect(evaluate(payload({ text: '!addmort 300' })).kind).toBe('ignored');
     });
 
+    it('signale comme refus ce qui mérite une trace, et pas le trafic ordinaire', () => {
+      const refus = evaluate(payload({ text: '!addtime 300', badges: [] }));
+      const plafond = evaluate(payload({ text: '!addtime 999999' }));
+      const ordinaire = evaluate(payload({ text: 'salut la compagnie' }));
+      const inconnue = evaluate(payload({ text: '!addmort 300' }));
+      const desactivees = evaluate(
+        payload({ text: '!addtime 300' }),
+        configSchema.parse({ twitch: { enableChatCommands: false } }),
+      );
+
+      expect(refus.kind === 'ignored' && refus.refused).toBe(true);
+      expect(plafond.kind === 'ignored' && plafond.refused).toBe(true);
+      expect(ordinaire.kind === 'ignored' && ordinaire.refused).toBe(false);
+      expect(inconnue.kind === 'ignored' && inconnue.refused).toBe(false);
+      expect(desactivees.kind === 'ignored' && desactivees.refused).toBe(false);
+    });
+
     it('refuse un spectateur ordinaire', () => {
       expect(evaluate(payload({ text: '!addtime 300', badges: [] })).kind).toBe('ignored');
       expect(
