@@ -91,6 +91,34 @@ describe('createWsHub', () => {
       expect(client.sent[1]).toMatchObject({ type: 'state' });
     });
 
+    it('joint les portées manquantes à l’état', () => {
+      const incomplet = createWsHub({
+        bus,
+        getConfig: () => config,
+        getSnapshot: () => ({
+          counter,
+          twitch: { status: 'ready', missingScopes: ['user:read:chat', 'user:bot'] },
+        }),
+        clock: { now: () => 1_000, monotonicMs: () => monotonic },
+        timers: timers.timers,
+        getPort: () => 3_777,
+        getWsPort: () => 3_777,
+        appVersion: '0.1.0',
+        logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),
+      });
+      incomplet.start();
+
+      const other = createSocketDouble();
+      incomplet.accept(other.socket, {});
+
+      expect(other.sent[1]).toMatchObject({
+        type: 'state',
+        twitch: { missingScopes: ['user:read:chat', 'user:bot'] },
+      });
+
+      incomplet.stop();
+    });
+
     it('annonce le port du WebSocket quand il diffère de celui du HTTP', () => {
       const separate = createWsHub({
         bus,

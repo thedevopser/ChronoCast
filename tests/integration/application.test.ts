@@ -619,6 +619,38 @@ describe('application complète', () => {
       });
     });
 
+    it('ne relance pas la chaîne quand le jeton n’a pas les portées, et le signale', async () => {
+      await application.stop();
+
+      seededSecrets = new Map([
+        [
+          'twitch-credentials',
+          JSON.stringify({
+            clientSecret: 'secret-de-test',
+            accessToken: 'jeton-de-test',
+            refreshToken: 'rafraichissement-de-test',
+            expiresAt: Date.now() + 3_600_000,
+            scopes: ['channel:read:subscriptions', 'bits:read'],
+          }),
+        ],
+      ]);
+
+      openedSocketUrls = [];
+      application = build();
+      port = await application.start();
+
+      await patchConfig({ twitch: { enableChatCommands: true } });
+
+      await vi.waitFor(async () => {
+        const state = (await (await api('/api/state')).json()) as {
+          twitch: { missingScopes?: readonly string[] };
+        };
+        expect(state.twitch.missingScopes).toContain('user:read:chat');
+      });
+
+      expect(openedSocketUrls).toHaveLength(1);
+    });
+
     it('ne relance pas la chaîne Twitch quand on change une couleur d’overlay', async () => {
       await patchConfig({ overlay: { color: '#123456' } });
 

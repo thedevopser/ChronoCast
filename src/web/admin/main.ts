@@ -255,6 +255,14 @@ function start(): void {
 
     setText(requireElement(document, '#app-version'), model.appVersion, 32);
 
+    const reconnect = requireElement(document, '#twitch-reconnect-needed');
+    reconnect.hidden = model.missingScopes.length === 0;
+    setText(
+      requireElement(document, '#twitch-reconnect-scopes'),
+      model.missingScopes.join(', '),
+      200,
+    );
+
     paintEvents();
     painted = model;
   }

@@ -25,7 +25,11 @@ export interface HelloMessage {
 export interface StateMessage {
   readonly type: 'state';
   readonly counter: CounterState;
-  readonly twitch: { readonly status: TwitchConnectionStatus; readonly detail?: string };
+  readonly twitch: {
+    readonly status: TwitchConnectionStatus;
+    readonly detail?: string;
+    readonly missingScopes?: readonly string[];
+  };
 }
 
 export interface CounterMessage {

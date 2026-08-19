@@ -246,6 +246,7 @@ export function createApplication(options: ApplicationOptions): Application {
 
   let eventSub: EventSubClient | null = null;
   let twitchStatus: TwitchStatusPayload = { status: 'disconnected' };
+  let twitchMissingScopes: readonly string[] = [];
   let pendingOAuthState: string | null = null;
 
   function verifyOAuthState(state: string): boolean {
@@ -359,7 +360,7 @@ export function createApplication(options: ApplicationOptions): Application {
   const hub: WsHub = createWsHub({
     bus,
     getConfig: () => configService.get(),
-    getSnapshot: () => ({ counter: counterService.getState(), twitch: twitchStatus }),
+    getSnapshot: () => ({ counter: counterService.getState(), twitch: composeTwitchStatus() }),
     clock,
     timers: hubTimers,
     getPort: currentPort,
@@ -373,6 +374,18 @@ export function createApplication(options: ApplicationOptions): Application {
       await eventSub.stop();
       eventSub = null;
     }
+  }
+
+  function composeTwitchStatus(): TwitchStatusPayload {
+    return { ...twitchStatus, missingScopes: twitchMissingScopes };
+  }
+
+  // Une portée est accordée par Twitch au moment de l'autorisation : aucun redémarrage ne peut
+  // l'ajouter à un jeton déjà émis, seule une reconnexion le peut.
+  async function refreshMissingScopes(): Promise<readonly string[]> {
+    const credentials = await tokenStore.load();
+    twitchMissingScopes = credentials === null ? [] : oauth.findMissingScopes(credentials.scopes);
+    return twitchMissingScopes;
   }
 
   async function restartTwitch(): Promise<void> {
@@ -403,6 +416,17 @@ export function createApplication(options: ApplicationOptions): Application {
       try {
         do {
           twitchRestartPending = false;
+
+          const missing = await refreshMissingScopes();
+          if (missing.length > 0) {
+            // Relancer avec un jeton dépourvu de la portée recréerait une souscription vouée au
+            // même échec, au prix d'une coupure en plein direct.
+            scoped.warning('portées Twitch manquantes : reconnexion nécessaire', {
+              missingScopes: missing,
+            });
+            continue;
+          }
+
           scoped.info('réglages de souscription modifiés : redémarrage de la chaîne Twitch');
           await restartTwitch();
         } while (isTwitchRestartPending());
@@ -465,7 +489,7 @@ export function createApplication(options: ApplicationOptions): Application {
   });
 
   const twitchApi: TwitchApiPort = {
-    getStatus: () => twitchStatus,
+    getStatus: () => composeTwitchStatus(),
 
     async describe() {
       const twitch = configService.get().twitch;
@@ -570,8 +594,18 @@ export function createApplication(options: ApplicationOptions): Application {
     const credentials = await tokenStore.load();
 
     if (credentials === null || twitch.broadcasterUserId === '') {
+      twitchMissingScopes = [];
       scoped.info('Twitch non configuré : le compteur fonctionne sans événements');
       return;
+    }
+
+    // La chaîne démarre malgré tout : les souscriptions dont les portées sont accordées
+    // fonctionnent, et priver le streamer du décompte des abonnements serait pire que le défaut.
+    twitchMissingScopes = oauth.findMissingScopes(credentials.scopes);
+    if (twitchMissingScopes.length > 0) {
+      scoped.warning('portées Twitch manquantes : reconnexion nécessaire', {
+        missingScopes: twitchMissingScopes,
+      });
     }
 
     const validation = await oauth.validate(credentials.accessToken).catch(() => null);
