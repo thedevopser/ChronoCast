@@ -295,3 +295,143 @@ describe('commande de chat', () => {
     expect(computeReward(commandEvent(300), REWARDS).reason).toContain('addtime');
   });
 });
+
+describe('Happy Hour', () => {
+  const DOUBLED: RewardsConfig = rewardsWith({ happyHour: true });
+
+  function commandEvent(seconds: number): CommandEvent {
+    return { ...baseEvent(), source: 'chat-command', type: 'command', command: 'addtime', seconds };
+  }
+
+  describe('ce qui double', () => {
+    it('double les secondes d’un abonnement', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, DOUBLED).seconds).toBe(360);
+    });
+
+    it('double les secondes d’un réabonnement', () => {
+      const event: ResubEvent = {
+        ...baseEvent(),
+        type: 'resub',
+        tier: 'tier1',
+        cumulativeMonths: 12,
+      };
+
+      expect(computeReward(event, DOUBLED).seconds).toBe(
+        computeReward(event, REWARDS).seconds * 2,
+      );
+    });
+
+    it('double une salve d’abonnements offerts, déjà multipliée par le total', () => {
+      const event: GiftEvent = {
+        ...baseEvent(),
+        type: 'gift',
+        tier: 'tier1',
+        total: 5,
+        isAnonymous: false,
+      };
+
+      expect(computeReward(event, DOUBLED).seconds).toBe(1_800);
+    });
+
+    it('double un don de bits en mode linéaire', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
+
+      expect(computeReward(event, DOUBLED).seconds).toBe(240);
+    });
+
+    it('double le palier retenu en mode paliers, sans toucher à la table', () => {
+      const rewards = rewardsWith({
+        happyHour: true,
+        bits: {
+          mode: 'tiers',
+          tiers: [
+            { minBits: 100, seconds: 60 },
+            { minBits: 500, seconds: 360 },
+          ],
+        },
+      });
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 700 };
+
+      expect(computeReward(event, rewards).seconds).toBe(720);
+    });
+  });
+
+  describe('ce qui ne double pas', () => {
+    it('crédite la valeur littérale d’une commande de chat', () => {
+      expect(computeReward(commandEvent(300), DOUBLED).seconds).toBe(300);
+    });
+
+    it('ne double pas le plafond d’une commande de chat', () => {
+      const rewards = rewardsWith({ happyHour: true, chatCommand: { maxSeconds: 600 } });
+
+      expect(computeReward(commandEvent(99_999), rewards).seconds).toBe(600);
+    });
+
+    it('laisse le seuil de bits où il est, un don sous le seuil restant refusé', () => {
+      const rewards = rewardsWith({
+        happyHour: true,
+        bits: { mode: 'linear', linear: { unit: 1, secondsPerUnit: 1, minBits: 500 } },
+      });
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100 };
+
+      expect(computeReward(event, rewards).applied).toBe(false);
+      expect(computeReward(event, rewards).seconds).toBe(0);
+    });
+
+    it('laisse l’unité linéaire où elle est, un don sous une unité restant refusé', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50 };
+
+      expect(computeReward(event, DOUBLED).applied).toBe(false);
+      expect(computeReward(event, DOUBLED).seconds).toBe(0);
+    });
+
+    it('laisse un refus à zéro seconde', () => {
+      const event: GiftEvent = {
+        ...baseEvent(),
+        type: 'gift',
+        tier: 'tier1',
+        total: 0,
+        isAnonymous: false,
+      };
+
+      expect(computeReward(event, DOUBLED).applied).toBe(false);
+      expect(computeReward(event, DOUBLED).seconds).toBe(0);
+    });
+  });
+
+  describe('motif', () => {
+    it('dit le doublement, pour que l’historique ne mente pas sur le calcul', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, DOUBLED).reason).toContain('Happy Hour ×2');
+    });
+
+    it('conserve le motif de base devant la mention', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier2' };
+
+      expect(computeReward(event, DOUBLED).reason).toContain('tier2');
+    });
+
+    it('ne mentionne rien sur un refus', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50 };
+
+      expect(computeReward(event, DOUBLED).reason).not.toContain('Happy Hour');
+    });
+
+    it('ne mentionne rien sur une commande de chat', () => {
+      expect(computeReward(commandEvent(300), DOUBLED).reason).not.toContain('Happy Hour');
+    });
+  });
+
+  it('ne change strictement rien lorsqu’il est éteint', () => {
+    const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+    expect(computeReward(event, REWARDS)).toEqual({
+      seconds: 180,
+      applied: true,
+      reason: 'abonnement tier1',
+    });
+  });
+});

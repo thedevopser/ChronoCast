@@ -87,7 +87,9 @@ function computeBitsReward(bits: number, config: RewardsConfig['bits']): RewardC
   );
 }
 
-export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
+const HAPPY_HOUR_MULTIPLIER = 2;
+
+function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
   switch (event.type) {
     case 'sub':
       return granted(tierSeconds(rewards.sub, event.tier), `abonnement ${event.tier}`);
@@ -125,4 +127,20 @@ export function computeReward(event: DomainEvent, rewards: RewardsConfig): Rewar
       );
     }
   }
+}
+
+export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
+  const base = computeBaseReward(event, rewards);
+
+  // Seul le résultat est multiplié : les seuils d'entrée sont hors d'atteinte par construction, et
+  // un modérateur qui tape 300 veut créditer 300.
+  if (!rewards.happyHour || !base.applied || event.type === 'command') {
+    return base;
+  }
+
+  return {
+    ...base,
+    seconds: base.seconds * HAPPY_HOUR_MULTIPLIER,
+    reason: `${base.reason}, Happy Hour ×${String(HAPPY_HOUR_MULTIPLIER)}`,
+  };
 }

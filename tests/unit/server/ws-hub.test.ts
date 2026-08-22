@@ -147,6 +147,14 @@ describe('createWsHub', () => {
       expect(client.sent[0]?.['overlay']).toEqual(DEFAULT_CONFIG.overlay);
     });
 
+    it("annonce l'état du Happy Hour dès l'accueil", () => {
+      config = configSchema.parse({ rewards: { happyHour: true } });
+
+      hub.accept(client.socket, {});
+
+      expect(client.sent[0]).toMatchObject({ type: 'hello', happyHour: true });
+    });
+
     it("ne divulgue jamais de secret dans l'accueil", () => {
       hub.accept(client.socket, {});
 
@@ -349,6 +357,14 @@ describe('createWsHub', () => {
       hub.publishConfig();
 
       expect(messagesOfType(client, 'config')[0]?.['overlay']).toEqual(DEFAULT_CONFIG.overlay);
+    });
+
+    it('diffuse la bascule du Happy Hour, qui tient les onglets ouverts d’accord', () => {
+      config = configSchema.parse({ rewards: { happyHour: true } });
+
+      hub.publishConfig();
+
+      expect(messagesOfType(client, 'config')[0]?.['happyHour']).toBe(true);
     });
 
     it('sert plusieurs clients', () => {

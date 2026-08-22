@@ -4,6 +4,7 @@ import {
   applyMessage,
   counterControls,
   createDashboardModel,
+  happyHourLabels,
   MAX_RECENT_EVENTS,
   statusLabel,
   twitchLabel,
@@ -46,6 +47,23 @@ describe('createDashboardModel', () => {
     expect(model.events).toEqual([]);
     expect(model.twitch.status).toBe('disconnected');
     expect(model.appVersion).toBe('');
+    expect(model.happyHour).toBe(false);
+  });
+});
+
+describe('happyHourLabels', () => {
+  it('dit le multiplicateur quand il est actif, pour qu’on ne l’oublie pas en direct', () => {
+    expect(happyHourLabels(true).state).toContain('×2');
+  });
+
+  it('propose l’action inverse de l’état courant', () => {
+    expect(happyHourLabels(true).action).toBe('Désactiver');
+    expect(happyHourLabels(false).action).toBe('Activer');
+  });
+
+  it('nomme l’état éteint plutôt que de le laisser vide', () => {
+    expect(happyHourLabels(false).state.trim()).not.toBe('');
+    expect(happyHourLabels(false).state).not.toContain('×2');
   });
 });
 
@@ -58,10 +76,39 @@ describe('applyMessage', () => {
       port: 3_777,
       wsPort: 3_777,
       overlay: {} as never,
+      happyHour: false,
     });
 
     expect(model.appVersion).toBe('0.1.0');
     expect(model.port).toBe(3_777);
+  });
+
+  it('retient le Happy Hour annoncé par hello, qui survit à un redémarrage', () => {
+    const model = applyMessage(createDashboardModel(), {
+      type: 'hello',
+      protocolVersion: 1,
+      appVersion: '0.1.0',
+      port: 3_777,
+      wsPort: 3_777,
+      overlay: {} as never,
+      happyHour: true,
+    });
+
+    expect(model.happyHour).toBe(true);
+  });
+
+  it('suit la bascule du Happy Hour diffusée après un enregistrement', () => {
+    const active = applyMessage(createDashboardModel(), {
+      type: 'config',
+      overlay: {} as never,
+      happyHour: true,
+    });
+
+    expect(active.happyHour).toBe(true);
+
+    const éteint = applyMessage(active, { type: 'config', overlay: {} as never, happyHour: false });
+
+    expect(éteint.happyHour).toBe(false);
   });
 
   it('retient l’instantané complet', () => {

@@ -70,7 +70,7 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | Vue | Contenu |
 | --- | --- |
 | **Tableau de bord** | Le compteur, l'état de la connexion Twitch, les derniers événements, et les commandes : pause, reprise, ajout ou retrait de temps |
-| **Barème** | Combien de secondes ajoute chaque événement |
+| **Barème** | Combien de secondes ajoute chaque événement, et la bascule du Happy Hour |
 | **Apparence** | Police, taille, couleurs, ombre, contour, halo, cadre, dégradé, bulles d'annonce — avec un aperçu qui est l'overlay réel et qui suit votre saisie sans enregistrement |
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
 | **Historique** | Tous les événements reçus, avec leur montant — **y compris ceux qui n'ont rien crédité**, et la raison |
@@ -80,6 +80,16 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | **À propos** | Version, licence, lien vers le code source |
 
 Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre réseau local, ni depuis Internet.
+
+### Le Happy Hour
+
+Une bascule qui **double les secondes créditées**, le temps que vous décidez. Elle se trouve sur le **tableau de bord**, dans la carte *Happy Hour*, et aussi dans la vue *Barème* — c'est le même réglage, et les deux restent d'accord même si vous gardez plusieurs onglets ouverts.
+
+Sont doublés les **abonnements, réabonnements, sub offerts et bits**. Un sub Tier 1 qui vaut trois minutes en vaut six.
+
+Ne sont **pas** doublés : la commande `!addtime`, parce qu'un modérateur qui tape 300 veut créditer 300 ; et les seuils d'entrée, parce que doubler le nombre de bits minimum rendrait le barème moins généreux au lieu de plus. Un don qui ne créditait rien ne crédite toujours rien.
+
+**Le Happy Hour ne s'éteint pas tout seul** : il reste actif tant que vous ne le désactivez pas, et il survit à la fermeture de l'application. C'est pour cela que son état est affiché en permanence sur le tableau de bord — pensez à le couper quand la promesse est passée.
 
 ## 6. Les dons hors Twitch
 

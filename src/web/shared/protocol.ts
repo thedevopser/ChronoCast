@@ -145,6 +145,7 @@ export interface HelloMessage {
   readonly port: number;
   readonly wsPort: number;
   readonly overlay: OverlayConfig;
+  readonly happyHour: boolean;
 }
 
 export interface StateMessage {
@@ -188,6 +189,7 @@ export interface LogMessage {
 export interface ConfigMessage {
   readonly type: 'config';
   readonly overlay: OverlayConfig;
+  readonly happyHour: boolean;
 }
 
 export interface PongMessage {

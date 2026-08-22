@@ -31,9 +31,14 @@ describe('configSchema', () => {
         'bits',
         'chatCommand',
         'gift',
+        'happyHour',
         'resub',
         'sub',
       ]);
+    });
+
+    it('laisse le Happy Hour éteint', () => {
+      expect(DEFAULT_CONFIG.rewards.happyHour).toBe(false);
     });
 
     it('ne plafonne plus aucune récompense hors commande de chat', () => {

@@ -31,6 +31,15 @@ function reward(selector: string, path: string, label: string, view: FieldViewId
 }
 
 const REWARD_FIELDS: readonly AdminField[] = [
+  {
+    selector: '#reward-happy-hour',
+    path: 'rewards.happyHour',
+    label: 'Doubler les secondes créditées',
+    hint: 'Abonnements, réabonnements, sub offerts et bits comptent double. La saisie d’un modérateur et les seuils d’entrée ne bougent pas. Se bascule aussi depuis le tableau de bord.',
+    view: 'rewards',
+    kind: 'boolean',
+  },
+
   reward('#reward-sub-prime', 'rewards.sub.prime', 'Prime'),
   reward('#reward-sub-tier1', 'rewards.sub.tier1', 'Tier 1'),
   reward('#reward-sub-tier2', 'rewards.sub.tier2', 'Tier 2'),
@@ -502,6 +511,8 @@ export function fieldsOf(view: FieldViewId): readonly AdminField[] {
 }
 
 const GROUPS: readonly (readonly [string, string])[] = [
+  // Sans point final : la feuille n'a pas de sous-objet.
+  ['rewards.happyHour', 'Happy Hour'],
   ['rewards.sub.', 'Abonnements'],
   ['rewards.resub.', 'Réabonnements'],
   ['rewards.gift.', 'Sub offerts'],
