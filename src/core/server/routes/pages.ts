@@ -13,6 +13,7 @@ interface PageDefinition {
 
 const PAGES: Readonly<Record<string, PageDefinition>> = {
   '/overlay': { file: '/overlay/index.html', requiresToken: false },
+  '/goal': { file: '/goal/index.html', requiresToken: false },
   '/admin': { file: '/admin/index.html', requiresToken: true },
   '/setup': { file: '/setup/index.html', requiresToken: true },
 };

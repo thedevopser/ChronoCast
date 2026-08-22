@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChronoCast — Objectif</title>
+
+    <meta name="chronocast-ws-port" content="__CHRONOCAST_WS_PORT__" />
+
+    <link rel="stylesheet" href="/goal/goal.css" />
+
+    <link rel="stylesheet" href="/custom.css" />
+  </head>
+
+  <body>
+    <div class="goal" id="goal" hidden>
+      <div class="bar">
+        <span class="bar__fill" id="bar-fill"></span>
+        <span class="bar__text">
+          <span class="bar__label" id="goal-label"></span>
+          <span class="bar__count" id="goal-count"></span>
+        </span>
+      </div>
+    </div>
+
+    <div class="announce" id="announce" hidden>
+      <span class="announce__text" id="announce-text" hidden></span>
+      <span class="announce__label" id="announce-label"></span>
+    </div>
+
+    <script type="module" src="/goal/main.js"></script>
+  </body>
+</html>

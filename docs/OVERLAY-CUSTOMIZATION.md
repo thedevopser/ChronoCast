@@ -69,6 +69,18 @@ Quand un réglage manque, `custom.css` prend le relais. Elle est chargée **en d
 | `.toast__user` | Le pseudonyme dans la bulle |
 | `.toast__reward` | Le gain annoncé dans la bulle |
 
+**La même feuille sert aussi la page `/goal`**, sous le même interrupteur : les deux sources navigateur se personnalisent d'un seul fichier, et rien n'oblige à viser les deux.
+
+| Sélecteur | Élément de la page `/goal` |
+| --- | --- |
+| `.bar` | La barre, qui porte le fond, l'arrondi et le trait |
+| `.bar__fill` | La part parcourue, dont la largeur suit la progression |
+| `.bar__text` | Le texte inscrit dans la barre |
+| `.bar__label` | Le libellé de la promesse en cours |
+| `.bar__count` | Le compte « 12 / 50 » |
+| `.announce` | Le bandeau d'un palier franchi |
+| `.announce__text`, `.announce__label` | Le texte réglé, et le libellé du palier |
+
 ### Le piège des variables
 
 Les réglages du panneau sont posés en **style en ligne** sur `:root`, par le JavaScript de la page. Or un style en ligne bat une feuille de style : redéclarer `--cc-color` dans `custom.css` **n'aura aucun effet**.
@@ -158,6 +170,21 @@ Elles sont posées par le panneau et lues par la feuille de l'overlay. Les conna
 | `--cc-frame-background`, `--cc-frame-fill` | Trait du cadre, et remplissage intérieur |
 | `--cc-animation-duration` | Durée de l'effet d'ajout |
 | `--cc-toast-color`, `--cc-toast-font-size`, `--cc-toast-duration` | Bulles d'annonce |
+
+Celles de la page `/goal` portent toutes le préfixe `--cc-goal-`, si bien qu'aucune ne peut heurter les précédentes :
+
+| Variable | Rôle |
+| --- | --- |
+| `--cc-goal-font-family`, `--cc-goal-font-size`, `--cc-goal-font-weight`, `--cc-goal-letter-spacing` | Typographie |
+| `--cc-goal-color`, `--cc-goal-text-fill`, `--cc-goal-text-background` | Peinture du texte : couleur unie ou dégradé découpé |
+| `--cc-goal-text-align` | Alignement dans la barre |
+| `--cc-goal-text-shadow` | Ombre portée **et** halo, empilés |
+| `--cc-goal-outline-width`, `--cc-goal-outline-color` | Contour des lettres |
+| `--cc-goal-bar-height`, `--cc-goal-bar-radius` | Géométrie de la barre |
+| `--cc-goal-bar-fill`, `--cc-goal-bar-track` | Remplissage de la part parcourue, et fond de la barre |
+| `--cc-goal-bar-border-width`, `--cc-goal-bar-border-color` | Trait de la barre |
+| `--cc-goal-announce-color`, `--cc-goal-announce-duration` | Bandeau d'un palier franchi |
+| `--cc-goal-progress` | Part parcourue du palier courant, entre 0 et 1. **Posée sur la barre à chaque abonnement** : la surcharger fige l'affichage |
 
 ## 5. Tester sans attendre un sub
 

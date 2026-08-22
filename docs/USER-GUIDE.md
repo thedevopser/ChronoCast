@@ -63,6 +63,20 @@ Si vous avez changé le port dans les paramètres, remplacez `3777` par le vôtr
 
 > **Une source navigateur ne se recharge jamais toute seule.** Après un changement d'apparence, faites un clic droit sur la source → **Propriétés** → bouton **Actualiser le cache de la page actuelle**. Il n'y a pas de raccourci clavier pour ça. La case « Actualiser le navigateur lorsque la scène devient active » évite d'y penser : changez de scène et revenez.
 
+### La barre d'objectif, seconde source navigateur
+
+Si vous avez défini des paliers — voir la section 5 —, ajoutez une **seconde** source navigateur, indépendante de la première :
+
+| Champ | Valeur |
+| --- | --- |
+| URL | `http://127.0.0.1:3777/goal` |
+| Largeur | 800 |
+| Hauteur | 80 |
+
+Elle affiche une barre unique portant le libellé de la promesse en cours et le compte d'abonnements, et rien d'autre. Placez-la où vous voulez : elle ne dépend pas de l'overlay du compteur, et l'une peut exister sans l'autre.
+
+**Tant qu'aucun palier n'est défini, la page reste vide** — c'est l'état éteint des objectifs, et non une erreur.
+
 ## 5. Le panneau d'administration
 
 Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse `http://127.0.0.1:3777/admin`.
@@ -71,6 +85,7 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | --- | --- |
 | **Tableau de bord** | Le compteur, l'état de la connexion Twitch, les derniers événements, et les commandes : pause, reprise, ajout ou retrait de temps |
 | **Barème** | Combien de secondes ajoute chaque événement, et la bascule du Happy Hour |
+| **Objectifs** | L'échelle de vos promesses, la progression en cours, sa remise à zéro, et l'apparence de la barre affichée aux spectateurs |
 | **Apparence** | Police, taille, couleurs, ombre, contour, halo, cadre, dégradé, bulles d'annonce — avec un aperçu qui est l'overlay réel et qui suit votre saisie sans enregistrement |
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
 | **Historique** | Tous les événements reçus, avec leur montant — **y compris ceux qui n'ont rien crédité**, et la raison |
@@ -90,6 +105,26 @@ Sont doublés les **abonnements, réabonnements, sub offerts et bits**. Un sub T
 Ne sont **pas** doublés : la commande `!addtime`, parce qu'un modérateur qui tape 300 veut créditer 300 ; et les seuils d'entrée, parce que doubler le nombre de bits minimum rendrait le barème moins généreux au lieu de plus. Un don qui ne créditait rien ne crédite toujours rien.
 
 **Le Happy Hour ne s'éteint pas tout seul** : il reste actif tant que vous ne le désactivez pas, et il survit à la fermeture de l'application. C'est pour cela que son état est affiché en permanence sur le tableau de bord — pensez à le couper quand la promesse est passée.
+
+### Les objectifs
+
+Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesses. « À 50 subs je me rase la tête. » Les objectifs comptent ces promesses et les montrent à vos spectateurs, pour qu'ils voient ce que leur abonnement vient de faire avancer.
+
+**Ce qui fait avancer le compte.** Un abonnement vaut 1, un réabonnement vaut 1, et un lot de sub offerts vaut ce qu'il porte — dix sub offerts font avancer de dix. **Le palier Twitch ne pèse pas** : un Tier 3 vaut 1 comme un Tier 1, sans quoi la barre bondirait de six sur un seul abonnement et cesserait d'être lisible. Les **bits** se convertissent par tranches entières, réglées par *Bits pour un abonnement* — à 500, un don de 1 200 bits fait avancer de deux, et le reste n'est pas conservé.
+
+**Ce qui ne compte pas** : la commande `!addtime`. C'est un crédit accordé à la main par un modérateur, et le faire gonfler une promesse affichée aux spectateurs la rendrait mensongère.
+
+**L'échelle.** Dans la vue *Objectifs*, ajoutez un palier par promesse : un seuil en abonnements, et le libellé qui dit la promesse, en quarante caractères au plus. Vous ne saisissez que la borne haute — la borne basse est celle du palier précédent, si bien qu'il ne peut y avoir ni trou ni chevauchement. L'ordre de saisie n'a pas d'importance : l'échelle est triée pour vous.
+
+**Au-delà du dernier palier**, la barre reste pleine sur sa dernière promesse et le compte continue de monter. Rien ne repart à zéro tout seul.
+
+**La remise à zéro** se trouve sur le tableau de bord, et demande deux clics : le premier arme, le second exécute. Elle n'efface **que** la progression des objectifs — votre compteur n'y touche pas, et l'inverse est vrai aussi : réinitialiser le chrono ne remet pas les objectifs à zéro. La progression est enregistrée dans son propre fichier et survit à la fermeture de l'application.
+
+**Il n'y a pas d'ajustement manuel du compte**, et c'est délibéré : le compte ne reflète que ce que ChronoCast a réellement vu passer, et ne peut donc jamais mentir.
+
+**Un palier franchi ne crédite aucune seconde.** Le barème reste le seul juge du temps ajouté ; les objectifs disent *pourquoi* le compteur monte, ils ne le font pas monter.
+
+**Ce que voient les spectateurs.** La page `/goal`, ajoutée dans OBS comme une seconde source navigateur — voir la section 4. Elle montre la promesse en cours et la progression ; à chaque palier franchi, un bandeau l'annonce quelques secondes avant de rendre la main au palier suivant. Un lot de sub offerts qui traverse plusieurs paliers les annonce l'un après l'autre. Son apparence — police, couleurs, forme de la barre, texte et durée de l'annonce — se règle dans la vue *Objectifs*, et **l'overlay du compteur n'en est pas affecté**.
 
 ## 6. Les dons hors Twitch
 

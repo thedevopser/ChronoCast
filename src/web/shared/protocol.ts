@@ -131,6 +131,59 @@ export interface OverlayConfig {
   enableCustomCss: boolean;
 }
 
+/**
+ * L'apparence de la page `/goal`. Elle n'a pas de cadre, à la différence de l'overlay du compteur :
+ * la piste de la barre porte déjà fond, arrondi et bordure.
+ */
+export interface GoalOverlayConfig {
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  letterSpacing: number;
+  color: string;
+  textAlign: 'left' | 'center' | 'right';
+  showCount: boolean;
+  bar: {
+    height: number;
+    radius: number;
+    fillColor: string;
+    trackColor: string;
+    trackOpacity: number;
+    borderWidth: number;
+    borderColor: string;
+  };
+  shadow: {
+    enabled: boolean;
+    color: string;
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+  };
+  outline: {
+    enabled: boolean;
+    color: string;
+    width: number;
+  };
+  glow: {
+    enabled: boolean;
+    color: string;
+    radius: number;
+  };
+  gradient: {
+    onText: boolean;
+    onBar: boolean;
+    from: string;
+    to: string;
+    angleDeg: number;
+  };
+  announce: {
+    enabled: boolean;
+    durationMs: number;
+    color: string;
+    text: string;
+  };
+}
+
 export const PROTOCOL_VERSION = 2;
 
 export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'goal'] as const;
@@ -145,6 +198,7 @@ export interface HelloMessage {
   readonly port: number;
   readonly wsPort: number;
   readonly overlay: OverlayConfig;
+  readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
 }
 
@@ -189,6 +243,7 @@ export interface LogMessage {
 export interface ConfigMessage {
   readonly type: 'config';
   readonly overlay: OverlayConfig;
+  readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
 }
 

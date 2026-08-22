@@ -116,6 +116,21 @@ const REWARD_FIELDS: readonly AdminField[] = [
   },
 ];
 
+function goalColor(selector: string, path: string, label: string, hint?: string): AdminField {
+  const field = { selector, path, label, view: 'goals', kind: 'color' } as const;
+  return hint === undefined ? field : { ...field, hint };
+}
+
+function goalPixels(
+  selector: string,
+  path: string,
+  label: string,
+  min: number,
+  max: number,
+): AdminField {
+  return { selector, path, label, view: 'goals', kind: 'number', min, max, slider: true, unit: 'px' };
+}
+
 const GOAL_FIELDS: readonly AdminField[] = [
   {
     selector: '#goal-bits-per-sub',
@@ -125,6 +140,180 @@ const GOAL_FIELDS: readonly AdminField[] = [
     view: 'goals',
     kind: 'integer',
     min: 1,
+  },
+
+  {
+    selector: '#goal-font-family',
+    path: 'goals.overlay.fontFamily',
+    label: 'Police',
+    hint: 'Polices installées sur la machine uniquement : l’application doit fonctionner hors ligne.',
+    view: 'goals',
+    kind: 'text',
+  },
+  {
+    selector: '#goal-font-size',
+    path: 'goals.overlay.fontSize',
+    label: 'Taille',
+    view: 'goals',
+    kind: 'integer',
+    min: 1,
+    max: 1_000,
+    slider: true,
+    unit: 'px',
+  },
+  {
+    selector: '#goal-font-weight',
+    path: 'goals.overlay.fontWeight',
+    label: 'Graisse',
+    view: 'goals',
+    kind: 'integer',
+    min: 100,
+    max: 900,
+    slider: true,
+  },
+  {
+    // Bornes propres à l'interface : le schéma ne borne pas, mais un curseur a besoin d'une course.
+    selector: '#goal-letter-spacing',
+    path: 'goals.overlay.letterSpacing',
+    label: 'Interlettrage',
+    view: 'goals',
+    kind: 'number',
+    min: -20,
+    max: 40,
+    slider: true,
+    unit: 'px',
+  },
+  goalColor('#goal-color', 'goals.overlay.color', 'Couleur'),
+  {
+    selector: '#goal-text-align',
+    path: 'goals.overlay.textAlign',
+    label: 'Alignement dans la barre',
+    view: 'goals',
+    kind: 'enum',
+    options: ['left', 'center', 'right'],
+  },
+  {
+    selector: '#goal-show-count',
+    path: 'goals.overlay.showCount',
+    label: 'Afficher le compte',
+    hint: 'Le libellé du palier reste affiché ; seul le « 12 / 50 » disparaît.',
+    view: 'goals',
+    kind: 'boolean',
+  },
+
+  goalPixels('#goal-bar-height', 'goals.overlay.bar.height', 'Hauteur', 0, 400),
+  goalPixels('#goal-bar-radius', 'goals.overlay.bar.radius', 'Arrondi des coins', 0, 200),
+  goalColor(
+    '#goal-bar-fill-color',
+    'goals.overlay.bar.fillColor',
+    'Couleur de remplissage',
+    'Ignorée quand le dégradé porte sur la barre.',
+  ),
+  goalColor('#goal-bar-track-color', 'goals.overlay.bar.trackColor', 'Couleur du fond'),
+  {
+    selector: '#goal-bar-track-opacity',
+    path: 'goals.overlay.bar.trackOpacity',
+    label: 'Opacité du fond',
+    hint: '0 laisse voir la scène à travers la barre, 1 la masque.',
+    view: 'goals',
+    kind: 'number',
+    min: 0,
+    max: 1,
+    slider: true,
+  },
+  goalPixels('#goal-bar-border-width', 'goals.overlay.bar.borderWidth', 'Épaisseur du trait', 0, 40),
+  goalColor('#goal-bar-border-color', 'goals.overlay.bar.borderColor', 'Couleur du trait'),
+
+  {
+    selector: '#goal-shadow-enabled',
+    path: 'goals.overlay.shadow.enabled',
+    label: 'Ombre portée',
+    view: 'goals',
+    kind: 'boolean',
+  },
+  goalColor('#goal-shadow-color', 'goals.overlay.shadow.color', 'Couleur de l’ombre'),
+  goalPixels('#goal-shadow-blur', 'goals.overlay.shadow.blur', 'Flou', 0, 100),
+  goalPixels('#goal-shadow-offset-x', 'goals.overlay.shadow.offsetX', 'Décalage horizontal', -50, 50),
+  goalPixels('#goal-shadow-offset-y', 'goals.overlay.shadow.offsetY', 'Décalage vertical', -50, 50),
+
+  {
+    selector: '#goal-outline-enabled',
+    path: 'goals.overlay.outline.enabled',
+    label: 'Contour des lettres',
+    view: 'goals',
+    kind: 'boolean',
+  },
+  goalColor('#goal-outline-color', 'goals.overlay.outline.color', 'Couleur du contour'),
+  goalPixels('#goal-outline-width', 'goals.overlay.outline.width', 'Épaisseur', 0, 20),
+
+  {
+    selector: '#goal-glow-enabled',
+    path: 'goals.overlay.glow.enabled',
+    label: 'Halo',
+    view: 'goals',
+    kind: 'boolean',
+  },
+  goalColor('#goal-glow-color', 'goals.overlay.glow.color', 'Couleur du halo'),
+  goalPixels('#goal-glow-radius', 'goals.overlay.glow.radius', 'Rayon', 0, 100),
+
+  {
+    selector: '#goal-gradient-on-text',
+    path: 'goals.overlay.gradient.onText',
+    label: 'Dégradé sur le texte',
+    view: 'goals',
+    kind: 'boolean',
+  },
+  {
+    selector: '#goal-gradient-on-bar',
+    path: 'goals.overlay.gradient.onBar',
+    label: 'Dégradé sur la barre',
+    view: 'goals',
+    kind: 'boolean',
+  },
+  goalColor('#goal-gradient-from', 'goals.overlay.gradient.from', 'Première couleur'),
+  goalColor('#goal-gradient-to', 'goals.overlay.gradient.to', 'Seconde couleur'),
+  {
+    selector: '#goal-gradient-angle',
+    path: 'goals.overlay.gradient.angleDeg',
+    label: 'Sens du dégradé',
+    hint: '0 monte, 90 va vers la droite.',
+    view: 'goals',
+    kind: 'integer',
+    min: 0,
+    max: 360,
+    slider: true,
+    unit: '°',
+  },
+
+  {
+    selector: '#goal-announce-enabled',
+    path: 'goals.overlay.announce.enabled',
+    label: 'Annoncer un palier franchi',
+    hint: 'Un bandeau remplace la barre quelques secondes, puis rend la main au palier suivant.',
+    view: 'goals',
+    kind: 'boolean',
+  },
+  {
+    selector: '#goal-announce-duration',
+    path: 'goals.overlay.announce.durationMs',
+    label: 'Durée de l’annonce',
+    view: 'goals',
+    kind: 'integer',
+    min: 1,
+    max: 60_000,
+    slider: true,
+    unit: 'ms',
+  },
+  goalColor('#goal-announce-color', 'goals.overlay.announce.color', 'Couleur de l’annonce'),
+  {
+    selector: '#goal-announce-text',
+    path: 'goals.overlay.announce.text',
+    label: 'Texte de l’annonce',
+    hint: 'Affiché au-dessus du libellé du palier. Vide, seul le libellé s’affiche.',
+    view: 'goals',
+    kind: 'text',
+    allowEmpty: true,
+    max: 40,
   },
 ];
 
@@ -535,7 +724,17 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.bits.', 'Bits'],
   ['rewards.chatCommand.', 'Commande de chat'],
 
-  ['goals.', 'Objectifs'],
+  // Sans point final : le comptage n'a qu'une feuille, tout le reste de `goals.` est l'apparence
+  // de la page /goal. Une feuille de comptage ajoutée plus tard tombera dans « Divers », et le
+  // garde-fou la signalera — c'est voulu.
+  ['goals.bitsPerSub', 'Objectifs'],
+  ['goals.overlay.bar.', 'Barre'],
+  ['goals.overlay.shadow.', 'Ombre du texte'],
+  ['goals.overlay.outline.', 'Contour du texte'],
+  ['goals.overlay.glow.', 'Halo du texte'],
+  ['goals.overlay.gradient.', 'Dégradé du texte et de la barre'],
+  ['goals.overlay.announce.', 'Annonce d’un palier'],
+  ['goals.overlay.', 'Texte'],
 
   ['overlay.gradient.', 'Dégradé'],
   ['overlay.frame.', 'Cadre'],

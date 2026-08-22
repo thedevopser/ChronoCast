@@ -144,7 +144,7 @@ Le panneau n'a qu'un bouton qui y mène. **Aucune adresse ne traverse cette rout
 | Fichier | Ce qu'il défend |
 | --- | --- |
 | `xss-overlay.test.ts`, `xss-admin.test.ts`, `xss-admin-lists.test.ts`, `xss-setup.test.ts` | Un pseudonyme hostile n'est jamais interprété |
-| `xss-goal-label.test.ts` | Un libellé de palier hostile n'est jamais interprété |
+| `xss-goal-label.test.ts` | Un libellé de palier hostile n'est jamais interprété, ni dans le panneau ni sur la page `/goal` |
 | `host-guard.test.ts` | Un `Host` non-loopback est rejeté |
 | `csrf.test.ts` | Une mutation sans jeton est refusée |
 | `static-handler.test.ts` | La traversée de chemin et les liens sortants sont bloqués |

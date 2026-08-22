@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 4;
+export const CONFIG_SCHEMA_VERSION = 5;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -15,6 +15,34 @@ const seconds = z.number().int().nonnegative();
 const positiveSeconds = z.number().int().positive();
 
 const millisecondsAboveZero = z.number().int().positive();
+
+// Partagés par l'overlay du compteur et par la page Objectifs : les deux pages posent les mêmes
+// effets de texte, et deux déclarations dériveraient l'une de l'autre au premier réglage ajouté.
+const shadowSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    color: hexColor.default('#000000CC'),
+    blur: z.number().nonnegative().default(12),
+    offsetX: z.number().default(0),
+    offsetY: z.number().default(4),
+  })
+  .strip();
+
+const outlineSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    color: hexColor.default('#000000'),
+    width: z.number().nonnegative().default(2),
+  })
+  .strip();
+
+const glowSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    color: hexColor.default('#9146FF'),
+    radius: z.number().nonnegative().default(20),
+  })
+  .strip();
 
 const counterSchema = z
   .object({
@@ -120,6 +148,66 @@ const goalTierSchema = z
   })
   .strip();
 
+// L'apparence de la page /goal. Elle n'a pas de cadre, à la différence de l'overlay du compteur :
+// la piste de la barre porte déjà fond, arrondi et bordure, et un cadre par-dessus dessinerait une
+// seconde boîte autour de la première.
+const goalOverlaySchema = z
+  .object({
+    fontFamily: z.string().min(1).default('Inter, Segoe UI, system-ui, sans-serif'),
+    fontSize: z.number().int().positive().default(28),
+    fontWeight: z.number().int().min(100).max(900).default(700),
+    letterSpacing: z.number().default(0),
+    color: hexColor.default('#FFFFFF'),
+
+    textAlign: z.enum(['left', 'center', 'right']).default('center'),
+
+    showCount: z.boolean().default(true),
+
+    bar: z
+      .object({
+        height: z.number().nonnegative().max(400).default(48),
+        radius: z.number().nonnegative().max(200).default(24),
+        fillColor: hexColor.default('#9146FF'),
+        trackColor: hexColor.default('#000000'),
+        trackOpacity: z.number().min(0).max(1).default(0.5),
+        borderWidth: z.number().nonnegative().max(40).default(0),
+        borderColor: hexColor.default('#9146FF'),
+      })
+      .strip()
+      .default({}),
+
+    shadow: shadowSchema.default({}),
+
+    outline: outlineSchema.default({}),
+
+    glow: glowSchema.default({}),
+
+    gradient: z
+      .object({
+        onText: z.boolean().default(false),
+        onBar: z.boolean().default(false),
+        from: hexColor.default('#FF3D7F'),
+        to: hexColor.default('#FF9A3D'),
+        angleDeg: z.number().int().min(0).max(360).default(100),
+      })
+      .strip()
+      .default({}),
+
+    announce: z
+      .object({
+        enabled: z.boolean().default(true),
+        durationMs: millisecondsAboveZero.default(5_000),
+        color: hexColor.default('#FFCC00'),
+
+        // Vide, seul le libellé du palier s'affiche. Même longueur que le texte de la commande de
+        // chat : ce qui tient sur une ligne d'overlay tient sur une ligne de bandeau.
+        text: z.string().max(GOAL_LABEL_MAX_LENGTH).default('Palier atteint'),
+      })
+      .strip()
+      .default({}),
+  })
+  .strip();
+
 const goalsSchema = z
   .object({
     bitsPerSub: z.number().int().positive().default(500),
@@ -127,6 +215,8 @@ const goalsSchema = z
     // Ni tri ni unicité ici : un refine qui rejette ferait tomber toute la configuration au
     // chargement. L'échelle se normalise à la lecture, et la saisie se valide dans le panneau.
     tiers: z.array(goalTierSchema).default([]),
+
+    overlay: goalOverlaySchema.default({}),
   })
   .strip();
 
@@ -185,34 +275,11 @@ const overlaySchema = z
 
     textAlign: z.enum(['left', 'center', 'right']).default('center'),
 
-    shadow: z
-      .object({
-        enabled: z.boolean().default(true),
-        color: hexColor.default('#000000CC'),
-        blur: z.number().nonnegative().default(12),
-        offsetX: z.number().default(0),
-        offsetY: z.number().default(4),
-      })
-      .strip()
-      .default({}),
+    shadow: shadowSchema.default({}),
 
-    outline: z
-      .object({
-        enabled: z.boolean().default(false),
-        color: hexColor.default('#000000'),
-        width: z.number().nonnegative().default(2),
-      })
-      .strip()
-      .default({}),
+    outline: outlineSchema.default({}),
 
-    glow: z
-      .object({
-        enabled: z.boolean().default(false),
-        color: hexColor.default('#9146FF'),
-        radius: z.number().nonnegative().default(20),
-      })
-      .strip()
-      .default({}),
+    glow: glowSchema.default({}),
 
     gradient: z
       .object({
@@ -313,6 +380,7 @@ export type CounterConfig = ChronoCastConfig['counter'];
 export type RewardsConfig = ChronoCastConfig['rewards'];
 export type GoalsConfig = ChronoCastConfig['goals'];
 export type GoalTier = GoalsConfig['tiers'][number];
+export type GoalOverlayConfig = GoalsConfig['overlay'];
 export type TwitchConfig = ChronoCastConfig['twitch'];
 export type ServerConfig = ChronoCastConfig['server'];
 export type OverlayConfig = ChronoCastConfig['overlay'];

@@ -219,4 +219,19 @@ describe('regroupement', () => {
       expect(covered, view).toHaveLength(fieldsOf(view).length);
     }
   });
+
+  // L'apparence de la page /goal est un sous-arbre de `goals.` : sans préfixe plus spécifique
+  // déclaré avant lui, ses trente-quatre feuilles atterriraient toutes dans « Objectifs ».
+  it('sépare l’apparence de la page Objectifs du comptage lui-même', () => {
+    expect(groupsOf('goals')).toStrictEqual([
+      'Objectifs',
+      'Barre',
+      'Ombre du texte',
+      'Contour du texte',
+      'Halo du texte',
+      'Dégradé du texte et de la barre',
+      'Annonce d’un palier',
+      'Texte',
+    ]);
+  });
 });

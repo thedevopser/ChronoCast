@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import type { CounterChangeOrigin, TwitchConnectionStatus } from '../app/app-events.js';
-import type { OverlayConfig } from '../config/schema.js';
+import type { GoalOverlayConfig, OverlayConfig } from '../config/schema.js';
 import type { CounterState } from '../counter/counter-state.js';
 import type { DomainEvent } from '../events/domain-event.js';
 import type { LogRecord } from '../logging/logger.js';
@@ -20,6 +20,11 @@ export interface HelloMessage {
   readonly port: number;
   readonly wsPort: number;
   readonly overlay: OverlayConfig;
+
+  // L'apparence de la page /goal seule, et jamais le reste du sous-arbre : la Browser Source n'a
+  // que faire de l'échelle ni du nombre de bits, et le WebSocket est lisible sur la boucle locale.
+  readonly goalOverlay: GoalOverlayConfig;
+
   readonly happyHour: boolean;
 }
 
@@ -64,6 +69,7 @@ export interface LogMessage {
 export interface ConfigMessage {
   readonly type: 'config';
   readonly overlay: OverlayConfig;
+  readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
 }
 

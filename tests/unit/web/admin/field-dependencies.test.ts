@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
-import { fieldsOf } from '../../../../src/web/admin/fields.js';
+import { ADMIN_FIELDS, fieldsOf } from '../../../../src/web/admin/fields.js';
 import {
   DEPENDENCIES,
   inactiveGroups,
@@ -97,8 +97,10 @@ describe('mutedSelectors', () => {
 });
 
 describe('DEPENDENCIES', () => {
+  // Les règles couvrent désormais deux vues — l'overlay du compteur et la page /goal — et
+  // l'invariant porte sur le panneau entier : aucune règle ne cite un chemin qu'aucun champ ne lie.
   it('ne cite que des chemins réellement liés à un champ', () => {
-    const bound = new Set(APPEARANCE.map((field) => field.path));
+    const bound = new Set(ADMIN_FIELDS.map((field) => field.path));
 
     for (const rule of DEPENDENCIES) {
       for (const path of rule.when) {
@@ -115,6 +117,39 @@ describe('DEPENDENCIES', () => {
       for (const path of rule.when) {
         expect(rule.mutes).not.toContain(path);
       }
+    }
+  });
+});
+
+describe('page Objectifs', () => {
+  const GOALS = fieldsOf('goals');
+
+  function mutedGoals(patch: Record<string, RawValue> = {}): readonly string[] {
+    return mutedSelectors(GOALS, { ...valuesFrom(GOALS, DEFAULT_CONFIG), ...patch });
+  }
+
+  it('grise les réglages d’une annonce éteinte, et eux seuls', () => {
+    const outcome = mutedGoals({ '#goal-announce-enabled': false });
+
+    expect(outcome).toContain('#goal-announce-duration');
+    expect(outcome).toContain('#goal-announce-color');
+    expect(outcome).toContain('#goal-announce-text');
+    expect(outcome).not.toContain('#goal-announce-enabled');
+  });
+
+  it('grise les couleurs du dégradé tant qu’il ne porte sur rien', () => {
+    expect(mutedGoals()).toContain('#goal-gradient-from');
+    expect(mutedGoals({ '#goal-gradient-on-bar': true })).not.toContain('#goal-gradient-from');
+  });
+
+  it('grise le remplissage de la barre quand le dégradé le recouvre', () => {
+    expect(mutedGoals()).not.toContain('#goal-bar-fill-color');
+    expect(mutedGoals({ '#goal-gradient-on-bar': true })).toContain('#goal-bar-fill-color');
+  });
+
+  it('ne touche à rien de l’overlay du compteur', () => {
+    for (const selector of mutedGoals({ '#goal-shadow-enabled': false })) {
+      expect(selector.startsWith('#goal-')).toBe(true);
     }
   });
 });

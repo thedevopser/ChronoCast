@@ -1,23 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
-import { createToastQueue, type Toast } from '../../../../src/web/overlay/toast-queue.js';
+import { createToastQueue } from '../../../../src/web/shared/toast-queue.js';
 
 const DURATION = 4_000;
 
-function toast(id: string): Toast {
-  return { id, userName: `spectateur-${id}`, rewardSeconds: 300, type: 'sub' };
+// La file ne connaît de son élément que son identité : c'est ce qui la rend commune à l'overlay
+// du compteur et à la page /goal.
+interface Bulle {
+  readonly id: string;
+  readonly userName: string;
+
+  readonly label?: string;
+}
+
+function toast(id: string): Bulle {
+  return { id, userName: `spectateur-${id}` };
 }
 
 describe('createToastQueue', () => {
   describe('affichage', () => {
     it('n’affiche rien tant qu’aucun événement n’est arrivé', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
 
       expect(queue.current(0)).toBeNull();
     });
 
     it('affiche une bulle dès son arrivée', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
 
       queue.push(toast('a'), 1_000, DURATION);
 
@@ -25,14 +34,14 @@ describe('createToastQueue', () => {
     });
 
     it('la maintient pendant toute sa durée', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 1_000, DURATION);
 
       expect(queue.current(4_999)?.id).toBe('a');
     });
 
     it('la retire à l’échéance', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 1_000, DURATION);
 
       expect(queue.current(5_000)).toBeNull();
@@ -41,7 +50,7 @@ describe('createToastQueue', () => {
 
   describe('enchaînement', () => {
     it('ne remplace pas la bulle visible par une nouvelle arrivée', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 1_000, DURATION);
 
       queue.push(toast('b'), 2_000, DURATION);
@@ -50,7 +59,7 @@ describe('createToastQueue', () => {
     });
 
     it('affiche la suivante à l’expiration de la précédente', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 1_000, DURATION);
       queue.push(toast('b'), 2_000, DURATION);
 
@@ -58,7 +67,7 @@ describe('createToastQueue', () => {
     });
 
     it('accorde à la suivante sa durée pleine, comptée depuis son affichage', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 1_000, DURATION);
       queue.push(toast('b'), 2_000, DURATION);
 
@@ -68,7 +77,7 @@ describe('createToastQueue', () => {
     });
 
     it('enchaîne toute la file, dans l’ordre d’arrivée', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 0, DURATION);
       queue.push(toast('b'), 0, DURATION);
       queue.push(toast('c'), 0, DURATION);
@@ -80,7 +89,7 @@ describe('createToastQueue', () => {
     });
 
     it('respecte la durée propre à chaque bulle', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 0, 1_000);
       queue.push(toast('b'), 0, 5_000);
 
@@ -92,7 +101,7 @@ describe('createToastQueue', () => {
 
   describe('plafond', () => {
     it('écarte les plus anciennes en attente quand la file déborde', () => {
-      const queue = createToastQueue({ maxPending: 2 });
+      const queue = createToastQueue<Bulle>({ maxPending: 2 });
       queue.push(toast('visible'), 0, DURATION);
       queue.push(toast('a'), 0, DURATION);
       queue.push(toast('b'), 0, DURATION);
@@ -105,7 +114,7 @@ describe('createToastQueue', () => {
     });
 
     it('expose le nombre de bulles en attente', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 0, DURATION);
       queue.push(toast('b'), 0, DURATION);
 
@@ -113,7 +122,7 @@ describe('createToastQueue', () => {
     });
 
     it('vide la file sur demande', () => {
-      const queue = createToastQueue();
+      const queue = createToastQueue<Bulle>();
       queue.push(toast('a'), 0, DURATION);
       queue.push(toast('b'), 0, DURATION);
 
@@ -125,17 +134,19 @@ describe('createToastQueue', () => {
   });
 });
 
+// La file transporte l'élément tel quel : ce qu'elle ignore de sa forme arrive intact à
+// l'affichage, et c'est ce qui lui permet de servir deux pages aux charges différentes.
 describe('libellé', () => {
   it('transporte le libellé jusqu’à l’affichage', () => {
-    const queue = createToastQueue();
+    const queue = createToastQueue<Bulle>();
 
-    queue.push({ ...toast('a'), type: 'command', label: 'Temps ajouté' }, 0, DURATION);
+    queue.push({ ...toast('a'), label: 'Temps ajouté' }, 0, DURATION);
 
     expect(queue.current(0)?.label).toBe('Temps ajouté');
   });
 
   it('accepte une bulle sans libellé', () => {
-    const queue = createToastQueue();
+    const queue = createToastQueue<Bulle>();
 
     queue.push(toast('a'), 0, DURATION);
 

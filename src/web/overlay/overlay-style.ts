@@ -1,48 +1,16 @@
 import type { OverlayConfig } from '../shared/protocol.js';
-
-function composeTextShadow(config: OverlayConfig): string {
-  const layers: string[] = [];
-
-  if (config.shadow.enabled) {
-    const { offsetX, offsetY, blur, color } = config.shadow;
-    layers.push(`${String(offsetX)}px ${String(offsetY)}px ${String(blur)}px ${color}`);
-  }
-
-  if (config.glow.enabled) {
-    layers.push(`0 0 ${String(config.glow.radius)}px ${config.glow.color}`);
-  }
-
-  return layers.length === 0 ? 'none' : layers.join(', ');
-}
-
-function composeGradient(config: OverlayConfig): string {
-  const { angleDeg, from, to } = config.gradient;
-  return `linear-gradient(${String(angleDeg)}deg, ${from}, ${to})`;
-}
-
-function withOpacity(color: string, opacity: number): string {
-  const digits = color.replace(/^#/, '');
-
-  const expanded = digits.length <= 4 ? digits.replace(/./g, (digit) => `${digit}${digit}`) : digits;
-
-  const rgb = expanded.slice(0, 6);
-  const alpha = Math.round(Math.min(Math.max(opacity, 0), 1) * 255)
-    .toString(16)
-    .padStart(2, '0');
-
-  return `#${rgb}${alpha}`;
-}
+import { composeGradient, composeTextShadow, withOpacity } from '../shared/css-style.js';
 
 function frameBackground(config: OverlayConfig): string {
   if (!config.frame.enabled) {
     return 'transparent';
   }
 
-  return config.gradient.onFrame ? composeGradient(config) : config.frame.color;
+  return config.gradient.onFrame ? composeGradient(config.gradient) : config.frame.color;
 }
 
 export function overlayCssVariables(config: OverlayConfig): Record<string, string> {
-  const gradient = composeGradient(config);
+  const gradient = composeGradient(config.gradient);
   const { frame } = config;
 
   return {
@@ -63,7 +31,7 @@ export function overlayCssVariables(config: OverlayConfig): Record<string, strin
     '--cc-color': config.color,
     '--cc-text-align': config.textAlign,
 
-    '--cc-text-shadow': composeTextShadow(config),
+    '--cc-text-shadow': composeTextShadow(config.shadow, config.glow),
 
     '--cc-outline-width': config.outline.enabled ? `${String(config.outline.width)}px` : '0px',
     '--cc-outline-color': config.outline.color,

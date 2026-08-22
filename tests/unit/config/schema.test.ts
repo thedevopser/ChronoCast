@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
-import { CONFIG_SCHEMA_VERSION, configSchema } from '../../../src/core/config/schema.js';
+import {
+  CONFIG_SCHEMA_VERSION,
+  configSchema,
+  type ChronoCastConfig,
+} from '../../../src/core/config/schema.js';
 
 describe('configSchema', () => {
   describe('valeurs par défaut', () => {
@@ -344,8 +348,113 @@ describe('goals', () => {
   });
 });
 
+describe('apparence de la page Objectifs', () => {
+  const appearance = (): ChronoCastConfig['goals']['overlay'] =>
+    configSchema.parse({}).goals.overlay;
+
+  it('part sur un texte lisible sur n’importe quelle scène', () => {
+    const overlay = appearance();
+
+    expect(overlay.fontSize).toBe(28);
+    expect(overlay.fontWeight).toBe(700);
+    expect(overlay.color).toBe('#FFFFFF');
+    expect(overlay.textAlign).toBe('center');
+  });
+
+  it('affiche le compte par défaut : sans lui, la barre ne dit pas où elle en est', () => {
+    expect(appearance().showCount).toBe(true);
+  });
+
+  it('dessine une barre pleine hauteur, arrondie et sur piste sombre', () => {
+    const { bar } = appearance();
+
+    expect(bar).toStrictEqual({
+      height: 48,
+      radius: 24,
+      fillColor: '#9146FF',
+      trackColor: '#000000',
+      trackOpacity: 0.5,
+      borderWidth: 0,
+      borderColor: '#9146FF',
+    });
+  });
+
+  it('reprend l’ombre portée de l’overlay du compteur, allumée', () => {
+    expect(appearance().shadow).toStrictEqual({
+      enabled: true,
+      color: '#000000CC',
+      blur: 12,
+      offsetX: 0,
+      offsetY: 4,
+    });
+  });
+
+  it('laisse contour et halo éteints', () => {
+    expect(appearance().outline.enabled).toBe(false);
+    expect(appearance().glow.enabled).toBe(false);
+  });
+
+  it('porte le dégradé sur la barre et non sur un cadre : la barre est la boîte', () => {
+    const { gradient } = appearance();
+
+    expect(gradient.onBar).toBe(false);
+    expect(gradient.onText).toBe(false);
+    expect(gradient).not.toHaveProperty('onFrame');
+  });
+
+  it('annonce un palier franchi cinq secondes, texte réglable', () => {
+    expect(appearance().announce).toStrictEqual({
+      enabled: true,
+      durationMs: 5_000,
+      color: '#FFCC00',
+      text: 'Palier atteint',
+    });
+  });
+
+  it('borne le texte de l’annonce à quarante caractères, comme celui de la commande de chat', () => {
+    expect(() =>
+      configSchema.parse({ goals: { overlay: { announce: { text: 'x'.repeat(41) } } } }),
+    ).toThrow();
+  });
+
+  it('accepte un texte d’annonce vide : seul le libellé du palier s’affiche alors', () => {
+    const parsed = configSchema.parse({ goals: { overlay: { announce: { text: '' } } } });
+
+    expect(parsed.goals.overlay.announce.text).toBe('');
+  });
+
+  it('refuse une hauteur de barre négative', () => {
+    expect(() => configSchema.parse({ goals: { overlay: { bar: { height: -1 } } } })).toThrow();
+  });
+
+  it('refuse une opacité de piste hors de l’intervalle', () => {
+    expect(() =>
+      configSchema.parse({ goals: { overlay: { bar: { trackOpacity: 1.5 } } } }),
+    ).toThrow();
+  });
+
+  it('refuse une couleur qui n’est pas hexadécimale', () => {
+    expect(() =>
+      configSchema.parse({ goals: { overlay: { bar: { fillColor: 'purple' } } } }),
+    ).toThrow();
+  });
+
+  it('n’a aucun cadre : la piste de la barre porte déjà fond, arrondi et bordure', () => {
+    expect(appearance()).not.toHaveProperty('frame');
+  });
+
+  it('écarte une clé inconnue sans rejeter la configuration', () => {
+    const parsed = configSchema.parse({
+      goals: { overlay: { fontSize: 40, clignote: true } },
+    });
+
+    expect(parsed.goals.overlay.fontSize).toBe(40);
+    expect(parsed.goals.overlay).not.toHaveProperty('clignote');
+  });
+});
+
 describe('version du schéma', () => {
-  it('passe à 4 avec l’arrivée des objectifs, sans quoi les configurations existantes ne seraient jamais réécrites', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(4);
+  it('passe à 5 avec l’apparence de la page Objectifs, sans quoi les configurations existantes ne seraient jamais réécrites', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(5);
   });
 });
