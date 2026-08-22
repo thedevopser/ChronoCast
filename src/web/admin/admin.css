@@ -105,6 +105,14 @@
   border-radius: var(--cc-radius-lg);
 }
 
+/* Une carte posée directement dans une vue n'a pas le `gap` du `.board` : sans cette règle, deux
+   cartes successives se toucheraient bord à bord. `.fields` et `.actions`, eux, portent déjà la
+   leur — la marge est remplacée, jamais cumulée. */
+.view > .card + *,
+.view > * + .card {
+  margin-top: var(--cc-space-3);
+}
+
 .card--counter {
   grid-column: 1 / -1;
 }
