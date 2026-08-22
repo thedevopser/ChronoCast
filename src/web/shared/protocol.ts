@@ -133,7 +133,7 @@ export interface OverlayConfig {
 
 export const PROTOCOL_VERSION = 2;
 
-export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch'] as const;
+export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'goal'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export const DEFAULT_CHANNELS: readonly Channel[] = CHANNELS;
@@ -192,6 +192,21 @@ export interface ConfigMessage {
   readonly happyHour: boolean;
 }
 
+export interface GoalMessage {
+  readonly type: 'goal';
+  readonly subs: number;
+
+  readonly index: number;
+  readonly total: number;
+
+  readonly from: number;
+  readonly to: number;
+  readonly label: string;
+  readonly complete: boolean;
+
+  readonly crossed: readonly { readonly target: number; readonly label: string }[];
+}
+
 export interface PongMessage {
   readonly type: 'pong';
 }
@@ -210,6 +225,7 @@ export type ServerMessage =
   | EventMessage
   | LogMessage
   | ConfigMessage
+  | GoalMessage
   | PongMessage
   | ErrorMessage;
 
@@ -225,6 +241,7 @@ const SERVER_MESSAGE_TYPES = new Set<string>([
   'event',
   'log',
   'config',
+  'goal',
   'pong',
   'error',
 ]);

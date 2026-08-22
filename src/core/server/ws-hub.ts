@@ -1,8 +1,9 @@
 import type { AppEvents } from '../app/app-events.js';
 import type { Clock } from '../app/ports.js';
 import type { EventBus, Unsubscribe } from '../app/event-bus.js';
-import type { ChronoCastConfig } from '../config/schema.js';
+import type { ChronoCastConfig, GoalTier } from '../config/schema.js';
 import type { CounterState } from '../counter/counter-state.js';
+import type { GoalSnapshot } from '../goals/goal-service.js';
 import type { Logger, LogRecord } from '../logging/logger.js';
 import {
   CHANNELS,
@@ -40,6 +41,7 @@ export interface HubSnapshot {
     readonly detail?: string;
     readonly missingScopes?: readonly string[];
   };
+  readonly goal: GoalSnapshot;
 }
 
 export interface WsHub {
@@ -125,6 +127,20 @@ export function createWsHub(options: WsHubOptions): WsHub {
     return { type: 'state', counter: snapshot.counter, twitch: snapshot.twitch };
   }
 
+  function goalMessage(snapshot: GoalSnapshot, crossed: readonly GoalTier[]): ServerMessage {
+    return {
+      type: 'goal',
+      subs: snapshot.subs,
+      index: snapshot.position.index,
+      total: snapshot.position.total,
+      from: snapshot.position.from,
+      to: snapshot.position.to,
+      label: snapshot.position.label,
+      complete: snapshot.position.complete,
+      crossed: crossed.map((tier) => ({ target: tier.target, label: tier.label })),
+    };
+  }
+
   function handleMessage(client: Client, raw: string): void {
     function reject(code: string, message: string): void {
       sendTo(client, { type: 'error', code, message });
@@ -205,6 +221,12 @@ export function createWsHub(options: WsHubOptions): WsHub {
             deltaMs: payload.deltaMs,
             reason: payload.reason,
           });
+        }),
+      );
+
+      subscriptions.push(
+        bus.on('goals:changed', (payload) => {
+          broadcast(goalMessage(payload.snapshot, payload.crossed));
         }),
       );
 
@@ -298,6 +320,10 @@ export function createWsHub(options: WsHubOptions): WsHub {
       });
 
       sendTo(client, snapshotMessage());
+
+      // La progression est envoyée d'emblée : une Browser Source qui vient de s'ouvrir ne doit pas
+      // rester vide jusqu'au prochain abonnement.
+      sendTo(client, goalMessage(getSnapshot().goal, []));
     },
 
     clientCount(): number {

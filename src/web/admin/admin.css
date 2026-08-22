@@ -336,6 +336,13 @@
   color: var(--cc-danger);
 }
 
+/* Armé : le clic suivant efface la progression pour de bon. */
+.button--armed {
+  border-color: var(--cc-danger);
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger);
+}
+
 .button--ghost {
   background: transparent;
 }
@@ -536,6 +543,49 @@ details.group > .group__title:hover {
   grid-template-columns: 1fr 1fr auto;
   gap: var(--cc-space-2);
   align-items: end;
+}
+
+.progress {
+  display: block;
+  height: 10px;
+  margin: var(--cc-space-2) 0 0;
+  border-radius: 999px;
+  background: var(--cc-border);
+  overflow: hidden;
+}
+
+.progress__fill {
+  display: block;
+  height: 100%;
+  width: calc(var(--cc-goal-progress, 0) * 100%);
+  border-radius: inherit;
+  background: var(--cc-accent);
+  transition: width 240ms ease-out;
+}
+
+.ladder {
+  margin: var(--cc-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+}
+
+.ladder__entry {
+  display: flex;
+  gap: var(--cc-space-2);
+  align-items: baseline;
+  color: var(--cc-text-muted);
+  font-size: var(--cc-text-sm);
+}
+
+.ladder__entry--reached {
+  color: var(--cc-text);
+}
+
+.ladder__range {
+  font-family: var(--cc-font-mono);
 }
 
 .scopes,

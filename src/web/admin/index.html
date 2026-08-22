@@ -89,6 +89,20 @@
             </div>
 
             <div class="card">
+              <p class="card__label">Objectifs</p>
+              <p class="card__value" id="goal-subs">—</p>
+              <p class="card__hint" id="goal-detail">Aucun palier configuré.</p>
+              <div class="progress" id="goal-bar" hidden>
+                <span class="progress__fill" id="goal-bar-fill"></span>
+              </div>
+              <div class="actions">
+                <button class="button button--danger" type="button" id="goal-reset">
+                  Remettre la progression à zéro
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
               <p class="card__label">Overlay</p>
               <p class="card__hint">Adresse à coller dans une source Navigateur d'OBS.</p>
               <span class="copyable copyable--wide">
@@ -188,6 +202,43 @@
           <div class="actions">
             <button class="button button--primary" type="button" id="save-rewards">
               Enregistrer le barème
+            </button>
+          </div>
+        </section>
+
+        <section class="view" id="view-goals" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Objectifs</h1>
+            <p class="view__subtitle">
+              L'échelle des promesses, comptée en abonnements. Un sub, un réabonnement et chaque sub
+              offert valent un, quel que soit le tier ; les bits comptent par tranches.
+            </p>
+          </header>
+
+          <div class="fields" id="fields-goals"></div>
+
+          <div class="card" id="goal-progress-card">
+            <p class="card__label">Progression</p>
+            <p class="card__value" id="goal-progress-count">—</p>
+            <p class="card__hint" id="goal-progress-detail"></p>
+            <ul class="ladder" id="goal-ladder"></ul>
+          </div>
+
+          <div class="card" id="goal-tiers-card">
+            <p class="card__label">Paliers</p>
+            <p class="card__hint">
+              Seul le seuil d'arrivée se saisit : le point de départ d'un palier est le seuil du
+              précédent, et zéro pour le premier. Sans palier, rien n'est affiché nulle part.
+            </p>
+            <ul class="tiers" id="goal-tiers"></ul>
+            <div class="actions">
+              <button class="button" type="button" id="add-goal-tier">Ajouter un palier</button>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="button button--primary" type="button" id="save-goals">
+              Enregistrer les objectifs
             </button>
           </div>
         </section>

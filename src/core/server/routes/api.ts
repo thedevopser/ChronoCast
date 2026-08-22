@@ -5,6 +5,8 @@ import type { SystemSettingsOpener } from '../../app/ports.js';
 import type { ConfigService } from '../../config/config-service.js';
 import type { CounterEventOutcome, CounterService } from '../../counter/counter-service.js';
 import type { DomainEvent, DomainEventType } from '../../events/domain-event.js';
+import { normalizeLadder } from '../../goals/goal-ladder.js';
+import type { GoalService } from '../../goals/goal-service.js';
 import type { EventHistoryService } from '../../history/event-history-service.js';
 import type { Logger, LogLevel } from '../../logging/logger.js';
 import type { RingBufferSink } from '../../logging/sinks/ring-buffer-sink.js';
@@ -43,6 +45,7 @@ export interface TwitchApiPort {
 export interface ApiContext {
   readonly config: ConfigService;
   readonly counter: CounterService;
+  readonly goals: GoalService;
   readonly history: EventHistoryService;
 
   readonly system?: SystemSettingsOpener | undefined;
@@ -149,6 +152,7 @@ export function createApiRoutes(context: ApiContext): Route[] {
   const {
     config,
     counter,
+    goals,
     history,
     logs,
     twitch,
@@ -336,6 +340,27 @@ export function createApiRoutes(context: ApiContext): Route[] {
         return jsonResponse(200, {
           counter: await counter.setInitialSeconds(parsed.data.seconds),
         });
+      },
+    },
+
+    {
+      method: 'GET',
+      path: '/api/goals',
+      handler: () =>
+        jsonResponse(200, {
+          goal: goals.getSnapshot(),
+          // Triée et dédoublonnée à la lecture : le schéma accepte une échelle en désordre plutôt
+          // que de rejeter toute la configuration.
+          tiers: normalizeLadder(config.get().goals.tiers),
+        }),
+    },
+
+    {
+      method: 'POST',
+      path: '/api/goals/reset',
+      handler: async () => {
+        await goals.reset();
+        return jsonResponse(200, { goal: goals.getSnapshot() });
       },
     },
 

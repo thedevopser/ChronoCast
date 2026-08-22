@@ -22,6 +22,9 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
 
   'rewards.bits.tiers':
     'Tableau de paliers à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Barème avec son propre module.',
+
+  'goals.tiers':
+    'Échelle de paliers nommés, à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Objectifs avec son propre module.',
 };
 
 const DAY = 86_400;
@@ -110,6 +113,18 @@ const REWARD_FIELDS: readonly AdminField[] = [
     allowEmpty: true,
     max: 40,
     readOnly: true,
+  },
+];
+
+const GOAL_FIELDS: readonly AdminField[] = [
+  {
+    selector: '#goal-bits-per-sub',
+    path: 'goals.bitsPerSub',
+    label: 'Bits pour un abonnement',
+    hint: 'Les bits comptent en abonnements entiers ; le reste n’est pas conservé. À 500, un don de 1 200 bits fait avancer de deux.',
+    view: 'goals',
+    kind: 'integer',
+    min: 1,
   },
 ];
 
@@ -501,6 +516,7 @@ const SETTINGS_FIELDS: readonly AdminField[] = [
 
 export const ADMIN_FIELDS: readonly AdminField[] = [
   ...REWARD_FIELDS,
+  ...GOAL_FIELDS,
   ...APPEARANCE_FIELDS,
   ...TWITCH_FIELDS,
   ...SETTINGS_FIELDS,
@@ -518,6 +534,8 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.gift.', 'Sub offerts'],
   ['rewards.bits.', 'Bits'],
   ['rewards.chatCommand.', 'Commande de chat'],
+
+  ['goals.', 'Objectifs'],
 
   ['overlay.gradient.', 'Dégradé'],
   ['overlay.frame.', 'Cadre'],

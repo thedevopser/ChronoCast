@@ -12,6 +12,7 @@ import {
 import type { CounterState } from '../counter/counter-state.js';
 import { createDedupCache, type DedupCache } from '../dedup/dedup-cache.js';
 import type { DomainEvent } from '../events/domain-event.js';
+import { createGoalService, type GoalService, type GoalState } from '../goals/goal-service.js';
 import {
   createEventHistoryService,
   type EventHistoryService,
@@ -76,6 +77,8 @@ const CONFIG_FILE = 'config.json';
 
 const COUNTER_FILE = 'counter.json';
 
+const GOALS_FILE = 'goals.json';
+
 const WS_PATH = '/ws';
 
 export interface Application {
@@ -91,6 +94,7 @@ export interface Application {
 
   readonly config: ConfigService;
   readonly counter: CounterService;
+  readonly goals: GoalService;
   readonly history: EventHistoryService;
 
   getCsrfToken(): string;
@@ -204,6 +208,19 @@ export function createApplication(options: ApplicationOptions): Application {
     logger: logger.child('counter'),
   });
 
+  const goalService: GoalService = createGoalService({
+    store: createAtomicJsonStore<GoalState | null>({
+      filePath: paths.resolveDataFile(GOALS_FILE),
+      parse: (raw) => (raw === null ? null : (raw as GoalState)),
+      createDefault: () => null,
+      logger: logger.child('goals-store'),
+    }),
+    getConfig: () => configService.get(),
+    clock,
+    bus,
+    logger: logger.child('goals'),
+  });
+
   const history: EventHistoryService = createEventHistoryService({
     directory: paths.historyDirectory,
     logger,
@@ -270,6 +287,13 @@ export function createApplication(options: ApplicationOptions): Application {
   async function applyDomainEvent(event: DomainEvent): Promise<CounterEventOutcome> {
     const outcome = await counterService.applyEvent(event);
     await history.record(event, outcome.reward, outcome.state);
+
+    // Après le barème et sur le même événement déjà dédupliqué : ce qu'il a refusé ne doit pas
+    // davantage faire avancer une promesse affichée aux spectateurs.
+    if (outcome.reward.applied) {
+      await goalService.applyEvent(event);
+    }
+
     return outcome;
   }
 
@@ -360,7 +384,11 @@ export function createApplication(options: ApplicationOptions): Application {
   const hub: WsHub = createWsHub({
     bus,
     getConfig: () => configService.get(),
-    getSnapshot: () => ({ counter: counterService.getState(), twitch: composeTwitchStatus() }),
+    getSnapshot: () => ({
+      counter: counterService.getState(),
+      twitch: composeTwitchStatus(),
+      goal: goalService.getSnapshot(),
+    }),
     clock,
     timers: hubTimers,
     getPort: currentPort,
@@ -557,6 +585,7 @@ export function createApplication(options: ApplicationOptions): Application {
     routes: createApiRoutes({
       config: configService,
       counter: counterService,
+      goals: goalService,
       history,
       logs: ringBuffer,
       twitch: twitchApi,
@@ -635,6 +664,7 @@ export function createApplication(options: ApplicationOptions): Application {
     bus,
     config: configService,
     counter: counterService,
+    goals: goalService,
     history,
 
     getCsrfToken: () => csrfToken,
@@ -693,6 +723,7 @@ export function createApplication(options: ApplicationOptions): Application {
       });
 
       await counterService.start();
+      await goalService.start();
       hub.start();
 
       httpServer = createHttpServer({

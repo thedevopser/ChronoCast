@@ -274,3 +274,78 @@ describe('setup', () => {
     expect(parsed.setup).toStrictEqual({ completed: true });
   });
 });
+
+describe('goals', () => {
+  it('compte un abonnement pour cinq cents bits', () => {
+    expect(configSchema.parse({}).goals.bitsPerSub).toBe(500);
+  });
+
+  it('part sans aucun palier : une échelle vide est l’état éteint', () => {
+    expect(configSchema.parse({}).goals.tiers).toEqual([]);
+  });
+
+  it('retient une échelle nommée', () => {
+    const parsed = configSchema.parse({
+      goals: { tiers: [{ target: 50, label: 'Je me rase la tête' }] },
+    });
+
+    expect(parsed.goals.tiers).toEqual([{ target: 50, label: 'Je me rase la tête' }]);
+  });
+
+  it('accepte une échelle en désordre plutôt que de rejeter la configuration entière', () => {
+    const parsed = configSchema.parse({
+      goals: {
+        tiers: [
+          { target: 100, label: 'Cent' },
+          { target: 50, label: 'Cinquante' },
+        ],
+      },
+    });
+
+    expect(parsed.goals.tiers).toHaveLength(2);
+  });
+
+  it('accepte deux paliers de même seuil : le tri et les doublons se règlent à la lecture', () => {
+    expect(() =>
+      configSchema.parse({
+        goals: {
+          tiers: [
+            { target: 50, label: 'Premier' },
+            { target: 50, label: 'Second' },
+          ],
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it('refuse un seuil nul ou négatif', () => {
+    expect(() => configSchema.parse({ goals: { tiers: [{ target: 0, label: 'Rien' }] } })).toThrow();
+    expect(() =>
+      configSchema.parse({ goals: { tiers: [{ target: -5, label: 'Rien' }] } }),
+    ).toThrow();
+  });
+
+  it('borne le libellé d’un palier à quarante caractères', () => {
+    expect(() =>
+      configSchema.parse({ goals: { tiers: [{ target: 50, label: 'x'.repeat(41) }] } }),
+    ).toThrow();
+  });
+
+  it('écarte une clé inconnue dans un palier', () => {
+    const parsed = configSchema.parse({
+      goals: { tiers: [{ target: 50, label: 'Cinquante', bonusSeconds: 600 }] },
+    });
+
+    expect(parsed.goals.tiers[0]).toStrictEqual({ target: 50, label: 'Cinquante' });
+  });
+
+  it('refuse un nombre de bits par abonnement nul', () => {
+    expect(() => configSchema.parse({ goals: { bitsPerSub: 0 } })).toThrow();
+  });
+});
+
+describe('version du schéma', () => {
+  it('passe à 4 avec l’arrivée des objectifs, sans quoi les configurations existantes ne seraient jamais réécrites', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(4);
+  });
+});

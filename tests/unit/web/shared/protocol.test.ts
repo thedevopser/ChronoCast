@@ -78,6 +78,14 @@ describe('parseServerMessage', () => {
     });
   });
 
+  it('accepte le message du canal des objectifs', () => {
+    const message = parseServerMessage(
+      '{"type":"goal","subs":7,"index":1,"total":3,"from":5,"to":10,"label":"Karaoké","complete":false,"crossed":[]}',
+    );
+
+    expect(message?.type).toBe('goal');
+  });
+
   describe('refus', () => {
     it('rejette du JSON invalide sans lever', () => {
       expect(parseServerMessage('{ceci n’est pas du JSON')).toBeNull();

@@ -19,11 +19,20 @@ import { createWsClient, type WsClientStatus, type WsSocket } from '../shared/ws
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
 import { normalizeTiers, type TierInput } from './bits-tiers.js';
 import {
+  GOAL_LABEL_MAX_LENGTH,
+  normalizeGoalTiers,
+  type GoalTierInput,
+} from './goal-tiers.js';
+import {
   applyMessage,
   counterControls,
   createDashboardModel,
   EVENT_LABELS,
+  goalProgressRatio,
   happyHourLabels,
+  isResetArmed,
+  resetLabel,
+  RESET_ARM_WINDOW_MS,
   statusLabel,
   twitchLabel,
   type DashboardModel,
@@ -270,8 +279,90 @@ function start(): void {
       200,
     );
 
+    paintGoal();
+    paintGoalView();
+
     paintEvents();
     painted = model;
+  }
+
+  function paintGoal(): void {
+    const goal = model.goal;
+    const bar = requireElement(document, '#goal-bar');
+
+    if (goal === null) {
+      setText(requireElement(document, '#goal-subs'), '—');
+      bar.hidden = true;
+      return;
+    }
+
+    setText(requireElement(document, '#goal-subs'), `${String(goal.subs)} abo.`);
+
+    // Sans palier, il n'y a pas de promesse à afficher : la barre n'aurait aucune borne.
+    if (goal.total === 0) {
+      setText(
+        requireElement(document, '#goal-detail'),
+        'Aucun palier configuré. Rendez-vous dans Objectifs.',
+        200,
+      );
+      bar.hidden = true;
+      return;
+    }
+
+    setText(
+      requireElement(document, '#goal-detail'),
+      goal.complete
+        ? `${goal.label} — dernier palier franchi`
+        : `${goal.label} — ${String(goal.subs)} / ${String(goal.to)}`,
+      200,
+    );
+
+    bar.hidden = false;
+    setCssVariables(bar, { '--cc-goal-progress': String(goalProgressRatio(goal)) });
+  }
+
+  // La vue Objectifs affiche la même progression que le tableau de bord, plus l'échelle entière et
+  // ce qui en est franchi.
+  function paintGoalView(): void {
+    const goal = model.goal;
+    const ladder = requireElement(document, '#goal-ladder');
+    clearChildren(ladder);
+
+    setText(
+      requireElement(document, '#goal-progress-count'),
+      goal === null ? '—' : `${String(goal.subs)} abo.`,
+    );
+
+    const tiers = readGoalTiersFromConfig();
+    setText(
+      requireElement(document, '#goal-progress-detail'),
+      tiers.length === 0
+        ? 'Aucun palier : ajoutez-en un ci-dessous.'
+        : goal === null
+          ? ''
+          : goal.complete
+            ? 'Tous les paliers sont franchis.'
+            : `Palier ${String(goal.index + 1)} sur ${String(goal.total)} : ${goal.label}.`,
+      200,
+    );
+
+    let from = 0;
+    for (const tier of [...tiers].sort((left, right) => left.target - right.target)) {
+      const entry = document.createElement('li');
+      const reached = goal !== null && goal.subs >= tier.target;
+      entry.className = reached ? 'ladder__entry ladder__entry--reached' : 'ladder__entry';
+
+      const range = document.createElement('span');
+      range.className = 'ladder__range';
+      setText(range, `${String(from)} → ${String(tier.target)}`);
+
+      const label = document.createElement('span');
+      setText(label, tier.label, GOAL_LABEL_MAX_LENGTH);
+
+      entry.append(range, label);
+      ladder.append(entry);
+      from = tier.target;
+    }
   }
 
   function syncModeOf(origin: CounterChangeOrigin): SyncMode {
@@ -302,6 +393,9 @@ function start(): void {
         syncHappyHourField(message.happyHour);
         break;
 
+      // Le tableau de bord suit la progression par le modèle seul : recharger la configuration
+      // effacerait une saisie en cours dans l'éditeur d'échelle resté ouvert.
+      case 'goal':
       case 'hello':
       case 'twitch:status':
       case 'event':
@@ -335,6 +429,37 @@ function start(): void {
       paint();
     }
   }
+
+  let goalResetArmedAt: number | null = null;
+
+  const goalResetButton = button('#goal-reset');
+
+  function paintGoalReset(): void {
+    setText(goalResetButton, resetLabel(isResetArmed(goalResetArmedAt, Date.now())));
+    goalResetButton.className = isResetArmed(goalResetArmedAt, Date.now())
+      ? 'button button--danger button--armed'
+      : 'button button--danger';
+  }
+
+  goalResetButton.addEventListener('click', () => {
+    // Deux temps : la progression s'efface sans retour possible, et le bouton voisine avec ceux du
+    // compteur. Le premier clic arme, le second exécute.
+    if (!isResetArmed(goalResetArmedAt, Date.now())) {
+      goalResetArmedAt = Date.now();
+      paintGoalReset();
+      window.setTimeout(paintGoalReset, RESET_ARM_WINDOW_MS + 100);
+      return;
+    }
+
+    goalResetArmedAt = null;
+    paintGoalReset();
+    void guarded(goalResetButton, async () => {
+      await api.post('/api/goals/reset');
+      showBanner('Progression des objectifs remise à zéro.', 'banner--success');
+    });
+  });
+
+  paintGoalReset();
 
   for (const [selector, path] of [
     ['#pause', '/api/counter/pause'],
@@ -488,6 +613,75 @@ function start(): void {
     appendTierRow('', '');
   });
 
+  const goalTiersList = requireElement(document, '#goal-tiers');
+
+  function appendGoalRow(target: string, label: string): void {
+    const row = document.createElement('li');
+    row.className = 'tier';
+
+    const makeField = (
+      caption: string,
+      value: string,
+      role: string,
+      kind: 'number' | 'text',
+    ): HTMLElement => {
+      const wrapper = document.createElement('label');
+      wrapper.className = 'field field--compact';
+
+      const title = document.createElement('span');
+      title.className = 'field__label';
+      setText(title, caption);
+
+      const input = document.createElement('input');
+      input.className = 'field__input';
+      input.type = kind;
+      if (kind === 'number') {
+        input.min = '1';
+        input.step = '1';
+      } else {
+        input.maxLength = GOAL_LABEL_MAX_LENGTH;
+      }
+      input.value = value;
+      input.dataset['goal'] = role;
+
+      wrapper.append(title, input);
+      return wrapper;
+    };
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'button button--danger';
+    setText(remove, 'Retirer');
+    remove.addEventListener('click', () => {
+      row.remove();
+    });
+
+    row.append(
+      makeField('Seuil, en abonnements', target, 'target', 'number'),
+      makeField('Promesse', label, 'label', 'text'),
+      remove,
+    );
+    goalTiersList.append(row);
+  }
+
+  function readGoalRows(): GoalTierInput[] {
+    return [...goalTiersList.querySelectorAll('.tier')].map((row) => ({
+      target: row.querySelector<HTMLInputElement>('[data-goal="target"]')?.value ?? '',
+      label: row.querySelector<HTMLInputElement>('[data-goal="label"]')?.value ?? '',
+    }));
+  }
+
+  function renderGoalTiers(tiers: readonly { target: number; label: string }[]): void {
+    clearChildren(goalTiersList);
+    for (const tier of tiers) {
+      appendGoalRow(String(tier.target), tier.label);
+    }
+  }
+
+  requireElement(document, '#add-goal-tier').addEventListener('click', () => {
+    appendGoalRow('', '');
+  });
+
   const previewFrame = requireElement(document, '#overlay-preview') as HTMLIFrameElement;
   const previewStage = requireElement(document, '#preview-stage');
 
@@ -569,6 +763,9 @@ function start(): void {
     const tiers = (config as { rewards?: { bits?: { tiers?: { minBits: number; seconds: number }[] } } })
       .rewards?.bits?.tiers;
     renderTiers(tiers ?? []);
+
+    renderGoalTiers(readGoalTiersFromConfig());
+    paintGoalView();
   }
 
   async function refreshConfig(): Promise<void> {
@@ -605,6 +802,15 @@ function start(): void {
       }
     }
 
+    if (view === 'goals') {
+      const { tiers, errors: goalErrors } = normalizeGoalTiers(readGoalRows());
+      if (goalErrors.length > 0) {
+        tierMessages.push(...goalErrors);
+      } else if (JSON.stringify(tiers) !== JSON.stringify(readGoalTiersFromConfig())) {
+        patch['goals'] = { ...(patch['goals'] as object | undefined), tiers };
+      }
+    }
+
     if (allErrors.length > 0 || tierMessages.length > 0) {
       showFieldErrors(container, allErrors);
       const first = allErrors[0]?.message ?? tierMessages[0] ?? '';
@@ -622,13 +828,19 @@ function start(): void {
     showBanner('Modifications enregistrées.', 'banner--success');
   }
 
+  function readGoalTiersFromConfig(): readonly { target: number; label: string }[] {
+    return (
+      (config as { goals?: { tiers?: { target: number; label: string }[] } }).goals?.tiers ?? []
+    );
+  }
+
   function readTiersFromConfig(): unknown {
     return (
       (config as { rewards?: { bits?: { tiers?: unknown } } }).rewards?.bits?.tiers ?? []
     );
   }
 
-  for (const view of ['rewards', 'appearance', 'settings'] as const) {
+  for (const view of ['rewards', 'goals', 'appearance', 'settings'] as const) {
     const control = button(`#save-${view}`);
     control.addEventListener('click', () => {
       void guarded(control, () => saveView(view));

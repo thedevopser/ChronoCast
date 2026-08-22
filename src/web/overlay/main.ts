@@ -191,6 +191,9 @@ function start(): void {
         applyConfig(message.overlay);
         break;
 
+      // L'overlay du compteur ne montre rien des objectifs, mais il reçoit le message : le hub
+      // l'envoie à l'accueil, avant tout abonnement, et OBS ne recharge pas une page tout seul.
+      case 'goal':
       case 'twitch:status':
       case 'log':
       case 'pong':

@@ -17,6 +17,8 @@ Chaque contrôle décrit ici est tenu par un test de `tests/security/`. Ce docum
 
 ## 2. Le contenu venu de Twitch
 
+**Un libellé de palier est saisi par le streamer, et affiché en direct devant les spectateurs.** Il n'est pas hostile au même titre qu'un pseudonyme, mais il emprunte exactement le même chemin — `textContent`, longueur bornée, aucune exception — et un test d'injection le couvre comme les autres.
+
 **N'importe quel spectateur choisit son pseudonyme.** Il peut y mettre `<img src=x onerror=…>`, et ce pseudonyme s'affiche dans une Browser Source OBS — c'est-à-dire dans un Chromium, en direct, devant l'audience.
 
 Quatre contrôles, appliqués sans exception :
@@ -48,7 +50,7 @@ Dans les journaux, les retours à la ligne et les séquences ANSI sont échappé
 
 **Jamais renvoyés par l'API.** Les champs de secret sont en écriture seule : l'API répond `hasClientSecret: true`, jamais la valeur. Une configuration exportée depuis le panneau ne les contient pas.
 
-**Jamais diffusés sur le WebSocket.** Le canal est en lecture seule et ne transporte que l'état du compteur, les événements et la configuration d'apparence.
+**Jamais diffusés sur le WebSocket.** Les canaux sont en lecture seule et ne transportent que l'état du compteur, les événements, la configuration d'apparence et la progression des objectifs — un entier, un libellé et deux bornes, sans aucun secret ni pseudo.
 
 **Systématiquement rédigés dans les journaux.** Les secrets sont déclarés à un rédacteur au moment où ils sont chargés ; ils sont masqués partout ensuite, **y compris s'ils se retrouvent au milieu d'un message d'erreur**.
 
@@ -60,7 +62,7 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Garde anti-DNS-rebinding sur `Host`.** Un nom de domaine contrôlé par un attaquant peut être résolu vers `127.0.0.1`, ce qui contourne l'origine. L'en-tête `Host` est donc comparé à une liste close, exactement, sans tolérance de suffixe.
 
-**Jeton CSRF sur toute mutation.** Injecté dans la page au moment de la servir, il n'est exposé par aucune route : une page tierce ne peut ni le lire ni le deviner. Les comparaisons sont à temps constant.
+**Jeton CSRF sur toute mutation.** Injecté dans la page au moment de la servir, il n'est exposé par aucune route : une page tierce ne peut ni le lire ni le deviner. Les comparaisons sont à temps constant. Cela vaut pour `POST /api/goals/reset`, la seule mutation destructrice hors du compteur : elle efface une progression, jamais un jeton ni un réglage, et le panneau la demande en deux temps.
 
 **Aucun en-tête CORS permissif, et il ne faut jamais en ajouter un.** Un seul suffirait à annuler la garde d'`Host`, en autorisant une page tierce à lire les réponses qu'elle provoque.
 
@@ -142,6 +144,7 @@ Le panneau n'a qu'un bouton qui y mène. **Aucune adresse ne traverse cette rout
 | Fichier | Ce qu'il défend |
 | --- | --- |
 | `xss-overlay.test.ts`, `xss-admin.test.ts`, `xss-admin-lists.test.ts`, `xss-setup.test.ts` | Un pseudonyme hostile n'est jamais interprété |
+| `xss-goal-label.test.ts` | Un libellé de palier hostile n'est jamais interprété |
 | `host-guard.test.ts` | Un `Host` non-loopback est rejeté |
 | `csrf.test.ts` | Une mutation sans jeton est refusée |
 | `static-handler.test.ts` | La traversée de chemin et les liens sortants sont bloqués |
