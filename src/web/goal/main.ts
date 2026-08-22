@@ -10,6 +10,7 @@ import { createToastQueue } from '../shared/toast-queue.js';
 import { createWsClient, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
 import { goalCssVariables } from './goal-style.js';
+import { readGoalPreviewMessage } from './preview.js';
 import { announcementsOf, goalDisplay, type GoalAnnouncement } from './goal-view.js';
 
 // Ni `counter` ni `event` : la page n'affiche pas le chrono, et une page qui ne reçoit que ce
@@ -63,6 +64,30 @@ function start(): void {
   function applyConfig(config: GoalOverlayConfig): void {
     overlayConfig = config;
     setCssVariables(root, goalCssVariables(config));
+  }
+
+  /**
+   * Le panneau prévisualise ses réglages en poussant un brouillon dans l'iframe qu'il embarque.
+   *
+   * L'écouteur n'est posé que sur une page encadrée : une Browser Source OBS n'a pas de parent, et
+   * n'expose donc rien. L'annonce d'essai, elle, ne passe pas par ici — elle arrive par le canal
+   * WebSocket, si bien qu'elle joue dans l'aperçu et dans OBS du même geste.
+   */
+  function listenToPreview(): void {
+    if (window.parent === window) {
+      return;
+    }
+
+    window.addEventListener('message', (event: MessageEvent<unknown>) => {
+      const draft = readGoalPreviewMessage(
+        { origin: event.origin, data: event.data },
+        window.location.origin,
+      );
+
+      if (draft !== null) {
+        applyConfig(draft);
+      }
+    });
   }
 
   function handle(message: ServerMessage): void {
@@ -170,6 +195,7 @@ function start(): void {
   });
 
   client.start();
+  listenToPreview();
   window.requestAnimationFrame(render);
 }
 

@@ -53,7 +53,7 @@ Quand un réglage manque, `custom.css` prend le relais. Elle est chargée **en d
 
 **Où :** `%USERPROFILE%\ChronoCast\custom.css`. Ce nom-là, cet endroit-là, et nulle part ailleurs.
 
-**Comment l'activer :** vue *Apparence* → groupe *Texte du compteur* → case **« Charger custom.css depuis le répertoire de données »**. Tant qu'elle est décochée, le fichier n'est pas servi même s'il existe.
+**Comment l'activer :** vue *Apparence* → onglet *Compteur* → groupe *Texte du compteur* → case **« Charger custom.css depuis le répertoire de données »**. Tant qu'elle est décochée, le fichier n'est pas servi même s'il existe. Cette unique case gouverne les deux pages.
 
 **Pour vérifier qu'elle est bien servie**, sans passer par OBS : ouvrez `http://127.0.0.1:3777/custom.css` dans un navigateur. Une 404 signifie que la case est décochée, que le fichier n'est pas au bon endroit, ou qu'il n'est pas lisible.
 

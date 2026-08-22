@@ -121,8 +121,8 @@ describe('DEPENDENCIES', () => {
   });
 });
 
-describe('page Objectifs', () => {
-  const GOALS = fieldsOf('goals');
+describe('barre d’objectif', () => {
+  const GOALS = fieldsOf('goal-appearance');
 
   function mutedGoals(patch: Record<string, RawValue> = {}): readonly string[] {
     return mutedSelectors(GOALS, { ...valuesFrom(GOALS, DEFAULT_CONFIG), ...patch });

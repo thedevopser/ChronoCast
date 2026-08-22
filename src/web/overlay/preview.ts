@@ -1,21 +1,16 @@
 import type { OverlayConfig } from '../shared/protocol.js';
+import {
+  matchesTree,
+  readPreviewEnvelope,
+  type PreviewSource,
+  type Shape,
+} from '../shared/preview.js';
 
-export const PREVIEW_MESSAGE_TYPE = 'chronocast:overlay-preview';
+export { PREVIEW_MESSAGE_TYPE, type PreviewSource } from '../shared/preview.js';
 
 export type PreviewMessage =
   | { readonly kind: 'config'; readonly overlay: OverlayConfig }
   | { readonly kind: 'demo' };
-
-export interface PreviewSource {
-  readonly origin: string;
-  readonly data: unknown;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-type Shape = Readonly<Record<string, 'string' | 'number' | 'boolean'>>;
 
 const ROOT: Shape = {
   fontFamily: 'string',
@@ -54,33 +49,12 @@ const BRANCHES: Readonly<Record<string, Shape>> = {
   toast: { enabled: 'boolean', durationMs: 'number', color: 'string', fontSize: 'number' },
 };
 
-function matches(value: unknown, shape: Shape): boolean {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return Object.entries(shape).every(([key, kind]) => typeof value[key] === kind);
-}
-
-// Le panneau envoie toujours une configuration complète : une forme incomplète signale une page
-// qui n'est pas celle qu'on croit, et `overlayCssVariables` lèverait en lisant une branche absente.
-function isOverlayConfig(value: unknown): value is OverlayConfig {
-  if (!matches(value, ROOT)) {
-    return false;
-  }
-
-  return Object.entries(BRANCHES).every(([key, shape]) =>
-    matches((value as Record<string, unknown>)[key], shape),
-  );
-}
-
-export function readPreviewMessage(source: PreviewSource, expectedOrigin: string): PreviewMessage | null {
-  if (source.origin !== expectedOrigin) {
-    return null;
-  }
-
-  const { data } = source;
-  if (!isRecord(data) || data['type'] !== PREVIEW_MESSAGE_TYPE) {
+export function readPreviewMessage(
+  source: PreviewSource,
+  expectedOrigin: string,
+): PreviewMessage | null {
+  const data = readPreviewEnvelope(source, expectedOrigin);
+  if (data === null) {
     return null;
   }
 
@@ -93,5 +67,5 @@ export function readPreviewMessage(source: PreviewSource, expectedOrigin: string
   }
 
   const overlay = data['overlay'];
-  return isOverlayConfig(overlay) ? { kind: 'config', overlay } : null;
+  return matchesTree(overlay, ROOT, BRANCHES) ? { kind: 'config', overlay: overlay as OverlayConfig } : null;
 }

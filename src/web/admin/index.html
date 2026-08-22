@@ -215,15 +215,6 @@
             </p>
           </header>
 
-          <div class="fields" id="fields-goals"></div>
-
-          <div class="card" id="goal-progress-card">
-            <p class="card__label">Progression</p>
-            <p class="card__value" id="goal-progress-count">—</p>
-            <p class="card__hint" id="goal-progress-detail"></p>
-            <ul class="ladder" id="goal-ladder"></ul>
-          </div>
-
           <div class="card" id="goal-tiers-card">
             <p class="card__label">Paliers</p>
             <p class="card__hint">
@@ -236,6 +227,29 @@
             </div>
           </div>
 
+          <div class="card" id="goal-progress-card">
+            <p class="card__label">Progression</p>
+            <p class="card__value" id="goal-progress-count">—</p>
+            <p class="card__hint" id="goal-progress-detail"></p>
+            <ul class="ladder" id="goal-ladder"></ul>
+          </div>
+
+          <div class="card">
+            <p class="card__label">Barre d'objectif</p>
+            <p class="card__hint">
+              Adresse à coller dans une seconde source Navigateur d'OBS. Son apparence se règle dans
+              la vue Apparence, onglet « Barre d'objectif ».
+            </p>
+            <span class="copyable copyable--wide">
+              <code id="goal-url"></code>
+              <button class="button button--ghost" type="button" data-copy="goal-url">
+                Copier
+              </button>
+            </span>
+          </div>
+
+          <div class="fields" id="fields-goals"></div>
+
           <div class="actions">
             <button class="button button--primary" type="button" id="save-goals">
               Enregistrer les objectifs
@@ -247,12 +261,14 @@
           <header class="view__head">
             <h1 class="view__title">Apparence</h1>
             <p class="view__subtitle">
-              L'aperçu est l'overlay réel et suit votre saisie. L'overlay ouvert dans OBS, lui, ne
-              change qu'à l'enregistrement.
+              Les deux pages que vous collez dans OBS, chacune sous son onglet. L'aperçu est la page
+              réelle et suit votre saisie ; celle ouverte dans OBS ne change qu'à l'enregistrement.
             </p>
           </header>
 
-          <div class="workbench">
+          <div class="tabs" id="appearance-tabs" role="tablist"></div>
+
+          <div class="workbench" id="panel-appearance">
             <div class="workbench__fields">
               <div class="fields" id="fields-appearance"></div>
 
@@ -281,6 +297,40 @@
                 <p class="card__hint">
                   Toile de 1920 × 1080 réduite à l'échelle : les proportions sont celles qu'OBS
                   affichera. Le damier marque la transparence.
+                </p>
+              </div>
+            </aside>
+          </div>
+
+          <div class="workbench" id="panel-goal-appearance" hidden>
+            <div class="workbench__fields">
+              <div class="fields" id="fields-goal-appearance"></div>
+
+              <div class="actions">
+                <button class="button button--primary" type="button" id="save-goal-appearance">
+                  Enregistrer l'apparence de la barre
+                </button>
+              </div>
+            </div>
+
+            <aside class="workbench__preview">
+              <div class="preview">
+                <p class="card__label">Aperçu</p>
+                <div class="preview__stage" id="goal-preview-stage">
+                  <iframe
+                    class="preview__frame"
+                    id="goal-preview"
+                    title="Aperçu de la barre d'objectif"
+                  ></iframe>
+                </div>
+                <div class="actions">
+                  <button class="button button--ghost" type="button" id="goal-preview-demo">
+                    Jouer une annonce
+                  </button>
+                </div>
+                <p class="card__hint">
+                  L'annonce est jouée ici <strong>et</strong> sur la barre ouverte dans OBS, sans
+                  toucher à votre progression. Elle reprend le palier en cours.
                 </p>
               </div>
             </aside>

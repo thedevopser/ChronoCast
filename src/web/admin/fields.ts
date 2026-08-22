@@ -117,7 +117,7 @@ const REWARD_FIELDS: readonly AdminField[] = [
 ];
 
 function goalColor(selector: string, path: string, label: string, hint?: string): AdminField {
-  const field = { selector, path, label, view: 'goals', kind: 'color' } as const;
+  const field = { selector, path, label, view: 'goal-appearance', kind: 'color' } as const;
   return hint === undefined ? field : { ...field, hint };
 }
 
@@ -128,7 +128,17 @@ function goalPixels(
   min: number,
   max: number,
 ): AdminField {
-  return { selector, path, label, view: 'goals', kind: 'number', min, max, slider: true, unit: 'px' };
+  return {
+    selector,
+    path,
+    label,
+    view: 'goal-appearance',
+    kind: 'number',
+    min,
+    max,
+    slider: true,
+    unit: 'px',
+  };
 }
 
 const GOAL_FIELDS: readonly AdminField[] = [
@@ -147,14 +157,14 @@ const GOAL_FIELDS: readonly AdminField[] = [
     path: 'goals.overlay.fontFamily',
     label: 'Police',
     hint: 'Polices installées sur la machine uniquement : l’application doit fonctionner hors ligne.',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'text',
   },
   {
     selector: '#goal-font-size',
     path: 'goals.overlay.fontSize',
     label: 'Taille',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'integer',
     min: 1,
     max: 1_000,
@@ -165,7 +175,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     selector: '#goal-font-weight',
     path: 'goals.overlay.fontWeight',
     label: 'Graisse',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'integer',
     min: 100,
     max: 900,
@@ -176,7 +186,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     selector: '#goal-letter-spacing',
     path: 'goals.overlay.letterSpacing',
     label: 'Interlettrage',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'number',
     min: -20,
     max: 40,
@@ -188,7 +198,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     selector: '#goal-text-align',
     path: 'goals.overlay.textAlign',
     label: 'Alignement dans la barre',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'enum',
     options: ['left', 'center', 'right'],
   },
@@ -197,7 +207,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     path: 'goals.overlay.showCount',
     label: 'Afficher le compte',
     hint: 'Le libellé du palier reste affiché ; seul le « 12 / 50 » disparaît.',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'boolean',
   },
 
@@ -215,7 +225,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     path: 'goals.overlay.bar.trackOpacity',
     label: 'Opacité du fond',
     hint: '0 laisse voir la scène à travers la barre, 1 la masque.',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'number',
     min: 0,
     max: 1,
@@ -228,7 +238,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     selector: '#goal-shadow-enabled',
     path: 'goals.overlay.shadow.enabled',
     label: 'Ombre portée',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'boolean',
   },
   goalColor('#goal-shadow-color', 'goals.overlay.shadow.color', 'Couleur de l’ombre'),
@@ -240,7 +250,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     selector: '#goal-outline-enabled',
     path: 'goals.overlay.outline.enabled',
     label: 'Contour des lettres',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'boolean',
   },
   goalColor('#goal-outline-color', 'goals.overlay.outline.color', 'Couleur du contour'),
@@ -250,7 +260,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     selector: '#goal-glow-enabled',
     path: 'goals.overlay.glow.enabled',
     label: 'Halo',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'boolean',
   },
   goalColor('#goal-glow-color', 'goals.overlay.glow.color', 'Couleur du halo'),
@@ -260,14 +270,14 @@ const GOAL_FIELDS: readonly AdminField[] = [
     selector: '#goal-gradient-on-text',
     path: 'goals.overlay.gradient.onText',
     label: 'Dégradé sur le texte',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'boolean',
   },
   {
     selector: '#goal-gradient-on-bar',
     path: 'goals.overlay.gradient.onBar',
     label: 'Dégradé sur la barre',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'boolean',
   },
   goalColor('#goal-gradient-from', 'goals.overlay.gradient.from', 'Première couleur'),
@@ -277,7 +287,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     path: 'goals.overlay.gradient.angleDeg',
     label: 'Sens du dégradé',
     hint: '0 monte, 90 va vers la droite.',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'integer',
     min: 0,
     max: 360,
@@ -290,14 +300,14 @@ const GOAL_FIELDS: readonly AdminField[] = [
     path: 'goals.overlay.announce.enabled',
     label: 'Annoncer un palier franchi',
     hint: 'Un bandeau remplace la barre quelques secondes, puis rend la main au palier suivant.',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'boolean',
   },
   {
     selector: '#goal-announce-duration',
     path: 'goals.overlay.announce.durationMs',
     label: 'Durée de l’annonce',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'integer',
     min: 1,
     max: 60_000,
@@ -310,7 +320,7 @@ const GOAL_FIELDS: readonly AdminField[] = [
     path: 'goals.overlay.announce.text',
     label: 'Texte de l’annonce',
     hint: 'Affiché au-dessus du libellé du palier. Vide, seul le libellé s’affiche.',
-    view: 'goals',
+    view: 'goal-appearance',
     kind: 'text',
     allowEmpty: true,
     max: 40,

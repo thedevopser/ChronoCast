@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
 import { ADMIN_FIELDS, fieldsOf } from '../../../../src/web/admin/fields.js';
 import { valuesFrom, type RawValue } from '../../../../src/web/admin/form-binding.js';
-import { draftOverlayConfig } from '../../../../src/web/admin/overlay-draft.js';
-import type { OverlayConfig } from '../../../../src/web/shared/protocol.js';
+import { draftOverlayConfig, draftSubtree } from '../../../../src/web/admin/overlay-draft.js';
+import type { GoalOverlayConfig, OverlayConfig } from '../../../../src/web/shared/protocol.js';
 
 const APPEARANCE = fieldsOf('appearance');
 
@@ -98,5 +98,70 @@ describe('draftOverlayConfig', () => {
     expect(draftOverlayConfig(APPEARANCE, pristine(), {})).toBeNull();
     expect(draftOverlayConfig(APPEARANCE, pristine(), null)).toBeNull();
     expect(draftOverlayConfig(APPEARANCE, pristine(), { overlay: 'tout blanc' })).toBeNull();
+  });
+});
+
+describe('draftSubtree', () => {
+  const GOAL_APPEARANCE = fieldsOf('goal-appearance');
+
+  function goalPristine(): Record<string, RawValue> {
+    return valuesFrom(GOAL_APPEARANCE, DEFAULT_CONFIG);
+  }
+
+  function goalDraft(patch: Record<string, RawValue> = {}): GoalOverlayConfig {
+    const outcome = draftSubtree(
+      'goals.overlay.',
+      GOAL_APPEARANCE,
+      { ...goalPristine(), ...patch },
+      DEFAULT_CONFIG,
+    );
+    if (outcome === null) {
+      throw new Error('brouillon attendu sur une configuration complète');
+    }
+    return outcome as unknown as GoalOverlayConfig;
+  }
+
+  // Le sous-arbre visé n'est plus à la racine : il faut descendre `goals.` avant de le trouver.
+  it('atteint un sous-arbre imbriqué', () => {
+    expect(goalDraft()).toStrictEqual(DEFAULT_CONFIG.goals.overlay);
+  });
+
+  it('reporte un champ modifié, à la racine du sous-arbre comme dans une branche', () => {
+    const outcome = goalDraft({ '#goal-color': '#FFCC00', '#goal-bar-radius': '42' });
+
+    expect(outcome.color).toBe('#FFCC00');
+    expect(outcome.bar.radius).toBe(42);
+  });
+
+  it('ignore les champs qui ne sont pas sous le préfixe', () => {
+    const outcome = draftSubtree(
+      'goals.overlay.',
+      ADMIN_FIELDS,
+      { ...goalPristine(), '#goal-bits-per-sub': '1', '#overlay-color': '#000000' },
+      DEFAULT_CONFIG,
+    );
+
+    expect(outcome).toStrictEqual(DEFAULT_CONFIG.goals.overlay);
+  });
+
+  it('ne modifie jamais la configuration enregistrée', () => {
+    const before = structuredClone(DEFAULT_CONFIG.goals.overlay);
+
+    goalDraft({ '#goal-color': '#FFCC00' });
+
+    expect(DEFAULT_CONFIG.goals.overlay).toStrictEqual(before);
+  });
+
+  it('se tait plutôt que de rendre une configuration incomplète', () => {
+    expect(draftSubtree('goals.overlay.', GOAL_APPEARANCE, goalPristine(), {})).toBeNull();
+    expect(
+      draftSubtree('goals.overlay.', GOAL_APPEARANCE, goalPristine(), { goals: {} }),
+    ).toBeNull();
+  });
+
+  it('sert aussi le sous-arbre de l’overlay du compteur, qui n’est qu’un cas du même geste', () => {
+    expect(draftSubtree('overlay.', APPEARANCE, pristine(), DEFAULT_CONFIG)).toStrictEqual(
+      DEFAULT_CONFIG.overlay,
+    );
   });
 });
