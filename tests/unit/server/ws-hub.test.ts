@@ -171,6 +171,24 @@ describe('createWsHub', () => {
       expect(client.sent[0]?.['overlay']).toEqual(DEFAULT_CONFIG.overlay);
     });
 
+    it("transmet l'apparence de la page Objectifs dès l'accueil", () => {
+      hub.accept(client.socket, {});
+
+      expect(client.sent[0]?.['goalOverlay']).toEqual(DEFAULT_CONFIG.goals.overlay);
+    });
+
+    it("n'envoie du sous-arbre des objectifs que son apparence", () => {
+      config = configSchema.parse({
+        goals: { bitsPerSub: 250, tiers: [{ target: 50, label: 'Je me rase la tête' }] },
+      });
+
+      hub.accept(client.socket, {});
+
+      const serialized = JSON.stringify(client.sent[0]);
+      expect(serialized).not.toContain('bitsPerSub');
+      expect(serialized).not.toContain('Je me rase la tête');
+    });
+
     it("annonce l'état du Happy Hour dès l'accueil", () => {
       config = configSchema.parse({ rewards: { happyHour: true } });
 
@@ -381,6 +399,14 @@ describe('createWsHub', () => {
       hub.publishConfig();
 
       expect(messagesOfType(client, 'config')[0]?.['overlay']).toEqual(DEFAULT_CONFIG.overlay);
+    });
+
+    it("diffuse la nouvelle apparence de la page Objectifs : OBS ne recharge pas une page tout seul", () => {
+      config = configSchema.parse({ goals: { overlay: { fontSize: 64 } } });
+
+      hub.publishConfig();
+
+      expect(messagesOfType(client, 'config')[0]?.['goalOverlay']).toMatchObject({ fontSize: 64 });
     });
 
     it('diffuse la bascule du Happy Hour, qui tient les onglets ouverts d’accord', () => {

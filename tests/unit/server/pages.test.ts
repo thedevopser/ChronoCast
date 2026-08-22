@@ -48,7 +48,7 @@ describe('createPageHandler', () => {
     const root = join(base, 'public');
     setupCompleted = true;
 
-    for (const page of ['overlay', 'admin', 'setup']) {
+    for (const page of ['overlay', 'goal', 'admin', 'setup']) {
       await mkdir(join(root, page), { recursive: true });
       await writeFile(
         join(root, page, 'index.html'),
@@ -73,7 +73,7 @@ describe('createPageHandler', () => {
     await rm(base, { recursive: true, force: true });
   });
 
-  it.each(['/overlay', '/admin', '/setup'])('sert %s', async (path) => {
+  it.each(['/overlay', '/goal', '/admin', '/setup'])('sert %s', async (path) => {
     const response = await handler.serve(path);
 
     expect(response?.status).toBe(200);
@@ -99,7 +99,7 @@ describe('createPageHandler', () => {
     expect(response?.headers['cache-control']).toContain('no-store');
   });
 
-  it.each(['/overlay', '/admin', '/setup'])(
+  it.each(['/overlay', '/goal', '/admin', '/setup'])(
     'substitue le port du WebSocket dans %s',
     async (path) => {
       const body = (await handler.serve(path))?.body.toString() ?? '';
@@ -109,6 +109,14 @@ describe('createPageHandler', () => {
     },
   );
 
+  // Deux Browser Sources, même régime : sans jeton, donc rien à protéger d'un cache.
+  it.each(['/overlay', '/goal'])('n’injecte jamais le jeton dans %s', async (path) => {
+    const response = await handler.serve(path);
+
+    expect(response?.body.toString()).not.toContain(TOKEN);
+    expect(response?.body.toString()).toContain(CSRF_PLACEHOLDER);
+  });
+
   it("laisse l'overlay hors du régime « sans cache »", async () => {
     const response = await handler.serve('/overlay');
 
@@ -116,7 +124,7 @@ describe('createPageHandler', () => {
   });
 
   it('annonce une longueur cohérente avec le corps réécrit', async () => {
-    for (const path of ['/overlay', '/admin', '/setup']) {
+    for (const path of ['/overlay', '/goal', '/admin', '/setup']) {
       const response = await handler.serve(path);
       const body = response?.body.toString() ?? '';
 

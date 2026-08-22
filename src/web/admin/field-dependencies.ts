@@ -57,6 +57,28 @@ export const DEPENDENCIES: readonly DependencyRule[] = [
     satisfied: (values) => values.some((value) => value !== 'none'),
     mutes: ['overlay.animation.durationMs'],
   },
+
+  enables('goals.overlay.shadow', ['color', 'blur', 'offsetX', 'offsetY']),
+  enables('goals.overlay.outline', ['color', 'width']),
+  enables('goals.overlay.glow', ['color', 'radius']),
+  enables('goals.overlay.announce', ['durationMs', 'color', 'text']),
+
+  {
+    when: ['goals.overlay.gradient.onText', 'goals.overlay.gradient.onBar'],
+    satisfied: anyTrue,
+    mutes: [
+      'goals.overlay.gradient.from',
+      'goals.overlay.gradient.to',
+      'goals.overlay.gradient.angleDeg',
+    ],
+  },
+
+  // Le dégradé recouvre entièrement le remplissage de la barre : sa couleur est alors ignorée.
+  {
+    when: ['goals.overlay.gradient.onBar'],
+    satisfied: (values) => !anyTrue(values),
+    mutes: ['goals.overlay.bar.fillColor'],
+  },
 ];
 
 export function mutedSelectors(

@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { configSchema } from '../../src/core/config/schema.js';
 import { normalizeLadder, positionAt } from '../../src/core/goals/goal-ladder.js';
 import { normalizeGoalTiers } from '../../src/web/admin/goal-tiers.js';
+import { announcementsOf, goalDisplay } from '../../src/web/goal/goal-view.js';
 import { setText } from '../../src/web/shared/safe-dom.js';
+
+const APPEARANCE = configSchema.parse({}).goals.overlay;
 
 const HOSTILE = [
   '<script>alert(1)</script>',
@@ -54,6 +57,58 @@ describe('libellé de palier hostile', () => {
 
     expect(errors).toEqual([]);
     expect(paint(tiers[0]?.label ?? '').querySelectorAll('*')).toHaveLength(0);
+  });
+
+  // La surface neuve du chantier 3 : le libellé n'est plus seulement affiché dans le panneau, il
+  // part sur une Browser Source ouverte devant les spectateurs.
+  it.each(HOSTILE)('traverse la page /goal sans être interprété : %o', (hostile) => {
+    const label = hostile.slice(0, 40);
+    const view = goalDisplay(
+      {
+        type: 'goal',
+        subs: 3,
+        index: 0,
+        total: 1,
+        from: 0,
+        to: 50,
+        label,
+        complete: false,
+        crossed: [],
+      },
+      APPEARANCE,
+    );
+
+    const host = paint(view.label);
+    expect(host.querySelectorAll('*')).toHaveLength(0);
+    expect(host.textContent).toBe(label);
+  });
+
+  it.each(HOSTILE)('traverse l’annonce d’un palier sans être interprété : %o', (hostile) => {
+    const label = hostile.slice(0, 40);
+    const announcements = announcementsOf(
+      {
+        type: 'goal',
+        subs: 50,
+        index: 0,
+        total: 1,
+        from: 0,
+        to: 50,
+        label,
+        complete: true,
+        crossed: [{ target: 50, label }],
+      },
+      APPEARANCE,
+    );
+
+    expect(paint(announcements[0]?.label ?? '').querySelectorAll('*')).toHaveLength(0);
+  });
+
+  // Le texte de l'annonce est saisi dans le panneau au même titre qu'un libellé de palier.
+  it.each(HOSTILE)('n’interprète pas davantage le texte de l’annonce : %o', (hostile) => {
+    const text = hostile.slice(0, 40);
+    const parsed = configSchema.parse({ goals: { overlay: { announce: { text } } } });
+
+    expect(paint(parsed.goals.overlay.announce.text).querySelectorAll('*')).toHaveLength(0);
   });
 
   it('ne laisse passer aucun script à travers une échelle entière', () => {

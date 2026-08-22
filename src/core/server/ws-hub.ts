@@ -316,6 +316,7 @@ export function createWsHub(options: WsHubOptions): WsHub {
         port: getPort(),
         wsPort: getWsPort(),
         overlay: getConfig().overlay,
+        goalOverlay: getConfig().goals.overlay,
         happyHour: getConfig().rewards.happyHour,
       });
 
@@ -338,6 +339,7 @@ export function createWsHub(options: WsHubOptions): WsHub {
       broadcast({
         type: 'config',
         overlay: getConfig().overlay,
+        goalOverlay: getConfig().goals.overlay,
         happyHour: getConfig().rewards.happyHour,
       });
     },

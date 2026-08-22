@@ -7,6 +7,7 @@ import {
   setText,
   MAX_TEXT_LENGTH,
 } from '../shared/safe-dom.js';
+import { goalProgressRatio } from '../shared/goal-progress.js';
 import { formatRemaining, formatReward } from '../shared/time-format.js';
 import {
   DEFAULT_CHANNELS,
@@ -28,7 +29,6 @@ import {
   counterControls,
   createDashboardModel,
   EVENT_LABELS,
-  goalProgressRatio,
   happyHourLabels,
   isResetArmed,
   resetLabel,
@@ -1179,7 +1179,8 @@ function start(): void {
 
   for (const view of FIELD_VIEWS) {
     renderFieldGroups(document, containerOf(view), fieldsOf(view), groupsOf(view), {
-      collapsible: view === 'appearance',
+      // Les deux vues qui alignent plus de sept groupes : sans repli, on ne voit plus le formulaire.
+      collapsible: view === 'appearance' || view === 'goals',
     });
   }
 

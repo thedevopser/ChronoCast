@@ -1,6 +1,6 @@
 # Architecture
 
-ChronoCast est une application Electron entièrement locale. Un noyau TypeScript porte tout le métier, une coquille Electron l'installe sur Windows, un serveur HTTP local sert trois pages web, et un client EventSub écoute Twitch.
+ChronoCast est une application Electron entièrement locale. Un noyau TypeScript porte tout le métier, une coquille Electron l'installe sur Windows, un serveur HTTP local sert quatre pages web, et un client EventSub écoute Twitch.
 
 Ce document décrit les couches, les flux et les décisions qui les expliquent. Pour travailler dans le code, lire ensuite [DEVELOPER.md](DEVELOPER.md).
 
@@ -40,6 +40,7 @@ graph TD
 
     subgraph "web/ — servi au navigateur"
         OVERLAY["overlay/ — Browser Source OBS"]
+        GOAL["goal/ — Browser Source des objectifs"]
         ADMIN["admin/ — panneau"]
         SETUP["setup/ — assistant"]
     end
@@ -115,6 +116,7 @@ Un seul serveur HTTP, sur `127.0.0.1:3777` par défaut, avec le WebSocket **atta
 | Chemin | Contenu |
 | --- | --- |
 | `/overlay` | La page pour OBS. Aucun jeton CSRF : elle ne mute rien |
+| `/goal` | La barre d'objectif, seconde Browser Source. Aucun jeton non plus, et indépendante de la première |
 | `/admin` | Le panneau. Jeton CSRF injecté à la volée |
 | `/setup` | L'assistant de première configuration |
 | `/custom.css` | La feuille personnelle, si elle est activée |

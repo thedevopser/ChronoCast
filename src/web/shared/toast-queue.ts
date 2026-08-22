@@ -1,40 +1,42 @@
-import type { DomainEventType } from '../shared/protocol.js';
-
-export interface Toast {
+/**
+ * File d'affichage à un seul emplacement : ce qui arrive pendant qu'un élément est visible attend
+ * son tour plutôt que de l'écraser.
+ *
+ * Générique sur l'élément affiché : l'overlay du compteur y met des bulles d'événement, la page
+ * `/goal` des paliers franchis — un don groupé peut en traverser plusieurs d'un coup.
+ */
+export interface Identified {
   readonly id: string;
-  readonly userName: string;
-  readonly rewardSeconds: number;
-  readonly type: DomainEventType;
-
-  readonly label?: string;
 }
 
 export interface ToastQueueOptions {
   readonly maxPending?: number;
 }
 
-export interface ToastQueue {
-  push(toast: Toast, nowMs: number, durationMs: number): void;
-  current(nowMs: number): Toast | null;
+export interface ToastQueue<T extends Identified> {
+  push(toast: T, nowMs: number, durationMs: number): void;
+  current(nowMs: number): T | null;
   pendingCount(): number;
   clear(): void;
 }
 
 const DEFAULT_MAX_PENDING = 20;
 
-interface Scheduled {
-  readonly toast: Toast;
+interface Scheduled<T> {
+  readonly toast: T;
   readonly durationMs: number;
 }
 
-export function createToastQueue(options: ToastQueueOptions = {}): ToastQueue {
+export function createToastQueue<T extends Identified>(
+  options: ToastQueueOptions = {},
+): ToastQueue<T> {
   const maxPending = options.maxPending ?? DEFAULT_MAX_PENDING;
 
-  let visible: { toast: Toast; expiresAtMs: number } | null = null;
-  const pending: Scheduled[] = [];
+  let visible: { toast: T; expiresAtMs: number } | null = null;
+  const pending: Scheduled<T>[] = [];
 
   return {
-    push(toast: Toast, nowMs: number, durationMs: number): void {
+    push(toast: T, nowMs: number, durationMs: number): void {
       if (visible === null) {
         visible = { toast, expiresAtMs: nowMs + durationMs };
         return;
@@ -47,7 +49,7 @@ export function createToastQueue(options: ToastQueueOptions = {}): ToastQueue {
       }
     },
 
-    current(nowMs: number): Toast | null {
+    current(nowMs: number): T | null {
       while (visible !== null && nowMs >= visible.expiresAtMs) {
         const next = pending.shift();
         visible =

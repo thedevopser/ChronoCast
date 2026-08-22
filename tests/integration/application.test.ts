@@ -482,6 +482,55 @@ describe('application complète', () => {
       const payload = (await (await api('/api/goals')).json()) as { goal: { subs: number } };
       expect(payload.goal.subs).toBe(2);
     });
+
+    // Ce que la page /goal reçoit réellement sur le fil. Le service de la page elle-même est tenu
+    // par pages.test.ts : la racine statique du harnais est un répertoire temporaire vide.
+    describe('ce que reçoit la page /goal', () => {
+      it('annonce l’apparence de la page dès l’accueil, sans l’échelle ni le comptage', async () => {
+        await setLadder();
+
+        const client = collect(connectOverlay());
+        await client.waitFor(() => client.ofType('hello').length > 0, 'accueil');
+
+        const hello = client.ofType('hello')[0] as { goalOverlay?: { fontSize: number } };
+        expect(hello.goalOverlay).toMatchObject({ fontSize: 28 });
+        expect(JSON.stringify(hello)).not.toContain('Je me rase la tête');
+      });
+
+      it('reçoit la progression dès l’accueil, sans attendre le prochain abonnement', async () => {
+        await setLadder();
+        await notify('channel.subscribe', channelSubscribe);
+
+        const client = collect(connectOverlay());
+        await client.waitFor(() => client.ofType('goal').length > 0, 'progression à l’accueil');
+
+        expect(client.ofType('goal')[0]).toMatchObject({
+          subs: 1,
+          label: 'Karaoké',
+          from: 1,
+          to: 2,
+          crossed: [],
+        });
+      });
+
+      it('nomme chaque palier traversé par un don groupé, pour que chacun soit annoncé', async () => {
+        await setLadder();
+
+        const client = collect(connectOverlay());
+        await client.waitFor(() => client.ofType('goal').length > 0, 'progression à l’accueil');
+
+        await notify('channel.subscription.gift', channelSubscriptionGift);
+        await client.waitFor(() => client.ofType('goal').length > 1, 'franchissement diffusé');
+
+        const message = client.ofType('goal').at(-1) as {
+          crossed: { target: number; label: string }[];
+        };
+        expect(message.crossed.map((tier) => tier.label)).toEqual([
+          'Je me rase la tête',
+          'Karaoké',
+        ]);
+      });
+    });
   });
 
   describe('commandes de chat', () => {

@@ -4,7 +4,6 @@ import {
   applyMessage,
   counterControls,
   createDashboardModel,
-  goalProgressRatio,
   happyHourLabels,
   isResetArmed,
   MAX_RECENT_EVENTS,
@@ -80,6 +79,7 @@ describe('applyMessage', () => {
       port: 3_777,
       wsPort: 3_777,
       overlay: {} as never,
+      goalOverlay: {} as never,
       happyHour: false,
     });
 
@@ -95,6 +95,7 @@ describe('applyMessage', () => {
       port: 3_777,
       wsPort: 3_777,
       overlay: {} as never,
+      goalOverlay: {} as never,
       happyHour: true,
     });
 
@@ -105,12 +106,13 @@ describe('applyMessage', () => {
     const active = applyMessage(createDashboardModel(), {
       type: 'config',
       overlay: {} as never,
+      goalOverlay: {} as never,
       happyHour: true,
     });
 
     expect(active.happyHour).toBe(true);
 
-    const éteint = applyMessage(active, { type: 'config', overlay: {} as never, happyHour: false });
+    const éteint = applyMessage(active, { type: 'config', overlay: {} as never, goalOverlay: {} as never, happyHour: false });
 
     expect(éteint.happyHour).toBe(false);
   });
@@ -278,28 +280,6 @@ describe('objectifs', () => {
     const first = applyMessage(createDashboardModel(), goalMessage());
 
     expect(applyMessage(first, goalMessage())).toBe(first);
-  });
-});
-
-describe('goalProgressRatio', () => {
-  it('rend la part parcourue du palier courant', () => {
-    expect(goalProgressRatio({ subs: 7, from: 5, to: 10 })).toBeCloseTo(0.4);
-  });
-
-  it('rend zéro au tout début d’un palier', () => {
-    expect(goalProgressRatio({ subs: 5, from: 5, to: 10 })).toBe(0);
-  });
-
-  it('rend un quand le palier est atteint', () => {
-    expect(goalProgressRatio({ subs: 10, from: 5, to: 10 })).toBe(1);
-  });
-
-  it('reste plein au-delà du dernier palier', () => {
-    expect(goalProgressRatio({ subs: 500, from: 100, to: 200 })).toBe(1);
-  });
-
-  it('rend zéro sur un palier de largeur nulle plutôt que de diviser par zéro', () => {
-    expect(goalProgressRatio({ subs: 0, from: 0, to: 0 })).toBe(0);
   });
 });
 

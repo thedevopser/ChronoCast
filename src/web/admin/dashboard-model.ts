@@ -212,21 +212,6 @@ export function happyHourLabels(active: boolean): HappyHourLabels {
     : { state: 'Éteint', action: 'Activer' };
 }
 
-/** Part parcourue du palier courant, entre 0 et 1. Pilote la barre par une variable CSS. */
-export function goalProgressRatio(goal: {
-  readonly subs: number;
-  readonly from: number;
-  readonly to: number;
-}): number {
-  const span = goal.to - goal.from;
-  if (span <= 0) {
-    return 0;
-  }
-
-  const walked = (goal.subs - goal.from) / span;
-  return Math.min(1, Math.max(0, walked));
-}
-
 /**
  * La remise à zéro efface une progression sans retour possible : le premier clic arme, le second
  * exécute. L'instant est passé en argument plutôt que lu d'une horloge interne, pour rester

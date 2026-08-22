@@ -10,6 +10,7 @@ import {
   PROTOCOL_VERSION,
   type Channel,
   type CounterChangeOrigin,
+  type DomainEventType,
   type OverlayConfig,
   type ServerMessage,
 } from '../shared/protocol.js';
@@ -17,9 +18,18 @@ import { createWsClient, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
 import { overlayCssVariables } from './overlay-style.js';
 import { readPreviewMessage } from './preview.js';
-import { createToastQueue } from './toast-queue.js';
+import { createToastQueue } from '../shared/toast-queue.js';
 
 const OVERLAY_CHANNELS: readonly Channel[] = ['counter', 'event', 'config'];
+
+interface Toast {
+  readonly id: string;
+  readonly userName: string;
+  readonly rewardSeconds: number;
+  readonly type: DomainEventType;
+
+  readonly label?: string;
+}
 
 const ANIMATION_CLASSES: Readonly<Record<string, string>> = {
   flash: 'is-flash',
@@ -60,7 +70,7 @@ function start(): void {
   const toastRewardElement = requireElement(document, '#toast-reward');
 
   const countdown = createCountdown();
-  const toasts = createToastQueue();
+  const toasts = createToastQueue<Toast>();
 
   let overlayConfig: OverlayConfig | null = null;
   let animationTimer: number | null = null;
