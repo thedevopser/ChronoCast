@@ -513,6 +513,43 @@ describe('application complète', () => {
         });
       });
 
+      it('joue une annonce d’essai sans rien écrire, jusque dans les Browser Sources ouvertes', async () => {
+        await setLadder();
+
+        const client = collect(connectOverlay());
+        await client.waitFor(() => client.ofType('goal').length > 0, 'progression à l’accueil');
+
+        const response = await mutate('/api/goals/preview');
+        expect(response.status).toBe(200);
+
+        await client.waitFor(() => client.ofType('goal').length > 1, 'annonce d’essai diffusée');
+
+        const message = client.ofType('goal').at(-1) as {
+          subs: number;
+          crossed: { label: string }[];
+        };
+        expect(message.crossed.map((tier) => tier.label)).toEqual(['Je me rase la tête']);
+
+        // L'aperçu ne laisse rien derrière lui : ni compte avancé, ni palier consigné sur disque.
+        expect(message.subs).toBe(0);
+        expect((await readPersistedGoals()).subs).toBe(0);
+        expect((await readPersistedGoals()).reached).toEqual([]);
+      });
+
+      it('refuse l’annonce d’essai sans jeton CSRF', async () => {
+        await setLadder();
+
+        const response = await api('/api/goals/preview', { method: 'POST' });
+
+        expect(response.status).toBe(403);
+      });
+
+      it('refuse l’annonce d’essai tant qu’aucun palier n’est défini', async () => {
+        const response = await mutate('/api/goals/preview');
+
+        expect(response.status).toBe(409);
+      });
+
       it('nomme chaque palier traversé par un don groupé, pour que chacun soit annoncé', async () => {
         await setLadder();
 

@@ -62,7 +62,7 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Garde anti-DNS-rebinding sur `Host`.** Un nom de domaine contrôlé par un attaquant peut être résolu vers `127.0.0.1`, ce qui contourne l'origine. L'en-tête `Host` est donc comparé à une liste close, exactement, sans tolérance de suffixe.
 
-**Jeton CSRF sur toute mutation.** Injecté dans la page au moment de la servir, il n'est exposé par aucune route : une page tierce ne peut ni le lire ni le deviner. Les comparaisons sont à temps constant. Cela vaut pour `POST /api/goals/reset`, la seule mutation destructrice hors du compteur : elle efface une progression, jamais un jeton ni un réglage, et le panneau la demande en deux temps.
+**Jeton CSRF sur toute mutation.** Injecté dans la page au moment de la servir, il n'est exposé par aucune route : une page tierce ne peut ni le lire ni le deviner. Les comparaisons sont à temps constant. Cela vaut pour `POST /api/goals/reset`, la seule mutation destructrice hors du compteur : elle efface une progression, jamais un jeton ni un réglage, et le panneau la demande en deux temps. Cela vaut aussi pour `POST /api/goals/preview`, qui n'écrit rien du tout — elle rejoue une annonce sur la progression courante — mais reste une mutation au sens du jeton, faute de quoi une page tierce pourrait faire clignoter un bandeau sur le stream.
 
 **Aucun en-tête CORS permissif, et il ne faut jamais en ajouter un.** Un seul suffirait à annuler la garde d'`Host`, en autorisant une page tierce à lire les réponses qu'elle provoque.
 

@@ -229,6 +229,34 @@ describe('createApiRoutes', () => {
       expect(doubles.calls).toContain('goals.reset');
       expect(body(response)['goal']).toBeTypeOf('object');
     });
+
+    describe('POST /api/goals/preview', () => {
+      it('diffuse le palier en cours comme s’il venait d’être atteint', async () => {
+        const response = await call('POST', '/api/goals/preview');
+
+        expect(response.status).toBe(200);
+        expect(doubles.previewed).toStrictEqual({ target: 10, label: 'Karaoké' });
+      });
+
+      // C'est un aperçu : il ne doit rien laisser derrière lui, ni dans le compte ni sur disque.
+      it('ne touche jamais à la progression', async () => {
+        const before = doubles.goalSubs;
+
+        await call('POST', '/api/goals/preview');
+
+        expect(doubles.goalSubs).toBe(before);
+        expect(doubles.calls).not.toContain('goals.reset');
+      });
+
+      it('refuse sur une échelle vide plutôt que d’annoncer une promesse inexistante', async () => {
+        doubles.config = configSchema.parse({ ...doubles.config, goals: { tiers: [] } });
+
+        const response = await call('POST', '/api/goals/preview');
+
+        expect(response.status).toBe(409);
+        expect(doubles.previewed).toBeNull();
+      });
+    });
   });
 
   describe('twitch', () => {

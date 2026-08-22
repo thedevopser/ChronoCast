@@ -593,6 +593,9 @@ export function createApplication(options: ApplicationOptions): Application {
       getPort: currentPort,
       appVersion,
       applyManualEvent: (event) => applyDomainEvent(event),
+      previewGoal: (tier) => {
+        hub.publishGoalPreview(tier);
+      },
       logger,
     }),
     pageHandler: createPageHandler({

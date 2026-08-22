@@ -417,6 +417,17 @@ describe('createWsHub', () => {
       expect(messagesOfType(client, 'config')[0]?.['happyHour']).toBe(true);
     });
 
+    it('diffuse une annonce d’essai sur la progression réelle, sans la modifier', () => {
+      hub.publishGoalPreview({ target: 5, label: 'Je me rase la tête' });
+
+      const message = messagesOfType(client, 'goal').at(-1);
+
+      expect(message).toMatchObject({
+        subs: goal.subs,
+        crossed: [{ target: 5, label: 'Je me rase la tête' }],
+      });
+    });
+
     it('diffuse la progression des objectifs', () => {
       bus.emit('goals:changed', {
         snapshot: goal,

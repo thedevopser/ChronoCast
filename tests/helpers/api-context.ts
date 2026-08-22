@@ -10,6 +10,7 @@ import type { HistoryEntry } from '../../src/core/history/event-history-service.
 import type { EventHistoryService } from '../../src/core/history/event-history-service.js';
 import { normalizeLadder, positionAt } from '../../src/core/goals/goal-ladder.js';
 import type { GoalService, GoalSnapshot, GoalState } from '../../src/core/goals/goal-service.js';
+import type { GoalTier } from '../../src/core/config/schema.js';
 import {
   createRingBufferSink,
   type RingBufferSink,
@@ -30,6 +31,9 @@ export interface ApiDoubles {
   clientSecret: string | null;
   failTwitch: boolean;
   goalSubs: number;
+
+  /** Le palier dont l'aperçu a été diffusé, ou `null` si la route ne l'a pas fait. */
+  previewed: GoalTier | null;
 }
 
 export function createApiDoubles(): ApiDoubles {
@@ -53,6 +57,7 @@ export function createApiDoubles(): ApiDoubles {
     clientSecret: null as string | null,
     failTwitch: false,
     goalSubs: 7,
+    previewed: null as GoalTier | null,
   };
 
   const configService: ConfigService = {
@@ -198,6 +203,10 @@ export function createApiDoubles(): ApiDoubles {
         calls.push('system.openStartupSettings');
         return Promise.resolve();
       },
+    },
+    previewGoal: (tier: GoalTier) => {
+      calls.push('goals.preview');
+      doubles.previewed = tier;
     },
     getPort: () => 3_777,
     appVersion: '0.1.0',

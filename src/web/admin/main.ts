@@ -40,7 +40,14 @@ import {
 import { inactiveGroups, mutedSelectors } from './field-dependencies.js';
 import { fieldsOf, groupsOf } from './fields.js';
 import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
-import { draftOverlayConfig } from './overlay-draft.js';
+import { draftSubtree } from './overlay-draft.js';
+import {
+  APPEARANCE_TABS,
+  APPEARANCE_TAB_LABELS,
+  DEFAULT_APPEARANCE_TAB,
+  tabFromValue,
+  type AppearanceTabId,
+} from './appearance-tabs.js';
 import { previewScale } from './preview-stage.js';
 import { PREVIEW_MESSAGE_TYPE } from '../overlay/preview.js';
 import {
@@ -173,13 +180,6 @@ function start(): void {
   function showView(view: AdminViewId): void {
     for (const candidate of ADMIN_VIEWS as readonly string[]) {
       requireElement(document, `#view-${candidate}`).hidden = candidate !== view;
-    }
-
-    if (view === 'appearance') {
-      const preview = requireElement(document, '#overlay-preview') as HTMLIFrameElement;
-      if (preview.getAttribute('src') === null) {
-        preview.src = '/overlay';
-      }
     }
 
     for (const item of nav.querySelectorAll('a')) {
@@ -682,66 +682,158 @@ function start(): void {
     appendGoalRow('', '');
   });
 
-  const previewFrame = requireElement(document, '#overlay-preview') as HTMLIFrameElement;
-  const previewStage = requireElement(document, '#preview-stage');
+  /**
+   * Un onglet d'apparence : ses champs, son iframe, et le brouillon qu'il pousse dedans.
+   *
+   * Les deux pages servies à OBS partagent tout le mécanisme ; seuls changent le sous-arbre visé
+   * et le nom sous lequel il voyage dans le message d'aperçu.
+   */
+  interface AppearancePanel {
+    readonly stage: HTMLElement;
+    readonly frame: HTMLIFrameElement;
+    readonly page: string;
+    readonly prefix: string;
+    readonly payloadKey: string;
+    loaded: boolean;
+  }
 
-  function fitPreviewStage(): void {
-    setCssVariables(previewStage, {
-      '--cc-preview-scale': String(previewScale(previewStage.clientWidth)),
+  const PANELS: Readonly<Record<AppearanceTabId, AppearancePanel>> = {
+    appearance: {
+      stage: requireElement(document, '#preview-stage'),
+      frame: requireElement(document, '#overlay-preview') as HTMLIFrameElement,
+      page: '/overlay',
+      prefix: 'overlay.',
+      payloadKey: 'overlay',
+      loaded: false,
+    },
+    'goal-appearance': {
+      stage: requireElement(document, '#goal-preview-stage'),
+      frame: requireElement(document, '#goal-preview') as HTMLIFrameElement,
+      page: '/goal',
+      prefix: 'goals.overlay.',
+      payloadKey: 'goalOverlay',
+      loaded: false,
+    },
+  };
+
+  function fitStage(panel: AppearancePanel): void {
+    setCssVariables(panel.stage, {
+      '--cc-preview-scale': String(previewScale(panel.stage.clientWidth)),
     });
   }
 
-  new ResizeObserver(fitPreviewStage).observe(previewStage);
-  fitPreviewStage();
-
-  function postToPreview(payload: Record<string, unknown>): void {
-    previewFrame.contentWindow?.postMessage(
-      { type: PREVIEW_MESSAGE_TYPE, ...payload },
-      window.location.origin,
-    );
-  }
-
-  // L'aperçu reçoit le brouillon ; l'overlay ouvert dans OBS, lui, ne bouge qu'à l'enregistrement.
-  function pushPreviewConfig(): void {
-    const fields = fieldsOf('appearance');
-    const overlay = draftOverlayConfig(
+  // L'aperçu reçoit le brouillon ; la page ouverte dans OBS ne bouge qu'à l'enregistrement.
+  function pushPreviewConfig(tab: AppearanceTabId): void {
+    const panel = PANELS[tab];
+    const fields = fieldsOf(tab);
+    const draft = draftSubtree(
+      panel.prefix,
       fields,
-      readFieldValues(containerOf('appearance'), fields),
+      readFieldValues(containerOf(tab), fields),
       config,
     );
 
-    if (overlay !== null) {
-      postToPreview({ kind: 'config', overlay });
+    if (draft !== null) {
+      panel.frame.contentWindow?.postMessage(
+        { type: PREVIEW_MESSAGE_TYPE, kind: 'config', [panel.payloadKey]: draft },
+        window.location.origin,
+      );
     }
   }
 
-  function refreshAppearanceState(): void {
-    const fields = fieldsOf('appearance');
-    const container = containerOf('appearance');
+  function refreshAppearanceState(tab: AppearanceTabId): void {
+    const fields = fieldsOf(tab);
+    const container = containerOf(tab);
 
     setMutedFields(container, fields, mutedSelectors(fields, readFieldValues(container, fields)));
-    pushPreviewConfig();
+    pushPreviewConfig(tab);
   }
 
-  let appearanceFrame: number | null = null;
+  for (const tab of APPEARANCE_TABS) {
+    const panel = PANELS[tab];
 
-  containerOf('appearance').addEventListener('input', () => {
-    if (appearanceFrame !== null) {
-      return;
-    }
-    appearanceFrame = window.requestAnimationFrame(() => {
-      appearanceFrame = null;
-      refreshAppearanceState();
+    new ResizeObserver(() => {
+      fitStage(panel);
+    }).observe(panel.stage);
+    fitStage(panel);
+
+    panel.frame.addEventListener('load', () => {
+      pushPreviewConfig(tab);
+    });
+
+    let pending: number | null = null;
+    containerOf(tab).addEventListener('input', () => {
+      if (pending !== null) {
+        return;
+      }
+      pending = window.requestAnimationFrame(() => {
+        pending = null;
+        refreshAppearanceState(tab);
+      });
+    });
+  }
+
+  // La bulle de démonstration du compteur reste un message local : aucune route ne sait injecter
+  // une bulle sans créditer de temps.
+  requireElement(document, '#preview-demo').addEventListener('click', () => {
+    PANELS.appearance.frame.contentWindow?.postMessage(
+      { type: PREVIEW_MESSAGE_TYPE, kind: 'demo' },
+      window.location.origin,
+    );
+  });
+
+  // L'annonce d'essai, elle, passe par le serveur : l'aperçu est une vraie page /goal connectée au
+  // WebSocket, si bien qu'elle joue ici et dans OBS du même geste.
+  const goalDemo = button('#goal-preview-demo');
+  goalDemo.addEventListener('click', () => {
+    void guarded(goalDemo, async () => {
+      await api.post('/api/goals/preview', {});
     });
   });
 
-  previewFrame.addEventListener('load', () => {
-    pushPreviewConfig();
-  });
+  const tabList = requireElement(document, '#appearance-tabs');
+  let activeTab: AppearanceTabId = DEFAULT_APPEARANCE_TAB;
 
-  requireElement(document, '#preview-demo').addEventListener('click', () => {
-    postToPreview({ kind: 'demo' });
-  });
+  function showAppearanceTab(tab: AppearanceTabId): void {
+    activeTab = tab;
+
+    for (const candidate of APPEARANCE_TABS) {
+      requireElement(document, `#panel-${candidate}`).hidden = candidate !== tab;
+    }
+
+    for (const control of tabList.querySelectorAll('button')) {
+      control.setAttribute('aria-selected', String(control.dataset['tab'] === tab));
+    }
+
+    // L'iframe ne se charge qu'à la première visite : deux pages ouvertes d'emblée pour une seule
+    // regardée coûteraient deux connexions WebSocket pour rien.
+    const panel = PANELS[tab];
+    if (!panel.loaded) {
+      panel.loaded = true;
+      panel.frame.src = panel.page;
+    }
+
+    fitStage(panel);
+  }
+
+  function buildAppearanceTabs(): void {
+    clearChildren(tabList);
+
+    for (const tab of APPEARANCE_TABS) {
+      const control = document.createElement('button');
+      control.className = 'tab';
+      control.type = 'button';
+      control.setAttribute('role', 'tab');
+      control.dataset['tab'] = tab;
+      setText(control, APPEARANCE_TAB_LABELS[tab]);
+      control.addEventListener('click', () => {
+        showAppearanceTab(tabFromValue(tab));
+      });
+      tabList.append(control);
+    }
+
+    showAppearanceTab(activeTab);
+  }
 
   function paintFields(): void {
     for (const view of FIELD_VIEWS) {
@@ -752,13 +844,12 @@ function start(): void {
 
     // Le repli ne se décide qu'ici : le recalculer à la frappe refermerait sous les doigts un
     // groupe que l'utilisateur vient d'ouvrir.
-    const appearance = fieldsOf('appearance');
-    const container = containerOf('appearance');
-    setGroupsCollapsed(
-      container,
-      inactiveGroups(appearance, readFieldValues(container, appearance)),
-    );
-    refreshAppearanceState();
+    for (const tab of APPEARANCE_TABS) {
+      const fields = fieldsOf(tab);
+      const container = containerOf(tab);
+      setGroupsCollapsed(container, inactiveGroups(fields, readFieldValues(container, fields)));
+      refreshAppearanceState(tab);
+    }
 
     const tiers = (config as { rewards?: { bits?: { tiers?: { minBits: number; seconds: number }[] } } })
       .rewards?.bits?.tiers;
@@ -1185,12 +1276,14 @@ function start(): void {
   }
 
   buildNav();
+  buildAppearanceTabs();
   showView(viewFromHash(window.location.hash));
   window.addEventListener('hashchange', () => {
     showView(viewFromHash(window.location.hash));
   });
 
   setText(requireElement(document, '#overlay-url'), `${window.location.origin}/overlay`, 200);
+  setText(requireElement(document, '#goal-url'), `${window.location.origin}/goal`, 200);
 
   const client = createWsClient({
     url: resolveWebSocketUrl({

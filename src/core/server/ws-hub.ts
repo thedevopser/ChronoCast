@@ -56,6 +56,15 @@ export interface WsHub {
   publishLog(record: LogRecord): void;
 
   publishConfig(): void;
+
+  /**
+   * Rejoue le franchissement d'un palier sur la progression **courante**, sans rien écrire.
+   *
+   * L'aperçu du panneau est une vraie page `/goal` connectée au hub : une annonce d'essai y joue
+   * donc en même temps que sur les Browser Sources ouvertes dans OBS, ce qui est le seul endroit
+   * où le rendu se juge.
+   */
+  publishGoalPreview(tier: GoalTier): void;
 }
 
 export interface WsHubOptions {
@@ -333,6 +342,10 @@ export function createWsHub(options: WsHubOptions): WsHub {
 
     publishLog(record: LogRecord): void {
       broadcast({ type: 'log', record });
+    },
+
+    publishGoalPreview(tier: GoalTier): void {
+      broadcast(goalMessage(getSnapshot().goal, [tier]));
     },
 
     publishConfig(): void {

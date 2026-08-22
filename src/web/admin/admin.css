@@ -466,6 +466,39 @@ details.group > .group__title:hover {
   font-size: var(--cc-text-sm);
 }
 
+/* Les onglets d'apparence : une page servie à OBS par onglet, chacune avec son aperçu. */
+.tabs {
+  display: flex;
+  gap: var(--cc-space-2);
+  margin-bottom: var(--cc-space-3);
+  border-bottom: var(--cc-border-width) solid var(--cc-border);
+}
+
+.tab {
+  padding: var(--cc-space-2) var(--cc-space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--cc-text-muted);
+  font: inherit;
+  font-size: var(--cc-text-sm);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--cc-text);
+}
+
+.tab[aria-selected="true"] {
+  color: var(--cc-text);
+  font-weight: var(--cc-weight-medium);
+  border-bottom-color: var(--cc-accent);
+}
+
+.workbench[hidden] {
+  display: none;
+}
+
 .workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(22rem, 32rem);

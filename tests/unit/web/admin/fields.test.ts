@@ -221,10 +221,11 @@ describe('regroupement', () => {
   });
 
   // L'apparence de la page /goal est un sous-arbre de `goals.` : sans préfixe plus spécifique
-  // déclaré avant lui, ses trente-quatre feuilles atterriraient toutes dans « Objectifs ».
-  it('sépare l’apparence de la page Objectifs du comptage lui-même', () => {
-    expect(groupsOf('goals')).toStrictEqual([
-      'Objectifs',
+  // déclaré avant lui, ses trente-trois feuilles atterriraient toutes dans « Objectifs ».
+  it('sépare l’apparence de la barre du comptage lui-même', () => {
+    expect(groupsOf('goals')).toStrictEqual(['Objectifs']);
+
+    expect(groupsOf('goal-appearance')).toStrictEqual([
       'Barre',
       'Ombre du texte',
       'Contour du texte',
@@ -233,5 +234,13 @@ describe('regroupement', () => {
       'Annonce d’un palier',
       'Texte',
     ]);
+  });
+
+  // La vue Objectifs ne porte plus que les promesses et leur comptage : y laisser un réglage
+  // d'apparence rouvrirait le mélange des deux métiers que l'onglet vient de défaire.
+  it('ne laisse aucun réglage d’apparence dans la vue Objectifs', () => {
+    for (const field of fieldsOf('goals')) {
+      expect(field.path.startsWith('goals.overlay.'), field.path).toBe(false);
+    }
   });
 });

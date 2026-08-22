@@ -85,8 +85,8 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | --- | --- |
 | **Tableau de bord** | Le compteur, l'état de la connexion Twitch, les derniers événements, et les commandes : pause, reprise, ajout ou retrait de temps |
 | **Barème** | Combien de secondes ajoute chaque événement, et la bascule du Happy Hour |
-| **Objectifs** | L'échelle de vos promesses, la progression en cours, sa remise à zéro, et l'apparence de la barre affichée aux spectateurs |
-| **Apparence** | Police, taille, couleurs, ombre, contour, halo, cadre, dégradé, bulles d'annonce — avec un aperçu qui est l'overlay réel et qui suit votre saisie sans enregistrement |
+| **Objectifs** | L'échelle de vos promesses, la progression en cours, et l'adresse de la barre à coller dans OBS |
+| **Apparence** | Les deux pages que vous collez dans OBS, chacune sous son onglet — *Compteur* et *Barre d'objectif* — avec un aperçu qui est la page réelle et qui suit votre saisie sans enregistrement |
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
 | **Historique** | Tous les événements reçus, avec leur montant — **y compris ceux qui n'ont rien crédité**, et la raison |
 | **Journaux** | Ce que fait l'application, utile en cas de problème |
@@ -124,7 +124,9 @@ Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesse
 
 **Un palier franchi ne crédite aucune seconde.** Le barème reste le seul juge du temps ajouté ; les objectifs disent *pourquoi* le compteur monte, ils ne le font pas monter.
 
-**Ce que voient les spectateurs.** La page `/goal`, ajoutée dans OBS comme une seconde source navigateur — voir la section 4. Elle montre la promesse en cours et la progression ; à chaque palier franchi, un bandeau l'annonce quelques secondes avant de rendre la main au palier suivant. Un lot de sub offerts qui traverse plusieurs paliers les annonce l'un après l'autre. Son apparence — police, couleurs, forme de la barre, texte et durée de l'annonce — se règle dans la vue *Objectifs*, et **l'overlay du compteur n'en est pas affecté**.
+**Ce que voient les spectateurs.** La page `/goal`, ajoutée dans OBS comme une seconde source navigateur — voir la section 4. Elle montre la promesse en cours et la progression ; à chaque palier franchi, un bandeau l'annonce quelques secondes avant de rendre la main au palier suivant. Un lot de sub offerts qui traverse plusieurs paliers les annonce l'un après l'autre. Son apparence — police, couleurs, forme de la barre, texte et durée de l'annonce — se règle dans la vue *Apparence*, onglet **Barre d'objectif**, et **l'overlay du compteur n'en est pas affecté**.
+
+**Pour juger l'annonce sans attendre un vrai palier**, le bouton *Jouer une annonce* de cet onglet la rejoue sur le palier en cours. Elle s'affiche dans l'aperçu **et** dans la source ouverte dans OBS — c'est là que le rendu se juge — sans rien ajouter à votre progression.
 
 ## 6. Les dons hors Twitch
 

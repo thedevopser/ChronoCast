@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { TwitchStatusPayload } from '../../app/app-events.js';
 import type { SystemSettingsOpener } from '../../app/ports.js';
 import type { ConfigService } from '../../config/config-service.js';
+import type { GoalTier } from '../../config/schema.js';
 import type { CounterEventOutcome, CounterService } from '../../counter/counter-service.js';
 import type { DomainEvent, DomainEventType } from '../../events/domain-event.js';
 import { normalizeLadder } from '../../goals/goal-ladder.js';
@@ -54,6 +55,11 @@ export interface ApiContext {
   readonly getPort: () => number;
   readonly appVersion: string;
   readonly applyManualEvent: (event: DomainEvent) => Promise<CounterEventOutcome>;
+
+  // Diffuse un palier comme s'il venait d'être franchi, sans rien écrire : l'aperçu du panneau et
+  // les Browser Sources ouvertes jouent l'annonce du même geste.
+  readonly previewGoal: (tier: GoalTier) => void;
+
   readonly logger: Logger;
 }
 
@@ -153,6 +159,7 @@ export function createApiRoutes(context: ApiContext): Route[] {
     config,
     counter,
     goals,
+    previewGoal,
     history,
     logs,
     twitch,
@@ -353,6 +360,29 @@ export function createApiRoutes(context: ApiContext): Route[] {
           // que de rejeter toute la configuration.
           tiers: normalizeLadder(config.get().goals.tiers),
         }),
+    },
+
+    {
+      method: 'POST',
+      path: '/api/goals/preview',
+      handler: () => {
+        const { position } = goals.getSnapshot();
+
+        // Une échelle vide n'a aucune promesse à annoncer, et la page /goal s'y tait : mieux vaut
+        // le dire que de diffuser un bandeau sans libellé.
+        if (position.index < 0) {
+          return Promise.resolve(
+            errorResponse(
+              409,
+              'no_goal_tier',
+              'Définissez au moins un palier avant d’en prévisualiser l’annonce.',
+            ),
+          );
+        }
+
+        previewGoal({ target: position.to, label: position.label });
+        return Promise.resolve(jsonResponse(200, { tier: { target: position.to, label: position.label } }));
+      },
     },
 
     {

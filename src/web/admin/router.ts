@@ -13,7 +13,21 @@ export const ADMIN_VIEWS = [
 
 export type AdminViewId = (typeof ADMIN_VIEWS)[number];
 
-export const FIELD_VIEWS = ['rewards', 'goals', 'appearance', 'twitch', 'settings'] as const;
+/**
+ * Les vues porteuses d'un formulaire, qui n'ont pas à être des entrées de navigation.
+ *
+ * `goal-appearance` est un onglet de la vue Apparence et non une vue à part entière : régler ce
+ * qui se voit se fait à un seul endroit, avec un aperçu, tandis que la vue Objectifs ne porte plus
+ * que les promesses et leur comptage.
+ */
+export const FIELD_VIEWS = [
+  'rewards',
+  'goals',
+  'appearance',
+  'goal-appearance',
+  'twitch',
+  'settings',
+] as const;
 
 export type FieldViewId = (typeof FIELD_VIEWS)[number];
 

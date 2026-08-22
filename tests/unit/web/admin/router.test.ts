@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ADMIN_VIEWS,
   DEFAULT_VIEW,
+  FIELD_VIEWS,
   hashForView,
   VIEW_LABELS,
   viewFromHash,
@@ -84,5 +85,23 @@ describe('VIEW_LABELS', () => {
 
   it('nomme la vue « À propos »', () => {
     expect(VIEW_LABELS.about).toBe('À propos');
+  });
+});
+
+describe('FIELD_VIEWS', () => {
+  // La barre d'objectif se règle dans un onglet de la vue Apparence : ses champs ont donc leur
+  // propre conteneur, sans entrée de navigation qui leur corresponde.
+  it('porte l’apparence de la barre d’objectif', () => {
+    expect(FIELD_VIEWS).toContain('goal-appearance');
+  });
+
+  it('n’en fait pas une entrée de navigation', () => {
+    expect(ADMIN_VIEWS as readonly string[]).not.toContain('goal-appearance');
+  });
+
+  it('n’emploie que des identifiants sûrs comme fragments de sélecteur', () => {
+    for (const view of FIELD_VIEWS) {
+      expect(view).toMatch(/^[a-z][a-z0-9-]*$/);
+    }
   });
 });
