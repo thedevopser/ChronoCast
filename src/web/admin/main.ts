@@ -23,6 +23,7 @@ import {
   counterControls,
   createDashboardModel,
   EVENT_LABELS,
+  happyHourLabels,
   statusLabel,
   twitchLabel,
   type DashboardModel,
@@ -255,6 +256,12 @@ function start(): void {
 
     setText(requireElement(document, '#app-version'), model.appVersion, 32);
 
+    const happyHour = happyHourLabels(model.happyHour);
+    const happyHourPill = requireElement(document, '#happy-hour-status');
+    setText(happyHourPill, happyHour.state);
+    happyHourPill.className = model.happyHour ? 'pill pill--ok' : 'pill';
+    setText(button('#happy-hour-toggle'), happyHour.action);
+
     const reconnect = requireElement(document, '#twitch-reconnect-needed');
     reconnect.hidden = model.missingScopes.length === 0;
     setText(
@@ -289,10 +296,15 @@ function start(): void {
         }
         break;
 
+      // Un autre onglet vient d'enregistrer : la case du barème doit suivre sans qu'on recharge
+      // toute la configuration, ce qui effacerait une saisie en cours.
+      case 'config':
+        syncHappyHourField(message.happyHour);
+        break;
+
       case 'hello':
       case 'twitch:status':
       case 'event':
-      case 'config':
       case 'pong':
       case 'error':
         break;
@@ -337,6 +349,14 @@ function start(): void {
       });
     });
   }
+
+  // Le message « config » diffusé en retour repeint la carte : aucune mise à jour optimiste.
+  const happyHourToggle = button('#happy-hour-toggle');
+  happyHourToggle.addEventListener('click', () => {
+    void guarded(happyHourToggle, async () => {
+      await api.patch('/api/config', { config: { rewards: { happyHour: !model.happyHour } } });
+    });
+  });
 
   for (const [selector, path, fallback] of [
     ['#add-time', '/api/counter/add', 'ajout manuel'],
@@ -397,6 +417,20 @@ function start(): void {
 
   const containerOf = (view: FieldViewId): HTMLElement =>
     requireElement(document, `#fields-${view}`);
+
+  const HAPPY_HOUR_PATH = 'rewards.happyHour';
+  const HAPPY_HOUR_FIELDS = fieldsOf('rewards').filter((field) => field.path === HAPPY_HOUR_PATH);
+
+  function syncHappyHourField(active: boolean): void {
+    const rewards = (config as { rewards?: Record<string, unknown> }).rewards;
+    if (rewards !== undefined) {
+      rewards['happyHour'] = active;
+    }
+
+    for (const field of HAPPY_HOUR_FIELDS) {
+      writeFieldValues(containerOf(field.view), [field], { [field.selector]: active });
+    }
+  }
 
   const tiersList = requireElement(document, '#bits-tiers');
 

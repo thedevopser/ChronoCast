@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 2;
+export const CONFIG_SCHEMA_VERSION = 3;
 
 const hexColor = z
   .string()
@@ -96,6 +96,10 @@ const chatCommandSchema = z
 
 const rewardsSchema = z
   .object({
+    // Double les secondes créditées par les abonnements, les réabonnements, les subs offerts et
+    // les bits, jamais les seuils d'entrée ni la saisie d'un modérateur.
+    happyHour: z.boolean().default(false),
+
     chatCommand: chatCommandSchema.default({}),
     sub: tieredRewardSchema.default({}),
     resub: tieredRewardSchema.default({}),

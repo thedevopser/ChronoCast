@@ -287,6 +287,28 @@ describe('application complète', () => {
       expect(overlay.ofType('event')).toHaveLength(1);
     });
 
+    it('double le crédit d’un abonnement une fois le Happy Hour activé', async () => {
+      const response = await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { rewards: { happyHour: true } } }),
+      });
+      expect(response.status).toBe(200);
+
+      await notify('channel.subscribe', channelSubscribe);
+
+      const state = (await (await api('/api/state')).json()) as {
+        counter: { remainingMs: number };
+      };
+      expect(state.counter.remainingMs).toBe(43_200_000 + 360_000);
+
+      const history = (await (await api('/api/history')).json()) as {
+        entries: { rewardSeconds: number; reason: string }[];
+      };
+      expect(history.entries[0]?.rewardSeconds).toBe(360);
+      expect(history.entries[0]?.reason).toContain('Happy Hour ×2');
+    });
+
     it('ignore le rejeu du même message_id', async () => {
       await notify('channel.subscribe', channelSubscribe, 'msg-identique');
       await notify('channel.subscribe', channelSubscribe, 'msg-identique');

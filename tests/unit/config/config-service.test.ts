@@ -269,6 +269,20 @@ describe('createConfigService', () => {
       expect(double.persisted).toMatchObject({ schemaVersion: CONFIG_SCHEMA_VERSION });
     });
 
+    it('réécrit une configuration antérieure au Happy Hour pour qu\'elle porte la clé', async () => {
+      const legacy = structuredClone(DEFAULT_CONFIG) as unknown as Record<string, unknown> & {
+        rewards: Record<string, unknown>;
+      };
+      legacy['schemaVersion'] = 2;
+      delete legacy.rewards['happyHour'];
+      const { service, double } = createService(legacy);
+
+      const loaded = await service.load();
+
+      expect(loaded.rewards.happyHour).toBe(false);
+      expect(double.persisted).toMatchObject({ rewards: { happyHour: false } });
+    });
+
     it('ne réécrit rien lorsque la version est déjà à jour', async () => {
       const { service, double } = createService();
       const avant = double.persisted;

@@ -30,6 +30,8 @@ export interface DashboardModel {
   // Non vide tant qu'une souscription activée exige une portée que le jeton n'a pas : seule une
   // reconnexion peut l'accorder.
   readonly missingScopes: readonly string[];
+
+  readonly happyHour: boolean;
 }
 
 const EMPTY: DashboardModel = {
@@ -39,6 +41,7 @@ const EMPTY: DashboardModel = {
   appVersion: '',
   port: 0,
   missingScopes: [],
+  happyHour: false,
 };
 
 export function createDashboardModel(): DashboardModel {
@@ -72,7 +75,12 @@ function sameScopes(left: readonly string[], right: readonly string[]): boolean 
 export function applyMessage(model: DashboardModel, message: ServerMessage): DashboardModel {
   switch (message.type) {
     case 'hello':
-      return { ...model, appVersion: message.appVersion, port: message.port };
+      return {
+        ...model,
+        appVersion: message.appVersion,
+        port: message.port,
+        happyHour: message.happyHour,
+      };
 
     case 'state': {
       const detail = message.twitch.detail ?? '';
@@ -122,6 +130,10 @@ export function applyMessage(model: DashboardModel, message: ServerMessage): Das
     }
 
     case 'config':
+      return model.happyHour === message.happyHour
+        ? model
+        : { ...model, happyHour: message.happyHour };
+
     case 'log':
     case 'pong':
     case 'error':
@@ -145,6 +157,17 @@ export function counterControls(counter: CounterState | null): CounterControls {
     canResume: counter.status !== 'running',
     canReset: true,
   };
+}
+
+export interface HappyHourLabels {
+  readonly state: string;
+  readonly action: string;
+}
+
+export function happyHourLabels(active: boolean): HappyHourLabels {
+  return active
+    ? { state: 'Actif ×2', action: 'Désactiver' }
+    : { state: 'Éteint', action: 'Activer' };
 }
 
 const COUNTER_LABELS: Readonly<Record<CounterStatus, string>> = {
