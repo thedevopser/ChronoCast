@@ -5,12 +5,19 @@ import { createEventBus, type EventBus } from '../../../src/core/app/event-bus.j
 import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import { configSchema, type ChronoCastConfig } from '../../../src/core/config/schema.js';
 import { createInitialState, type CounterState } from '../../../src/core/counter/counter-state.js';
+import { positionAt } from '../../../src/core/goals/goal-ladder.js';
+import type { GoalSnapshot } from '../../../src/core/goals/goal-service.js';
 import { createLogger, type LogSink } from '../../../src/core/logging/logger.js';
 import { PROTOCOL_VERSION } from '../../../src/core/server/protocol.js';
 import { createWsHub, type HubTimers, type WsHub } from '../../../src/core/server/ws-hub.js';
 import { createSocketDouble, type SocketDouble } from '../../helpers/hub-socket.js';
 
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
+
+const LADDER = [
+  { target: 5, label: 'Je me rase la tête' },
+  { target: 10, label: 'Karaoké' },
+] as const;
 
 function createTimersDouble() {
   const intervals = new Map<number, { handler: () => void; ms: number }>();
@@ -47,6 +54,7 @@ describe('createWsHub', () => {
   let timers: ReturnType<typeof createTimersDouble>;
   let config: ChronoCastConfig;
   let counter: CounterState;
+  let goal: GoalSnapshot;
   let monotonic: number;
   let client: SocketDouble;
 
@@ -59,12 +67,18 @@ describe('createWsHub', () => {
     timers = createTimersDouble();
     config = DEFAULT_CONFIG;
     counter = createInitialState({ initialMs: 43_200_000, now: 1_000 });
+    goal = {
+      subs: 7,
+      reached: [{ target: 5, reachedAt: 1_000 }],
+      position: positionAt(7, LADDER),
+      tiers: LADDER,
+    };
     monotonic = 0;
 
     hub = createWsHub({
       bus,
       getConfig: () => config,
-      getSnapshot: () => ({ counter, twitch: { status: 'ready' } }),
+      getSnapshot: () => ({ counter, twitch: { status: 'ready' }, goal }),
       clock: { now: () => 1_000, monotonicMs: () => monotonic },
       timers: timers.timers,
       getPort: () => 3_777,
@@ -91,6 +105,15 @@ describe('createWsHub', () => {
       expect(client.sent[1]).toMatchObject({ type: 'state' });
     });
 
+    it('envoie la progression des objectifs à la connexion, sans attendre le prochain sub', () => {
+      hub.accept(client.socket, {});
+
+      const message = messagesOfType(client, 'goal')[0];
+
+      expect(message).toMatchObject({ type: 'goal', subs: 7, label: 'Karaoké' });
+      expect(message?.['crossed']).toEqual([]);
+    });
+
     it('joint les portées manquantes à l’état', () => {
       const incomplet = createWsHub({
         bus,
@@ -98,6 +121,7 @@ describe('createWsHub', () => {
         getSnapshot: () => ({
           counter,
           twitch: { status: 'ready', missingScopes: ['user:read:chat', 'user:bot'] },
+          goal,
         }),
         clock: { now: () => 1_000, monotonicMs: () => monotonic },
         timers: timers.timers,
@@ -123,7 +147,7 @@ describe('createWsHub', () => {
       const separate = createWsHub({
         bus,
         getConfig: () => config,
-        getSnapshot: () => ({ counter, twitch: { status: 'ready' } }),
+        getSnapshot: () => ({ counter, twitch: { status: 'ready' }, goal }),
         clock: { now: () => 1_000, monotonicMs: () => monotonic },
         timers: timers.timers,
         getPort: () => 3_777,
@@ -367,6 +391,27 @@ describe('createWsHub', () => {
       expect(messagesOfType(client, 'config')[0]?.['happyHour']).toBe(true);
     });
 
+    it('diffuse la progression des objectifs', () => {
+      bus.emit('goals:changed', {
+        snapshot: goal,
+        crossed: [{ target: 5, label: 'Je me rase la tête' }],
+      });
+
+      const message = messagesOfType(client, 'goal').at(-1);
+
+      expect(message).toMatchObject({
+        type: 'goal',
+        subs: 7,
+        index: 1,
+        total: 2,
+        from: 5,
+        to: 10,
+        label: 'Karaoké',
+        complete: false,
+      });
+      expect(message?.['crossed']).toEqual([{ target: 5, label: 'Je me rase la tête' }]);
+    });
+
     it('sert plusieurs clients', () => {
       const second = createSocketDouble();
       hub.accept(second.socket, {});
@@ -423,6 +468,15 @@ describe('createWsHub', () => {
 
       expect(messagesOfType(client, 'log')).toHaveLength(0);
       expect(messagesOfType(client, 'counter')).toHaveLength(1);
+    });
+
+    it('n’envoie rien sur le canal des objectifs à qui ne s’y abonne pas', () => {
+      client.receive(JSON.stringify({ type: 'subscribe', channels: ['counter'] }));
+      const before = messagesOfType(client, 'goal').length;
+
+      bus.emit('goals:changed', { snapshot: goal, crossed: [] });
+
+      expect(messagesOfType(client, 'goal')).toHaveLength(before);
     });
 
     it('répond à un ping', () => {

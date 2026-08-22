@@ -1,6 +1,8 @@
+import type { GoalTier } from '../config/schema.js';
 import type { CounterState } from '../counter/counter-state.js';
 import type { RewardComputation } from '../counter/reward-engine.js';
 import type { DomainEvent } from '../events/domain-event.js';
+import type { GoalSnapshot } from '../goals/goal-service.js';
 import type { OAuthOutcome } from '../server/oauth-callback.js';
 
 export type CounterChangeOrigin = 'tick' | 'manual' | 'twitch' | 'restore';
@@ -21,6 +23,13 @@ export interface CounterEventAppliedPayload {
 export interface CounterPersistFailedPayload {
   readonly state: CounterState;
   readonly error: unknown;
+}
+
+export interface GoalsChangedPayload {
+  readonly snapshot: GoalSnapshot;
+
+  // Vide hors franchissement, et hors remise à zéro : un palier ne se rejoue jamais.
+  readonly crossed: readonly GoalTier[];
 }
 
 export type TwitchConnectionStatus =
@@ -58,6 +67,8 @@ export interface AppEvents extends Record<string, unknown> {
   readonly 'counter:event-applied': CounterEventAppliedPayload;
 
   readonly 'counter:persist-failed': CounterPersistFailedPayload;
+
+  readonly 'goals:changed': GoalsChangedPayload;
 
   readonly 'twitch:status': TwitchStatusPayload;
 

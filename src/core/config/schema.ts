@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 3;
+export const CONFIG_SCHEMA_VERSION = 4;
+
+export const GOAL_LABEL_MAX_LENGTH = 40;
 
 const hexColor = z
   .string()
@@ -105,6 +107,26 @@ const rewardsSchema = z
     resub: tieredRewardSchema.default({}),
     gift: giftRewardSchema.default({}),
     bits: bitsRewardSchema.default({}),
+  })
+  .strip();
+
+const goalTierSchema = z
+  .object({
+    // Seule la borne haute est stockée : la borne basse se dérive du palier précédent, si bien
+    // qu'aucun trou ni chevauchement ne peut exister dans la configuration.
+    target: z.number().int().positive(),
+
+    label: z.string().max(GOAL_LABEL_MAX_LENGTH),
+  })
+  .strip();
+
+const goalsSchema = z
+  .object({
+    bitsPerSub: z.number().int().positive().default(500),
+
+    // Ni tri ni unicité ici : un refine qui rejette ferait tomber toute la configuration au
+    // chargement. L'échelle se normalise à la lecture, et la saisie se valide dans le panneau.
+    tiers: z.array(goalTierSchema).default([]),
   })
   .strip();
 
@@ -274,6 +296,7 @@ export const configSchema = z
     schemaVersion: z.number().int().nonnegative().default(CONFIG_SCHEMA_VERSION),
     counter: counterSchema.default({}),
     rewards: rewardsSchema.default({}),
+    goals: goalsSchema.default({}),
     twitch: twitchSchema.default({}),
     server: serverSchema.default({}),
     overlay: overlaySchema.default({}),
@@ -288,6 +311,8 @@ export type ChronoCastConfig = z.infer<typeof configSchema>;
 
 export type CounterConfig = ChronoCastConfig['counter'];
 export type RewardsConfig = ChronoCastConfig['rewards'];
+export type GoalsConfig = ChronoCastConfig['goals'];
+export type GoalTier = GoalsConfig['tiers'][number];
 export type TwitchConfig = ChronoCastConfig['twitch'];
 export type ServerConfig = ChronoCastConfig['server'];
 export type OverlayConfig = ChronoCastConfig['overlay'];

@@ -5,6 +5,7 @@ import type { AppEvents } from '../../src/core/app/app-events.js';
 import { createEventBus, type EventBus } from '../../src/core/app/event-bus.js';
 import { DEFAULT_CONFIG } from '../../src/core/config/defaults.js';
 import { createInitialState } from '../../src/core/counter/counter-state.js';
+import { positionAt } from '../../src/core/goals/goal-ladder.js';
 import { createLogger, type LogSink } from '../../src/core/logging/logger.js';
 import { createHttpServer, type HttpServer } from '../../src/core/server/http-server.js';
 import { jsonResponse } from '../../src/core/server/http-types.js';
@@ -93,6 +94,7 @@ describe('createWsAdapter', () => {
       getSnapshot: () => ({
         counter: createInitialState({ initialMs: 43_200_000, now: 1_000 }),
         twitch: { status: 'ready' },
+        goal: { subs: 0, reached: [], position: positionAt(0, []), tiers: [] },
       }),
       clock: { now: () => 1_000, monotonicMs: () => 0 },
       timers: {
@@ -155,11 +157,12 @@ describe('createWsAdapter', () => {
 
   it('diffuse un événement du bus au client réel', async () => {
     const messages = collect(connect());
-    await messages.waitFor(2);
+    // hello, state, puis la progression des objectifs : l'accueil en envoie trois.
+    const welcome = (await messages.waitFor(3)).length;
 
     bus.emit('twitch:status', { status: 'reconnecting', detail: 'session perdue' });
 
-    expect((await messages.waitFor(3))[2]).toMatchObject({
+    expect((await messages.waitFor(welcome + 1))[welcome]).toMatchObject({
       type: 'twitch:status',
       status: 'reconnecting',
     });

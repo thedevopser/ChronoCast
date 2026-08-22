@@ -8,7 +8,7 @@ import type { LogRecord } from '../logging/logger.js';
 
 export const PROTOCOL_VERSION = 2;
 
-export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch'] as const;
+export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'goal'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export const DEFAULT_CHANNELS: readonly Channel[] = CHANNELS;
@@ -67,6 +67,23 @@ export interface ConfigMessage {
   readonly happyHour: boolean;
 }
 
+export interface GoalMessage {
+  readonly type: 'goal';
+  readonly subs: number;
+
+  readonly index: number;
+  readonly total: number;
+
+  readonly from: number;
+  readonly to: number;
+  readonly label: string;
+  readonly complete: boolean;
+
+  // Les paliers franchis par le dernier événement, dans l'ordre : un don groupé peut traverser
+  // l'échelle entière, et chaque promesse intermédiaire doit pouvoir être annoncée.
+  readonly crossed: readonly { readonly target: number; readonly label: string }[];
+}
+
 export interface PongMessage {
   readonly type: 'pong';
 }
@@ -85,6 +102,7 @@ export type ServerMessage =
   | EventMessage
   | LogMessage
   | ConfigMessage
+  | GoalMessage
   | PongMessage
   | ErrorMessage;
 
@@ -100,6 +118,8 @@ export function channelOf(message: ServerMessage): Channel | null {
       return 'config';
     case 'twitch:status':
       return 'twitch';
+    case 'goal':
+      return 'goal';
     case 'hello':
     case 'state':
     case 'pong':

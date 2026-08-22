@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { CONFIG_SCHEMA_VERSION } from '../../../../src/core/config/schema.js';
+import { CONFIG_SCHEMA_VERSION, configSchema } from '../../../../src/core/config/schema.js';
 import type { HttpResponse } from '../../../../src/core/server/http-types.js';
 import { createApiRoutes } from '../../../../src/core/server/routes/api.js';
 import type { Route } from '../../../../src/core/server/router.js';
@@ -190,6 +190,44 @@ describe('createApiRoutes', () => {
       });
 
       expect(response.status).toBe(400);
+    });
+  });
+
+  describe('objectifs', () => {
+    it('GET /api/goals rend la progression et l’échelle', async () => {
+      const response = await call('GET', '/api/goals');
+
+      expect(response.status).toBe(200);
+      expect(body(response)['goal']).toMatchObject({ subs: 7 });
+      expect(body(response)['tiers']).toEqual([
+        { target: 5, label: 'Je me rase la tête' },
+        { target: 10, label: 'Karaoké' },
+      ]);
+    });
+
+    it('GET /api/goals rend l’échelle triée, jamais telle qu’elle est stockée', async () => {
+      doubles.config = configSchema.parse({
+        ...doubles.config,
+        goals: {
+          tiers: [
+            { target: 10, label: 'Karaoké' },
+            { target: 5, label: 'Je me rase la tête' },
+          ],
+        },
+      });
+
+      expect(body(await call('GET', '/api/goals'))['tiers']).toEqual([
+        { target: 5, label: 'Je me rase la tête' },
+        { target: 10, label: 'Karaoké' },
+      ]);
+    });
+
+    it('POST /api/goals/reset délègue au service', async () => {
+      const response = await call('POST', '/api/goals/reset');
+
+      expect(response.status).toBe(200);
+      expect(doubles.calls).toContain('goals.reset');
+      expect(body(response)['goal']).toBeTypeOf('object');
     });
   });
 

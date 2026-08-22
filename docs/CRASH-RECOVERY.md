@@ -62,7 +62,7 @@ Pour remettre le compteur d'aplomb : *Tableau de bord* → **Ajouter du temps**,
 
 ## 6. Ce que le crash ne touche pas
 
-**Vos réglages** (`config.json`) sont écrits par le même mécanisme atomique, avec le même `.bak`.
+**Vos réglages** (`config.json`) sont écrits par le même mécanisme atomique, avec le même `.bak`. **La progression de vos objectifs** (`goals.json`) aussi : elle est indépendante du compteur, et remettre le chrono à zéro ne l'efface pas.
 
 **Vos jetons Twitch** (`secrets.json`) survivent également. En revanche, ils sont chiffrés **pour votre compte Windows** : les recopier vers un autre PC ou un autre compte les rend illisibles, et ChronoCast rouvrira son assistant. Ce n'est pas un défaut, c'est la protection qui empêche quiconque récupérant le fichier de s'en servir.
 

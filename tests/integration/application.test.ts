@@ -365,6 +365,125 @@ describe('application complète', () => {
     });
   });
 
+  describe('objectifs', () => {
+    async function readPersistedGoals(): Promise<{ subs: number; reached: { target: number }[] }> {
+      const raw = await readFile(join(dataDirectory, 'goals.json'), 'utf8');
+      return JSON.parse(raw) as { subs: number; reached: { target: number }[] };
+    }
+
+    async function setLadder(): Promise<void> {
+      const response = await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({
+          config: {
+            goals: {
+              tiers: [
+                { target: 1, label: 'Je me rase la tête' },
+                { target: 2, label: 'Karaoké' },
+                { target: 10, label: 'Marathon 24 h' },
+              ],
+            },
+          },
+        }),
+      });
+      expect(response.status).toBe(200);
+    }
+
+    it('compte un abonnement et le persiste hors de l’état du compteur', async () => {
+      await notify('channel.subscribe', channelSubscribe);
+
+      expect((await readPersistedGoals()).subs).toBe(1);
+      expect((await readPersistedCounter())).not.toHaveProperty('subs');
+    });
+
+    it('compte un don groupé pour ce qu’il porte et franchit tous les paliers traversés', async () => {
+      await setLadder();
+
+      await notify('channel.subscription.gift', channelSubscriptionGift);
+
+      const persisted = await readPersistedGoals();
+      expect(persisted.subs).toBe(2);
+      expect(persisted.reached.map((entry) => entry.target)).toEqual([1, 2]);
+    });
+
+    it('sert la progression et l’échelle triée', async () => {
+      await setLadder();
+      await notify('channel.subscribe', channelSubscribe);
+
+      const payload = (await (await api('/api/goals')).json()) as {
+        goal: { subs: number; position: { label: string; from: number; to: number } };
+        tiers: { target: number }[];
+      };
+
+      expect(payload.goal.subs).toBe(1);
+      expect(payload.goal.position).toMatchObject({ label: 'Karaoké', from: 1, to: 2 });
+      expect(payload.tiers.map((tier) => tier.target)).toEqual([1, 2, 10]);
+    });
+
+    it('diffuse la progression sur le canal des objectifs', async () => {
+      await setLadder();
+      const page = collect(connectOverlay());
+      await page.waitFor(() => page.ofType('goal').length > 0, 'instantané des objectifs');
+
+      await notify('channel.subscribe', channelSubscribe);
+
+      await page.waitFor(() => page.ofType('goal').length > 1, 'diffusion des objectifs');
+      const message = page.ofType('goal').at(-1) as unknown as {
+        subs: number;
+        crossed: { label: string }[];
+      };
+      expect(message.subs).toBe(1);
+      expect(message.crossed.map((tier) => tier.label)).toEqual(['Je me rase la tête']);
+    });
+
+    it('n’avance pas sur une commande de chat, qui est une saisie humaine', async () => {
+      await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { twitch: { enableChatCommands: true } } }),
+      });
+
+      await notify('channel.chat.message', chatMessageModeratorAddTime);
+
+      const payload = (await (await api('/api/goals')).json()) as { goal: { subs: number } };
+      expect(payload.goal.subs).toBe(0);
+    });
+
+    it('remet la progression à zéro sans toucher au compteur', async () => {
+      await notify('channel.subscription.gift', channelSubscriptionGift);
+      const before = (await (await api('/api/state')).json()) as {
+        counter: { remainingMs: number };
+      };
+
+      const response = await mutate('/api/goals/reset');
+      expect(response.status).toBe(200);
+
+      expect((await readPersistedGoals()).subs).toBe(0);
+      const after = (await (await api('/api/state')).json()) as {
+        counter: { remainingMs: number };
+      };
+      expect(after.counter.remainingMs).toBe(before.counter.remainingMs);
+    });
+
+    it('refuse la remise à zéro sans jeton CSRF', async () => {
+      const response = await api('/api/goals/reset', { method: 'POST' });
+
+      expect(response.status).toBe(403);
+    });
+
+    it('retrouve la progression après un redémarrage', async () => {
+      await notify('channel.subscription.gift', channelSubscriptionGift);
+      await application.stop();
+
+      application = build();
+      port = await application.start();
+
+      const payload = (await (await api('/api/goals')).json()) as { goal: { subs: number } };
+      expect(payload.goal.subs).toBe(2);
+    });
+  });
+
   describe('commandes de chat', () => {
     async function enableChatCommands(patch: unknown = {}): Promise<void> {
       const response = await api('/api/config', {

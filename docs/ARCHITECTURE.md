@@ -35,6 +35,7 @@ graph TD
         LOG["logging/ — journalisation, rédaction"]
         CHAT["chat/ — commandes de chat"]
         HISTORY["history/ — historique des événements"]
+        GOALS["goals/ — objectifs, progression en abonnements"]
     end
 
     subgraph "web/ — servi au navigateur"
@@ -53,6 +54,7 @@ graph TD
     APP --> LOG
     APP --> CHAT
     APP --> HISTORY
+    APP --> GOALS
     SERVER -.sert.-> OVERLAY
     SERVER -.sert.-> ADMIN
     SERVER -.sert.-> SETUP
@@ -63,6 +65,10 @@ graph TD
 **`core/chat/` illustre le principe jusqu'au bout.** Reconnaître un préfixe `!`, lire un nombre de secondes, décider si l'auteur est diffuseur ou modérateur, refuser une durée au-delà du plafond : tout cela est pur, sans horloge ni réseau, et se vérifie en conteneur. Le service ne connaît ni le WebSocket qui lui a apporté le message, ni le compteur qu'il fera bouger — il rend un événement de domaine, une action à exécuter, ou une raison d'avoir écarté le message.
 
 **Toutes les commandes ne créditent pas du temps.** `!pause` et `!reprendre` sont des **actions d'état** : elles n'ont ni récompense ni entrée d'historique, et ne traversent donc ni le barème ni l'historique. C'est la raison pour laquelle le service rend une union à trois branches plutôt qu'un événement de domaine forcé qui ne créditerait rien. Elles se lisent aussi sur une porte d'autorisation plus étroite : le badge `broadcaster` seul, là où `!addtime` accepte aussi les modérateurs.
+
+**`core/goals/` compte les promesses, jamais les secondes.** Un subathon tient sur une échelle de paliers nommés — « à 50 subs je me rase la tête » — que le compteur seul ne dit pas. Deux modules purs s'en chargent : l'un traduit un événement en abonnements gagnés, l'autre traduit un compte en position sur l'échelle et rend les paliers qu'un événement traverse. Un don groupé de cent abonnements franchit plusieurs promesses d'un coup, et elles doivent toutes pouvoir être annoncées.
+
+**Les objectifs ne créditent aucune seconde.** Le barème reste le seul juge du temps ; les objectifs se branchent après lui, sur le même événement déjà dédupliqué, et ce qu'il a refusé ne fait pas non plus avancer la barre. La progression vit dans son propre fichier : le compteur est remis à zéro à chaque subathon, une promesse lui survit.
 
 **`web/` est du code navigateur.** Il n'importe du noyau que des **types**, jamais de valeur : une règle ESLint le garantit, et `src/web/shared/protocol.ts` redéclare le contrat du WebSocket plutôt que de le ré-exporter — contrainte de `rootDir` en TypeScript, tenue par un test qui fait échouer la compilation dès qu'un champ diverge.
 
@@ -142,6 +148,7 @@ Producteurs et consommateurs ne se connaissent pas. Le catalogue est un type uni
 | --- | --- |
 | `config.json` | À chaque modification, atomique |
 | `counter.json` | Mutations immédiates, érosion toutes les 5 s |
+| `goals.json` | À chaque abonnement compté, atomique |
 | `secrets.json` | Chiffré par DPAPI, jamais en clair |
 | `history/*.jsonl` | Une ligne par événement |
 | `logs/*.log` | Journalisation |

@@ -4,8 +4,12 @@ import {
   applyMessage,
   counterControls,
   createDashboardModel,
+  goalProgressRatio,
   happyHourLabels,
+  isResetArmed,
   MAX_RECENT_EVENTS,
+  RESET_ARM_WINDOW_MS,
+  resetLabel,
   statusLabel,
   twitchLabel,
   type DashboardModel,
@@ -234,6 +238,91 @@ describe('applyMessage', () => {
     const model = applyMessage(createDashboardModel(), snapshot);
 
     expect(applyMessage(model, snapshot)).toBe(model);
+  });
+});
+
+describe('objectifs', () => {
+  function goalMessage(overrides: Record<string, unknown> = {}): ServerMessage {
+    return {
+      type: 'goal',
+      subs: 7,
+      index: 1,
+      total: 3,
+      from: 5,
+      to: 10,
+      label: 'Karaoké',
+      complete: false,
+      crossed: [],
+      ...overrides,
+    };
+  }
+
+  it('part sans progression connue', () => {
+    expect(createDashboardModel().goal).toBeNull();
+  });
+
+  it('retient la progression annoncée', () => {
+    const model = applyMessage(createDashboardModel(), goalMessage());
+
+    expect(model.goal).toMatchObject({ subs: 7, label: 'Karaoké', from: 5, to: 10 });
+  });
+
+  it('remplace la progression précédente', () => {
+    const first = applyMessage(createDashboardModel(), goalMessage());
+    const second = applyMessage(first, goalMessage({ subs: 12, label: 'Marathon' }));
+
+    expect(second.goal?.subs).toBe(12);
+  });
+
+  it('rend le même modèle quand rien ne change, pour ne pas repeindre inutilement', () => {
+    const first = applyMessage(createDashboardModel(), goalMessage());
+
+    expect(applyMessage(first, goalMessage())).toBe(first);
+  });
+});
+
+describe('goalProgressRatio', () => {
+  it('rend la part parcourue du palier courant', () => {
+    expect(goalProgressRatio({ subs: 7, from: 5, to: 10 })).toBeCloseTo(0.4);
+  });
+
+  it('rend zéro au tout début d’un palier', () => {
+    expect(goalProgressRatio({ subs: 5, from: 5, to: 10 })).toBe(0);
+  });
+
+  it('rend un quand le palier est atteint', () => {
+    expect(goalProgressRatio({ subs: 10, from: 5, to: 10 })).toBe(1);
+  });
+
+  it('reste plein au-delà du dernier palier', () => {
+    expect(goalProgressRatio({ subs: 500, from: 100, to: 200 })).toBe(1);
+  });
+
+  it('rend zéro sur un palier de largeur nulle plutôt que de diviser par zéro', () => {
+    expect(goalProgressRatio({ subs: 0, from: 0, to: 0 })).toBe(0);
+  });
+});
+
+describe('remise à zéro en deux temps', () => {
+  it('n’est pas armée tant que rien n’a été cliqué', () => {
+    expect(isResetArmed(null, 10_000)).toBe(false);
+  });
+
+  it('est armée juste après le premier clic', () => {
+    expect(isResetArmed(10_000, 10_100)).toBe(true);
+  });
+
+  it('se désarme toute seule passé le délai', () => {
+    expect(isResetArmed(10_000, 10_000 + RESET_ARM_WINDOW_MS + 1)).toBe(false);
+  });
+
+  it('reste armée à la limite exacte du délai', () => {
+    expect(isResetArmed(10_000, 10_000 + RESET_ARM_WINDOW_MS)).toBe(true);
+  });
+
+  it('annonce ce que le clic va faire', () => {
+    expect(resetLabel(false)).not.toBe(resetLabel(true));
+    expect(resetLabel(true).toLowerCase()).toContain('confirmer');
   });
 });
 

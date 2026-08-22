@@ -8,6 +8,8 @@ import type { CounterEventOutcome, CounterService } from '../../src/core/counter
 import type { DomainEvent } from '../../src/core/events/domain-event.js';
 import type { HistoryEntry } from '../../src/core/history/event-history-service.js';
 import type { EventHistoryService } from '../../src/core/history/event-history-service.js';
+import { normalizeLadder, positionAt } from '../../src/core/goals/goal-ladder.js';
+import type { GoalService, GoalSnapshot, GoalState } from '../../src/core/goals/goal-service.js';
 import {
   createRingBufferSink,
   type RingBufferSink,
@@ -27,6 +29,7 @@ export interface ApiDoubles {
   twitchStatus: TwitchStatusPayload;
   clientSecret: string | null;
   failTwitch: boolean;
+  goalSubs: number;
 }
 
 export function createApiDoubles(): ApiDoubles {
@@ -35,12 +38,21 @@ export function createApiDoubles(): ApiDoubles {
 
   const doubles = {
     calls,
-    config: DEFAULT_CONFIG,
+    config: configSchema.parse({
+      ...DEFAULT_CONFIG,
+      goals: {
+        tiers: [
+          { target: 5, label: 'Je me rase la tête' },
+          { target: 10, label: 'Karaoké' },
+        ],
+      },
+    }),
     counterState: createInitialState({ initialMs: 43_200_000, now: 1_700_000_000_000 }),
     historyEntries: [] as HistoryEntry[],
     twitchStatus: { status: 'ready' } as TwitchStatusPayload,
     clientSecret: null as string | null,
     failTwitch: false,
+    goalSubs: 7,
   };
 
   const configService: ConfigService = {
@@ -107,6 +119,37 @@ export function createApiDoubles(): ApiDoubles {
     purge: () => Promise.resolve(0),
   };
 
+  function goalState(): GoalState {
+    return {
+      subs: doubles.goalSubs,
+      reached: [],
+      updatedAt: 1_700_000_000_000,
+      schemaVersion: 1,
+    };
+  }
+
+  function goalSnapshot(): GoalSnapshot {
+    const tiers = normalizeLadder(doubles.config.goals.tiers);
+    return {
+      subs: doubles.goalSubs,
+      reached: [],
+      position: positionAt(doubles.goalSubs, tiers),
+      tiers,
+    };
+  }
+
+  const goals: GoalService = {
+    start: () => Promise.resolve(),
+    getState: () => goalState(),
+    getSnapshot: () => goalSnapshot(),
+    applyEvent: () => Promise.resolve({ snapshot: goalSnapshot(), crossed: [] }),
+    reset: () => {
+      calls.push('goals.reset');
+      doubles.goalSubs = 0;
+      return Promise.resolve(goalState());
+    },
+  };
+
   const twitch: TwitchApiPort = {
     getStatus: () => doubles.twitchStatus,
     describe: () => {
@@ -146,6 +189,7 @@ export function createApiDoubles(): ApiDoubles {
   const context: ApiContext = {
     config: configService,
     counter: counterService,
+    goals,
     history,
     logs: ringBuffer,
     twitch,
