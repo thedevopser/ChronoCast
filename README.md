@@ -1,7 +1,8 @@
 # ChronoCast
 
 Compteur subathon Twitch pour OBS : un compte à rebours affiché sur le stream, qui
-s'incrémente automatiquement à chaque sub, resub, gift sub, sub Prime ou don de bits.
+s'incrémente automatiquement à chaque sub, resub, gift sub, sub Prime ou don de bits,
+et une barre d'objectif qui montre aux spectateurs la promesse en cours.
 
 Tout fonctionne en local. Aucun serveur, aucune base de données distante, aucun
 abonnement : la seule communication sortante est celle qui va vers Twitch.
@@ -9,8 +10,14 @@ abonnement : la seule communication sortante est celle qui va vers Twitch.
 ## En deux mots
 
 - **Un overlay** à ajouter dans OBS comme simple Browser Source, fond transparent.
-- **Un panneau d'administration** local pour tout piloter : barème, apparence,
-  pause, ajout ou retrait de temps, historique, logs.
+- **Une barre d'objectif**, seconde Browser Source indépendante : l'échelle de vos
+  promesses — « à 50 subs je me rase la tête » — comptée en abonnements, avec un
+  bandeau qui annonce chaque palier franchi.
+- **Un Happy Hour** : une bascule qui double les secondes créditées, le temps que
+  vous décidez.
+- **Un panneau d'administration** local pour tout piloter : barème, objectifs,
+  apparence des deux pages avec aperçu en direct, pause, ajout ou retrait de temps,
+  historique, logs.
 - **Une connexion Twitch EventSub** en WebSocket, sans nom de domaine ni port
   ouvert sur Internet.
 - **Un état persistant** : le compteur survit à une fermeture, à un crash et à un
@@ -23,10 +30,25 @@ l'adresse à coller dans OBS.
 
 ![Tableau de bord](docs/images/dashboard.png)
 
-L'apparence se règle entièrement depuis le panneau, et l'aperçu affiché **est
-l'overlay réel** — ce que vous y voyez est ce qu'OBS affichera.
+La progression des objectifs et la bascule du Happy Hour s'y trouvent aussi, sous
+les yeux pendant tout le direct.
+
+![Happy Hour et progression](docs/images/happy-hour.png)
+
+L'échelle de vos promesses : un seuil, un libellé, et la progression en cours. Vous
+ne saisissez que le seuil d'arrivée — le point de départ d'un palier est celui du
+précédent, si bien qu'il ne peut y avoir ni trou ni chevauchement.
+
+![Vue Objectifs](docs/images/subgoals.png)
+
+L'apparence se règle entièrement depuis le panneau, un onglet par page collée dans
+OBS, et l'aperçu affiché **est la page réelle** — ce que vous y voyez est ce qu'OBS
+affichera. Le bouton « Jouer une annonce » rejoue un palier franchi dans l'aperçu
+et dans votre scène, sans toucher à votre progression.
 
 ![Vue Apparence](docs/images/apparence.png)
+
+![Onglet de la barre d'objectif](docs/images/apparence-subgoals.png)
 
 L'historique dit d'où vient le temps gagné, y compris les événements qui n'ont
 rien crédité.

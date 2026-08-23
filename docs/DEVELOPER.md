@@ -83,9 +83,10 @@ src/
     config/    schéma Zod
     logging/   journalisation, rédaction des secrets
     events/    vocabulaire du domaine
+    goals/     objectifs, progression comptée en abonnements
   main/        coquille Electron
   headless/    point d'entrée Node nu, outil de développement
-  web/         overlay, panneau, assistant — servis au navigateur
+  web/         overlay, barre d'objectif, panneau, assistant — servis au navigateur
 tests/
   unit/        par module
   integration/ l'application entière, sans réseau
@@ -110,7 +111,8 @@ Pensez à `required` : une souscription facultative qui échoue est signalée sa
 1. Le déclarer dans `core/config/schema.ts`, **avec sa valeur par défaut et un commentaire disant pourquoi il existe**.
 2. Lancer les tests. `tests/unit/web/admin/fields.test.ts` passe au rouge tout seul : chaque feuille du schéma doit être **liée à un champ du panneau ou écartée avec sa raison**.
 3. Ajouter le descripteur dans `src/web/admin/fields.ts`. Le gabarit HTML n'est pas à toucher : les champs sont rendus depuis cette table.
-4. Si le réglage concerne l'overlay, l'ajouter au type partagé `src/web/shared/protocol.ts` — sans quoi le typecheck casse, ce qui est l'effet recherché.
+4. Si le réglage concerne une page servie à OBS, l'ajouter au type partagé `src/web/shared/protocol.ts` — sans quoi le typecheck casse, ce qui est l'effet recherché. Un réglage d'apparence relève d'un **onglet** de la vue Apparence, une vue à champs par page servie ; le sous-arbre qu'il vise se prévisualise par `draftSubtree`, qui prend un préfixe.
+5. **Un préfixe de sous-arbre plus spécifique se déclare avant son parent** dans `GROUPS` : `groupOf` retient le premier qui correspond, et `groupsOf` rend les groupes dans cet ordre. Deux vues ne peuvent pas partager un nom de groupe, un test l'interdit.
 
 Ce garde-fou a fonctionné à chaque ajout. Il est là parce qu'un réglage déclaré mais lu nulle part **ment à l'utilisateur** : le cas s'est produit avec un mode WebSocket qui n'avait aucun effet, et il a fallu le retirer.
 
