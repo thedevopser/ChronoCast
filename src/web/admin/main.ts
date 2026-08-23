@@ -22,6 +22,7 @@ import { normalizeTiers, type TierInput } from './bits-tiers.js';
 import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
+  parseGoalSubs,
   type GoalTierInput,
 } from './goal-tiers.js';
 import {
@@ -460,6 +461,22 @@ function start(): void {
   });
 
   paintGoalReset();
+
+  const saveGoalSubs = button('#save-goal-subs');
+  saveGoalSubs.addEventListener('click', () => {
+    void guarded(saveGoalSubs, async () => {
+      const parsed = parseGoalSubs(input('#goal-subs-input').value);
+      if ('error' in parsed) {
+        showBanner(parsed.error, 'banner--error');
+        return;
+      }
+
+      // Rien à peindre ici : le service annonce le nouveau compte sur le bus, et la barre comme
+      // l'échelle se rafraîchissent par le WebSocket.
+      await api.post('/api/goals/subs', { subs: parsed.subs });
+      showBanner('Compte des objectifs enregistré.', 'banner--success');
+    });
+  });
 
   for (const [selector, path] of [
     ['#pause', '/api/counter/pause'],

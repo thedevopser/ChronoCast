@@ -4,6 +4,8 @@ import { GOAL_LABEL_MAX_LENGTH as CORE_LABEL_MAX_LENGTH } from '../../../../src/
 import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
+  parseGoalSubs,
+  type GoalSubsResult,
   type GoalTierInput,
 } from '../../../../src/web/admin/goal-tiers.js';
 
@@ -120,5 +122,32 @@ describe('normalizeGoalTiers', () => {
 
       expect(errors[0]).toContain('Palier 3');
     });
+  });
+});
+
+describe('parseGoalSubs', () => {
+  function refusal(result: GoalSubsResult): string {
+    return 'error' in result ? result.error : '';
+  }
+
+  it('accepte un entier saisi', () => {
+    expect(parseGoalSubs('80')).toEqual({ subs: 80 });
+  });
+
+  it('tolère les espaces autour de la saisie', () => {
+    expect(parseGoalSubs('  80  ')).toEqual({ subs: 80 });
+  });
+
+  // La remise à zéro par le champ doit rester possible : c'est le même geste, à la valeur près.
+  it('accepte zéro', () => {
+    expect(parseGoalSubs('0')).toEqual({ subs: 0 });
+  });
+
+  // Sans ce refus, un champ vide vaudrait Number('') === 0 et effacerait la progression.
+  it.each(['', '   ', '-1', '1.5', 'quatre-vingts', '8e1', '80abc'])('refuse %j', (raw) => {
+    const result = parseGoalSubs(raw);
+
+    expect(result).not.toHaveProperty('subs');
+    expect(refusal(result)).not.toBe('');
   });
 });

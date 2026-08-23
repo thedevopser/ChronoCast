@@ -466,6 +466,44 @@ describe('application complète', () => {
       expect(after.counter.remainingMs).toBe(before.counter.remainingMs);
     });
 
+    it('écrit un compte déjà acquis et le persiste', async () => {
+      await setLadder();
+
+      const response = await mutate('/api/goals/subs', JSON.stringify({ subs: 8 }));
+      expect(response.status).toBe(200);
+
+      expect((await readPersistedGoals()).subs).toBe(8);
+      // Aucun franchissement fabriqué pour les paliers 1 et 2 que la valeur dépasse.
+      expect((await readPersistedGoals()).reached).toEqual([]);
+    });
+
+    it('laisse le palier suivant s’annoncer depuis le compte écrit', async () => {
+      await setLadder();
+      await mutate('/api/goals/subs', JSON.stringify({ subs: 9 }));
+
+      const page = collect(connectOverlay());
+      await page.waitFor(() => page.ofType('goal').length > 0, 'instantané des objectifs');
+
+      await notify('channel.subscribe', channelSubscribe);
+
+      await page.waitFor(() => page.ofType('goal').length > 1, 'diffusion des objectifs');
+      const message = page.ofType('goal').at(-1) as unknown as {
+        subs: number;
+        crossed: { label: string }[];
+      };
+      expect(message.subs).toBe(10);
+      expect(message.crossed.map((tier) => tier.label)).toEqual(['Marathon 24 h']);
+    });
+
+    it('refuse l’écriture du compte sans jeton CSRF', async () => {
+      const response = await api('/api/goals/subs', {
+        method: 'POST',
+        body: JSON.stringify({ subs: 8 }),
+      });
+
+      expect(response.status).toBe(403);
+    });
+
     it('refuse la remise à zéro sans jeton CSRF', async () => {
       const response = await api('/api/goals/reset', { method: 'POST' });
 

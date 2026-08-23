@@ -148,6 +148,11 @@ export function createApiDoubles(): ApiDoubles {
     getState: () => goalState(),
     getSnapshot: () => goalSnapshot(),
     applyEvent: () => Promise.resolve({ snapshot: goalSnapshot(), crossed: [] }),
+    setSubs: (count: number) => {
+      calls.push(`goals.setSubs:${String(count)}`);
+      doubles.goalSubs = count;
+      return Promise.resolve(goalState());
+    },
     reset: () => {
       calls.push('goals.reset');
       doubles.goalSubs = 0;

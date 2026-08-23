@@ -232,6 +232,29 @@
             <p class="card__value" id="goal-progress-count">—</p>
             <p class="card__hint" id="goal-progress-detail"></p>
             <ul class="ladder" id="goal-ladder"></ul>
+
+            <hr class="rule" />
+
+            <label class="field field--compact">
+              <span class="field__label">Abonnements déjà acquis</span>
+              <input
+                class="field__input"
+                id="goal-subs-input"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="80"
+                autocomplete="off"
+              />
+            </label>
+            <p class="note">
+              Pour caler la barre sur un subathon déjà commencé. La valeur saisie remplace le
+              compte : elle n'annonce aucun palier aux spectateurs et ne crédite aucune seconde au
+              compteur.
+            </p>
+            <div class="actions">
+              <button class="button" type="button" id="save-goal-subs">Enregistrer</button>
+            </div>
           </div>
 
           <div class="card">

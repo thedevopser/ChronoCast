@@ -275,6 +275,78 @@ describe('createGoalService', () => {
     });
   });
 
+  describe('écriture du compte', () => {
+    beforeEach(async () => {
+      await harness.service.start();
+    });
+
+    it('remplace le compte plutôt que de s’y ajouter', async () => {
+      await harness.service.applyEvent(giftEvent(3));
+
+      await harness.service.setSubs(80);
+
+      expect(harness.service.getState().subs).toBe(80);
+    });
+
+    it('persiste le compte écrit', async () => {
+      await harness.service.setSubs(80);
+
+      expect(harness.store.persisted?.subs).toBe(80);
+    });
+
+    it('n’annonce aucun palier, même en dépassant l’échelle entière', async () => {
+      const before = harness.changes.length;
+
+      await harness.service.setSubs(80);
+
+      expect(harness.changes.length).toBe(before + 1);
+      expect(harness.changes.at(-1)?.crossed).toEqual([]);
+      expect(harness.service.getState().reached).toEqual([]);
+    });
+
+    it('laisse les paliers suivants s’annoncer normalement', async () => {
+      await harness.service.setSubs(9);
+
+      const outcome = await harness.service.applyEvent(subEvent());
+
+      expect(outcome.crossed.map((tier) => tier.target)).toEqual([10]);
+    });
+
+    it('élague les franchissements que la nouvelle valeur laisse derrière elle', async () => {
+      await harness.service.applyEvent(giftEvent(20));
+      expect(harness.service.getState().reached).toHaveLength(2);
+
+      await harness.service.setSubs(7);
+
+      expect(harness.service.getState().reached).toEqual([
+        { target: 5, reachedAt: START_EPOCH },
+      ]);
+    });
+
+    it('accepte zéro comme n’importe quelle autre valeur', async () => {
+      await harness.service.applyEvent(giftEvent(20));
+
+      await harness.service.setSubs(0);
+
+      expect(harness.service.getState().subs).toBe(0);
+      expect(harness.service.getState().reached).toEqual([]);
+    });
+
+    it('date l’écriture sur l’horloge murale', async () => {
+      harness.clock.advance(60_000);
+
+      await harness.service.setSubs(4);
+
+      expect(harness.service.getState().updatedAt).toBe(START_EPOCH + 60_000);
+    });
+
+    it('refuse d’écrire avant le démarrage', async () => {
+      const cold = createHarness();
+
+      await expect(cold.service.setSubs(4)).rejects.toThrow();
+    });
+  });
+
   describe('remise à zéro', () => {
     beforeEach(async () => {
       await harness.service.start();

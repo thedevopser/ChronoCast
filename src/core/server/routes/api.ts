@@ -74,6 +74,9 @@ const MAX_ADJUSTMENT_SECONDS = 86_400;
 
 const MAX_INITIAL_SECONDS = 2_592_000;
 
+// Aucune chaîne Twitch n'atteindra ce compte : le plafond n'est là que pour borner une saisie.
+const MAX_GOAL_SUBS = 1_000_000;
+
 const secondsSchema = z.number().int().positive().max(MAX_ADJUSTMENT_SECONDS);
 
 const adjustmentSchema = z
@@ -85,6 +88,10 @@ const adjustmentSchema = z
 
 const initialSchema = z
   .object({ seconds: z.number().int().positive().max(MAX_INITIAL_SECONDS) })
+  .strip();
+
+const goalSubsSchema = z
+  .object({ subs: z.number().int().min(0).max(MAX_GOAL_SUBS) })
   .strip();
 
 const configPatchSchema = z
@@ -382,6 +389,20 @@ export function createApiRoutes(context: ApiContext): Route[] {
 
         previewGoal({ target: position.to, label: position.label });
         return Promise.resolve(jsonResponse(200, { tier: { target: position.to, label: position.label } }));
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/api/goals/subs',
+      handler: async (request) => {
+        const parsed = goalSubsSchema.safeParse(parseJsonBody(request));
+        if (!parsed.success) {
+          return badRequest('Nombre d’abonnements invalide.');
+        }
+
+        await goals.setSubs(parsed.data.subs);
+        return jsonResponse(200, { goal: goals.getSnapshot() });
       },
     },
 
