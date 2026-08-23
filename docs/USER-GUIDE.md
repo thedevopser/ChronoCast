@@ -120,7 +120,7 @@ Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesse
 
 **La remise à zéro** se trouve sur le tableau de bord, et demande deux clics : le premier arme, le second exécute. Elle n'efface **que** la progression des objectifs — votre compteur n'y touche pas, et l'inverse est vrai aussi : réinitialiser le chrono ne remet pas les objectifs à zéro. La progression est enregistrée dans son propre fichier et survit à la fermeture de l'application.
 
-**Il n'y a pas d'ajustement manuel du compte**, et c'est délibéré : le compte ne reflète que ce que ChronoCast a réellement vu passer, et ne peut donc jamais mentir.
+**Si votre subathon a commencé avant ChronoCast**, le champ *Abonnements déjà acquis*, sous l'échelle dans la vue *Objectifs*, cale la barre sur votre compte réel. La valeur saisie **remplace** le compte : elle ne s'y ajoute pas, elle n'annonce aucun palier à vos spectateurs même si elle en dépasse plusieurs, et elle ne crédite aucune seconde au compteur. Servez-vous-en pour rattraper un retard ou corriger une saisie, et non pour gonfler une promesse : c'est le seul endroit où le compte affiché peut s'écarter de ce que ChronoCast a réellement vu passer.
 
 **Un palier franchi ne crédite aucune seconde.** Le barème reste le seul juge du temps ajouté ; les objectifs disent *pourquoi* le compteur monte, ils ne le font pas monter.
 

@@ -230,6 +230,50 @@ describe('createApiRoutes', () => {
       expect(body(response)['goal']).toBeTypeOf('object');
     });
 
+    describe('POST /api/goals/subs', () => {
+      it('écrit le compte et rend la progression', async () => {
+        const response = await call('POST', '/api/goals/subs', {
+          body: JSON.stringify({ subs: 80 }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(doubles.calls).toContain('goals.setSubs:80');
+        expect(body(response)['goal']).toMatchObject({ subs: 80 });
+      });
+
+      // Zéro n'est pas une valeur limite à écarter : c'est la remise à zéro par la même porte.
+      it('accepte zéro', async () => {
+        const response = await call('POST', '/api/goals/subs', {
+          body: JSON.stringify({ subs: 0 }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(doubles.calls).toContain('goals.setSubs:0');
+      });
+
+      it.each([
+        {},
+        { subs: -1 },
+        { subs: 1.5 },
+        { subs: '80' },
+        { subs: null },
+        { subs: Number.MAX_SAFE_INTEGER },
+      ])('refuse %j', async (payload) => {
+        const response = await call('POST', '/api/goals/subs', {
+          body: JSON.stringify(payload),
+        });
+
+        expect(response.status).toBe(400);
+        expect(doubles.calls.some((entry) => entry.startsWith('goals.setSubs'))).toBe(false);
+      });
+
+      it('refuse un corps illisible', async () => {
+        const response = await call('POST', '/api/goals/subs', { body: 'pas du json' });
+
+        expect(response.status).toBe(400);
+      });
+    });
+
     describe('POST /api/goals/preview', () => {
       it('diffuse le palier en cours comme s’il venait d’être atteint', async () => {
         const response = await call('POST', '/api/goals/preview');

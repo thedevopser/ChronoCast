@@ -56,6 +56,8 @@ export interface GoalService {
 
   applyEvent(event: DomainEvent): Promise<GoalOutcome>;
 
+  setSubs(count: number): Promise<GoalState>;
+
   reset(): Promise<GoalState>;
 }
 
@@ -162,6 +164,27 @@ export function createGoalService(options: GoalServiceOptions): GoalService {
       });
 
       return { snapshot: await commit(next, crossed), crossed };
+    },
+
+    async setSubs(count: number): Promise<GoalState> {
+      const previous = requireState();
+
+      const next: GoalState = {
+        subs: count,
+        // Aucun franchissement fabriqué : `reached` n'enregistre que ce qui a été vécu en direct.
+        // Ceux que la nouvelle valeur laisse derrière elle s'en vont, faute de quoi un compte
+        // abaissé traînerait un historique qui le contredit.
+        reached: previous.reached.filter((entry) => entry.target <= count),
+        updatedAt: clock.now(),
+        schemaVersion: GOAL_STATE_VERSION,
+      };
+
+      // Émis sans palier franchi : écrire quatre-vingts abonnements sur une échelle de douze
+      // paliers ne doit pas jeter douze annonces à la suite sur la page des spectateurs.
+      await commit(next, []);
+      logger.info('compte des objectifs écrit', { subs: count });
+
+      return next;
     },
 
     async reset(): Promise<GoalState> {

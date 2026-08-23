@@ -19,6 +19,24 @@ export interface GoalTiersResult {
 
 const INTEGER = /^\d+$/;
 
+export type GoalSubsResult = { readonly subs: number } | { readonly error: string };
+
+/**
+ * Lit le compte d'abonnements saisi. Un champ vide est refusé plutôt qu'entendu comme zéro :
+ * `Number('')` vaut 0, et une saisie oubliée effacerait la progression au lieu de ne rien faire.
+ */
+export function parseGoalSubs(raw: string): GoalSubsResult {
+  const value = raw.trim();
+
+  if (!INTEGER.test(value)) {
+    return {
+      error: 'Nombre d’abonnements attendu : un entier positif ou zéro.',
+    };
+  }
+
+  return { subs: Number(value) };
+}
+
 function isBlank(row: GoalTierInput): boolean {
   return row.target.trim() === '' && row.label.trim() === '';
 }
