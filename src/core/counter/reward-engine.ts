@@ -66,43 +66,25 @@ const BITS_USAGE_MENTIONS: Readonly<Record<BitsUsage, string>> = {
   unknown: ' d’origine inconnue',
 };
 
+const MILLISECONDS_PER_SECOND = 1_000;
+
+// Chaque bit compte : le taux s'applique au bit près, et le crédit garde ses décimales jusqu'à la
+// milliseconde, qui est la précision du compteur.
 function computeBitsReward(
   bits: number,
   usage: BitsUsage,
-  config: RewardsConfig['bits'],
+  rate: RewardsConfig['bits'],
 ): RewardComputation {
   if (bits <= 0) {
     return refused('nombre de bits invalide');
   }
 
   const spent = `${String(bits)} bits${BITS_USAGE_MENTIONS[usage]}`;
+  const seconds =
+    Math.round(((bits * rate.seconds) / rate.unit) * MILLISECONDS_PER_SECOND) /
+    MILLISECONDS_PER_SECOND;
 
-  if (config.mode === 'tiers') {
-    const matching = config.tiers.filter((tier) => bits >= tier.minBits);
-    if (matching.length === 0) {
-      return refused(`${spent}, sous le premier palier`);
-    }
-
-    const best = matching.reduce((highest, candidate) =>
-      candidate.minBits > highest.minBits ? candidate : highest,
-    );
-
-    return granted(best.seconds, `${spent}, palier ${String(best.minBits)}`);
-  }
-
-  if (bits < config.linear.minBits) {
-    return refused(`${spent}, sous le seuil de ${String(config.linear.minBits)}`);
-  }
-
-  const units = Math.floor(bits / config.linear.unit);
-  if (units <= 0) {
-    return refused(`${spent}, moins d'une unité de ${String(config.linear.unit)}`);
-  }
-
-  return granted(
-    units * config.linear.secondsPerUnit,
-    `${spent}, ${String(units)} unité(s)`,
-  );
+  return seconds > 0 ? granted(seconds, spent) : refused(`${spent}, sans crédit à ce taux`);
 }
 
 const HAPPY_HOUR_MENTION = 'Happy Hour';

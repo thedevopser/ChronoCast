@@ -23,17 +23,15 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
   'rewards.happyHour':
     'Bascule à effet immédiat, tenue par un bouton du tableau de bord et de la vue Happy Hour. En faire aussi une case à enregistrer donnerait deux gestes pour un même état.',
 
-  'rewards.bits.tiers':
-    'Tableau de paliers à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Barème avec son propre module.',
-
-  'rewards.happyHourRewards.bits.tiers':
-    'Même éditeur de paliers que le barème normal, paramétré pour le Happy Hour : un tableau à cardinalité variable n’est pas un champ.',
-
   'goals.tiers':
     'Échelle de paliers nommés, à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Objectifs avec son propre module.',
 };
 
 const DAY = 86_400;
+
+// Les deux champs du taux des bits se lisent à la suite, comme une phrase.
+const BITS_UNIT_LABEL = 'Pour ce nombre de bits…';
+const BITS_SECONDS_LABEL = '…créditer ce nombre de secondes';
 
 function reward(selector: string, path: string, label: string, view: FieldViewId = 'rewards'): AdminField {
   return { selector, path, label, view, kind: 'integer', min: 0, max: DAY };
@@ -68,32 +66,15 @@ const REWARD_FIELDS: readonly AdminField[] = [
   happyHourReward('#reward-hh-gift-tier2', 'gift.tier2', 'Tier 2'),
   happyHourReward('#reward-hh-gift-tier3', 'gift.tier3', 'Tier 3'),
   {
-    selector: '#reward-hh-bits-mode',
-    path: 'rewards.happyHourRewards.bits.mode',
-    label: 'Mode de calcul',
-    hint: 'Proportionnel au nombre de bits, ou par seuils. Indépendant du mode du barème normal.',
-    view: 'happy-hour',
-    kind: 'enum',
-    options: ['linear', 'tiers'],
-  },
-  {
     selector: '#reward-hh-bits-unit',
-    path: 'rewards.happyHourRewards.bits.linear.unit',
-    label: 'Bits par unité',
+    path: 'rewards.happyHourRewards.bits.unit',
+    label: BITS_UNIT_LABEL,
+    hint: 'Le taux du Happy Hour, indépendant du taux normal. Chaque bit compte : à 100 bits pour 120 secondes, 1 bit ajoute 1,2 s.',
     view: 'happy-hour',
     kind: 'integer',
     min: 1,
   },
-  happyHourReward('#reward-hh-bits-seconds', 'bits.linear.secondsPerUnit', 'Secondes par unité'),
-  {
-    selector: '#reward-hh-bits-min',
-    path: 'rewards.happyHourRewards.bits.linear.minBits',
-    label: 'Bits minimum',
-    hint: 'En deçà de ce seuil, rien n’est crédité pendant le Happy Hour. Se règle à part du seuil normal.',
-    view: 'happy-hour',
-    kind: 'integer',
-    min: 1,
-  },
+  happyHourReward('#reward-hh-bits-seconds', 'bits.seconds', BITS_SECONDS_LABEL),
 
   reward('#reward-sub-prime', 'rewards.sub.prime', 'Prime'),
   reward('#reward-sub-tier1', 'rewards.sub.tier1', 'Tier 1'),
@@ -109,32 +90,15 @@ const REWARD_FIELDS: readonly AdminField[] = [
   reward('#reward-gift-tier2', 'rewards.gift.tier2', 'Tier 2'),
   reward('#reward-gift-tier3', 'rewards.gift.tier3', 'Tier 3'),
   {
-    selector: '#reward-bits-mode',
-    path: 'rewards.bits.mode',
-    label: 'Mode de calcul',
-    hint: 'Proportionnel au nombre de bits, ou par seuils.',
-    view: 'rewards',
-    kind: 'enum',
-    options: ['linear', 'tiers'],
-  },
-  {
     selector: '#reward-bits-unit',
-    path: 'rewards.bits.linear.unit',
-    label: 'Bits par unité',
+    path: 'rewards.bits.unit',
+    label: BITS_UNIT_LABEL,
+    hint: 'Les deux champs forment un taux, et chaque bit compte : à 100 bits pour 60 secondes, 1 bit ajoute 0,6 s et 150 bits ajoutent 90 s.',
     view: 'rewards',
     kind: 'integer',
     min: 1,
   },
-  reward('#reward-bits-seconds', 'rewards.bits.linear.secondsPerUnit', 'Secondes par unité'),
-  {
-    selector: '#reward-bits-min',
-    path: 'rewards.bits.linear.minBits',
-    label: 'Bits minimum',
-    hint: 'En deçà de ce seuil, rien n’est crédité.',
-    view: 'rewards',
-    kind: 'integer',
-    min: 1,
-  },
+  reward('#reward-bits-seconds', 'rewards.bits.seconds', BITS_SECONDS_LABEL),
   {
     selector: '#reward-command-name',
     path: 'rewards.chatCommand.name',

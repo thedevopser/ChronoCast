@@ -86,6 +86,26 @@ describe('formatReward', () => {
     expect(formatReward(30)).toBe('+30 s');
   });
 
+  // Un bit peut créditer moins d'une seconde : le taire afficherait « +0 s » pour un don réel.
+  it('garde une décimale en deçà de la minute quand le crédit n’est pas entier', () => {
+    expect(formatReward(0.6)).toBe('+0,6 s');
+    expect(formatReward(4.2)).toBe('+4,2 s');
+    expect(formatReward(0.333)).toBe('+0,3 s');
+  });
+
+  it('n’écrit pas de décimale à un crédit entier, ni à celui qu’elle arrondit à l’entier', () => {
+    expect(formatReward(30)).toBe('+30 s');
+    expect(formatReward(29.96)).toBe('+30 s');
+  });
+
+  it('montre qu’un crédit minuscule n’est pas nul', () => {
+    expect(formatReward(0.04)).toBe('+0,1 s');
+  });
+
+  it('tait les décimales au-delà de la minute', () => {
+    expect(formatReward(90.6)).toBe('+1 min 30');
+  });
+
   it('exprime en minutes rondes quand il n’y a pas de reste', () => {
     expect(formatReward(300)).toBe('+5 min');
   });

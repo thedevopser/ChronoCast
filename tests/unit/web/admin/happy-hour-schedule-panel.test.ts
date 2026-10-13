@@ -190,11 +190,48 @@ describe('vue Happy Hour', () => {
     expect(element('#view-dashboard').querySelector('input[type="time"]')).toBeNull();
   });
 
-  it('porte le barème Happy Hour et ses paliers de bits, que la vue Barème ne montre plus', () => {
+  it('porte le barème Happy Hour, que la vue Barème ne montre plus', () => {
     expect(view().contains(element('#reward-hh-sub-tier1'))).toBe(true);
-    expect(view().contains(element('#reward-hh-bits-mode'))).toBe(true);
-    expect(view().contains(element('#hh-bits-tiers'))).toBe(true);
-    expect(element('#view-rewards').querySelector('[id^="reward-hh-"], #hh-bits-tiers')).toBeNull();
+    expect(view().contains(element('#reward-hh-bits-unit'))).toBe(true);
+    expect(view().contains(element('#reward-hh-bits-seconds'))).toBe(true);
+    expect(element('#view-rewards').querySelector('[id^="reward-hh-"]')).toBeNull();
+  });
+
+  it('ne propose plus ni mode de calcul, ni seuil, ni paliers de bits', () => {
+    for (const selector of [
+      '#bits-tiers',
+      '#hh-bits-tiers',
+      '#reward-bits-mode',
+      '#reward-hh-bits-mode',
+      '#reward-bits-min',
+      '#reward-hh-bits-min',
+    ]) {
+      expect(document.querySelector(selector), selector).toBeNull();
+    }
+  });
+
+  it('enregistre le taux des bits de chaque barème par le bouton de sa vue', async () => {
+    field('#reward-bits-unit').value = '1';
+    field('#reward-bits-seconds').value = '2';
+    const before = requests.filter((request) => request.method === 'PATCH').length;
+
+    element('#save-rewards').click();
+    await settle();
+
+    // Un enregistrement recharge la configuration et repeint toutes les vues : la saisie de la
+    // seconde vue se fait donc après.
+    field('#reward-hh-bits-seconds').value = '300';
+    element('#save-happy-hour').click();
+    await settle();
+
+    const patches = requests
+      .filter((request) => request.method === 'PATCH')
+      .slice(before)
+      .map((request) => JSON.parse(request.body ?? '{}') as unknown);
+    expect(patches[0]).toStrictEqual({ config: { rewards: { bits: { unit: 1, seconds: 2 } } } });
+    expect(patches[1]).toMatchObject({
+      config: { rewards: { happyHourRewards: { bits: { seconds: 300 } } } },
+    });
   });
 
   it('affiche l’état et la plage au même titre que le tableau de bord', async () => {

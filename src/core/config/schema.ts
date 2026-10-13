@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 7;
+export const CONFIG_SCHEMA_VERSION = 8;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -87,46 +87,19 @@ function giftReward(factor: number) {
 const tieredRewardSchema = tieredReward(1);
 const giftRewardSchema = giftReward(1);
 
-const bitsTierSchema = z
-  .object({
-    minBits: z.number().int().positive(),
-    seconds,
-  })
-  .strip();
+const DEFAULT_BITS_UNIT = 100;
 
-const DEFAULT_SECONDS_PER_UNIT = 60;
+const DEFAULT_BITS_SECONDS = 60;
 
-const DEFAULT_BITS_TIERS = [
-  { minBits: 100, seconds: 60 },
-  { minBits: 500, seconds: 360 },
-  { minBits: 1_000, seconds: 900 },
-] as const;
-
+// Un taux, « `unit` bits = `seconds` secondes », appliqué au bit près : au défaut, un bit crédite
+// 0,6 seconde. Deux entiers plutôt qu'un décimal par bit, pour qu'on n'ait rien à convertir.
 function bitsReward(factor: number) {
   return z
     .object({
-      mode: z.enum(['linear', 'tiers']).default('linear'),
-
-      linear: z
-        .object({
-          unit: z.number().int().positive().default(100),
-          secondsPerUnit: seconds.default(DEFAULT_SECONDS_PER_UNIT * factor),
-          minBits: z.number().int().positive().default(1),
-        })
-        .strip()
-        .default({}),
-
-      tiers: z
-        .array(bitsTierSchema)
-        .default(
-          DEFAULT_BITS_TIERS.map((tier) => ({ minBits: tier.minBits, seconds: tier.seconds * factor })),
-        ),
+      unit: z.number().int().positive().default(DEFAULT_BITS_UNIT),
+      seconds: seconds.default(DEFAULT_BITS_SECONDS * factor),
     })
-    .strip()
-    .refine((value) => value.mode !== 'tiers' || value.tiers.length > 0, {
-      message: 'le mode « tiers » exige au moins un palier',
-      path: ['tiers'],
-    });
+    .strip();
 }
 
 const bitsRewardSchema = bitsReward(1);

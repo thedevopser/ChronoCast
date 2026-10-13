@@ -36,17 +36,28 @@ export function formatRemaining(remainingMs: number, options: TimeFormatOptions)
   return days > 0 ? `${String(days)}j ${clock}` : clock;
 }
 
+const TENTHS_PER_SECOND = 10;
+
 export function formatReward(seconds: number): string {
   if (!Number.isFinite(seconds)) {
     return '+0 s';
   }
 
   const sign = seconds < 0 ? '-' : '+';
-  const total = Math.abs(Math.trunc(seconds));
+  const magnitude = Math.abs(seconds);
 
-  if (total < SECONDS_PER_MINUTE) {
-    return `${sign}${String(total)} s`;
+  // En deçà de la minute, un crédit garde une décimale : un bit peut valoir moins d'une seconde,
+  // et « +0 s » dirait qu'il n'a rien valu.
+  const tenths = Math.max(Math.round(magnitude * TENTHS_PER_SECOND), magnitude > 0 ? 1 : 0);
+  if (tenths < SECONDS_PER_MINUTE * TENTHS_PER_SECOND) {
+    const whole = Math.floor(tenths / TENTHS_PER_SECOND);
+    const tenth = tenths % TENTHS_PER_SECOND;
+    return tenth === 0
+      ? `${sign}${String(whole)} s`
+      : `${sign}${String(whole)},${String(tenth)} s`;
   }
+
+  const total = Math.max(Math.trunc(magnitude), SECONDS_PER_MINUTE);
 
   if (total < SECONDS_PER_HOUR) {
     const minutes = Math.floor(total / SECONDS_PER_MINUTE);

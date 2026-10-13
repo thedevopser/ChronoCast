@@ -97,15 +97,25 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 
 Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre réseau local, ni depuis Internet.
 
+### Les bits
+
+Les bits se règlent par **un taux**, dans la vue *Barème* : *pour ce nombre de bits…* *…créditer ce nombre de secondes*. Par défaut, 100 bits pour 60 secondes.
+
+**Chaque bit compte.** Le taux s'applique au bit près, et non par tranches entières : à 100 bits pour 60 secondes, un seul bit ajoute 0,6 seconde au compteur, 50 bits en ajoutent 30 et 150 bits en ajoutent 90. Il n'y a ni seuil minimum, ni palier : pour que les bits pèsent plus ou moins, changez le taux. Pour qu'ils ne créditent rien, mettez les secondes à 0.
+
+Le décompte à l'écran avance en secondes entières : un don d'un seul bit ne fait pas toujours bouger le chiffre à l'instant où il arrive, mais son temps est bien acquis, et la bulle de l'overlay l'annonce (« +0,6 s »).
+
+Les bits dépensés en Power-ups suivent le même taux — voir la section 6.
+
 ### Le Happy Hour
 
-Une bascule qui **fait passer les crédits sur un barème à part**, le temps que vous décidez. **Tout se règle dans la vue *Happy Hour*** du menu : l'état et la bascule, la programmation d'une plage, le barème et ses paliers de bits. Le **tableau de bord** garde une carte *Happy Hour* qui montre l'état et la plage programmée, avec le même bouton *Activer* / *Désactiver* pour basculer d'un clic en plein direct — les deux restent d'accord, même si vous gardez plusieurs onglets ouverts.
+Une bascule qui **fait passer les crédits sur un barème à part**, le temps que vous décidez. **Tout se règle dans la vue *Happy Hour*** du menu : l'état et la bascule, la programmation d'une plage, le barème. Le **tableau de bord** garde une carte *Happy Hour* qui montre l'état et la plage programmée, avec le même bouton *Activer* / *Désactiver* pour basculer d'un clic en plein direct — les deux restent d'accord, même si vous gardez plusieurs onglets ouverts.
 
-**Le Happy Hour a son propre barème**, que vous réglez dans la vue *Happy Hour* et enregistrez par son bouton *Enregistrer le barème Happy Hour* : les cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, puis *Happy Hour · Bits* et ses paliers, avec les mêmes réglages que le barème normal. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
+**Le Happy Hour a son propre barème**, que vous réglez dans la vue *Happy Hour* et enregistrez par son bouton *Enregistrer le barème Happy Hour* : les cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, puis *Happy Hour · Bits*, qui porte son propre taux. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
 
 Ce barème vaut au départ **le double de votre barème normal** : si vous aviez réglé un sub Tier 1 à cinq minutes, il en vaut dix en Happy Hour, comme avant. Il est ensuite indépendant — modifier le barème normal ne le change plus, et inversement. Le bouton *Copier vers…* au pied de chaque carte d'abonnement recopie ses valeurs dans les deux autres.
 
-**Les seuils d'entrée des bits se règlent à part pour le Happy Hour** : le nombre de bits minimum, l'unité et le seuil de chaque palier lui appartiennent. Au départ ils reprennent ceux du barème normal, seules les secondes étant doublées ; libre à vous ensuite d'abaisser le minimum pendant le Happy Hour, ou de le relever. Un don sous le seuil du Happy Hour ne crédite rien tant que celui-ci est actif.
+**Le taux des bits du Happy Hour se règle à part** : au départ il reprend le nombre de bits de votre taux normal, avec des secondes doublées — 100 bits pour 120 secondes si vous êtes à 100 bits pour 60. Libre à vous ensuite de le rendre plus ou moins généreux.
 
 La commande `!addtime` n'est **jamais** concernée, parce qu'un modérateur qui tape 300 veut créditer 300.
 

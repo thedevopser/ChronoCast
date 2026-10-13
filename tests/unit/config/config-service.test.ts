@@ -115,7 +115,7 @@ describe('createConfigService', () => {
 
       expect(updated.rewards.sub.tier1).toBe(600);
       expect(updated.rewards.sub.tier2).toBe(DEFAULT_CONFIG.rewards.sub.tier2);
-      expect(updated.rewards.bits.mode).toBe(DEFAULT_CONFIG.rewards.bits.mode);
+      expect(updated.rewards.bits.unit).toBe(DEFAULT_CONFIG.rewards.bits.unit);
     });
 
     it('persiste immédiatement la nouvelle configuration', async () => {
@@ -131,11 +131,18 @@ describe('createConfigService', () => {
       const { service } = createService();
       await service.load();
 
-      const updated = await service.update({
-        rewards: { bits: { tiers: [{ minBits: 50, seconds: 30 }] } },
+      await service.update({
+        goals: {
+          tiers: [
+            { target: 5, label: 'Premier' },
+            { target: 10, label: 'Second' },
+          ],
+        },
       });
 
-      expect(updated.rewards.bits.tiers).toEqual([{ minBits: 50, seconds: 30 }]);
+      const updated = await service.update({ goals: { tiers: [{ target: 50, label: 'Seul' }] } });
+
+      expect(updated.goals.tiers).toEqual([{ target: 50, label: 'Seul' }]);
     });
 
     it('refuse une valeur invalide sans rien persister', async () => {

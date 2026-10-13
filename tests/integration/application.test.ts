@@ -362,12 +362,12 @@ describe('application complète', () => {
         expect(await lastRewardSeconds()).toBe(2_000);
       });
 
-      it('crédite un don de bits le double du barème réglé, seuil d’entrée inchangé', async () => {
+      it('crédite un don de bits au double du taux réglé, au bit près et sans plus de seuil', async () => {
         await notify('channel.bits.use', channelBitsUseCheer);
         expect(await lastRewardSeconds()).toBe(1_200);
 
         await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 99 });
-        expect(await lastRewardSeconds()).toBe(0);
+        expect(await lastRewardSeconds()).toBe(118.8);
       });
 
       it('dérive le barème des bits d’une configuration qui ne porte que celui des abonnements', async () => {
@@ -396,7 +396,7 @@ describe('application complète', () => {
         const raw = await readFile(join(dataDirectory, 'config.json'), 'utf8');
         expect(JSON.parse(raw)).toMatchObject({
           schemaVersion: CONFIG_SCHEMA_VERSION,
-          rewards: { happyHourRewards: { bits: { linear: { secondsPerUnit: 90 } } } },
+          rewards: { bits: { unit: 100, seconds: 45 }, happyHourRewards: { bits: { unit: 100, seconds: 90 } } },
         });
       });
 
@@ -410,7 +410,7 @@ describe('application complète', () => {
               sub: { prime: 200, tier1: 600, tier2: 1_200, tier3: 1_800 },
               resub: { prime: 200, tier1: 800, tier2: 1_200, tier3: 1_800 },
               gift: { tier1: 1_000, tier2: 1_200, tier3: 1_800 },
-              bits: { mode: 'linear', linear: { unit: 50, secondsPerUnit: 60, minBits: 100 } },
+              bits: { unit: 50, seconds: 60 },
             },
           },
         });
@@ -510,6 +510,131 @@ describe('application complète', () => {
         expect(records.map((record) => record.message)).toContain(
           'dépense de bits de type inconnu, comptée pour ses bits',
         );
+      });
+    });
+
+    describe('taux unique des bits', () => {
+      it('ajoute 0,6 seconde au compteur pour un seul bit, au taux par défaut', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 1 });
+
+        const state = (await (await api('/api/state')).json()) as {
+          counter: { remainingMs: number };
+        };
+        expect(state.counter.remainingMs).toBe(43_200_000 + 600);
+        expect((await readPersistedCounter()).remainingMs).toBe(43_200_600);
+
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { rewardSeconds: number; applied: boolean }[];
+        };
+        expect(history.entries[0]).toMatchObject({ rewardSeconds: 0.6, applied: true });
+      });
+
+      it('garde le compteur en millisecondes entières sur un taux sans écriture décimale finie', async () => {
+        await api('/api/config', {
+          method: 'PATCH',
+          headers: { [CSRF_HEADER]: application.getCsrfToken() },
+          body: JSON.stringify({ config: { rewards: { bits: { unit: 3, seconds: 1 } } } }),
+        });
+
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 1 });
+
+        const state = (await (await api('/api/state')).json()) as {
+          counter: { remainingMs: number };
+        };
+        expect(state.counter.remainingMs).toBe(43_200_333);
+      });
+
+      describe('configuration 1.3.0 réglée par paliers', () => {
+        const TIERS = {
+          mode: 'tiers',
+          linear: { unit: 100, secondsPerUnit: 60, minBits: 1 },
+          tiers: [
+            { minBits: 500, seconds: 360 },
+            { minBits: 200, seconds: 100 },
+            { minBits: 1_000, seconds: 900 },
+          ],
+        };
+
+        beforeEach(async () => {
+          await application.stop();
+          await writeFile(
+            join(dataDirectory, 'config.json'),
+            JSON.stringify({ schemaVersion: 5, rewards: { happyHour: false, bits: TIERS } }),
+            'utf8',
+          );
+          application = build();
+          port = await application.start();
+        });
+
+        it('convertit sur le palier le plus bas et crédite au bit près', async () => {
+          await notify('channel.bits.use', channelBitsUseCheer);
+
+          const history = (await (await api('/api/history')).json()) as {
+            entries: { rewardSeconds: number }[];
+          };
+          expect(history.entries[0]?.rewardSeconds).toBe(500);
+        });
+
+        it('réécrit le fichier sous le taux unique, sans les clés des anciens modes', async () => {
+          const written = JSON.parse(
+            await readFile(join(dataDirectory, 'config.json'), 'utf8'),
+          ) as { schemaVersion: number; rewards: { bits: unknown; happyHourRewards: { bits: unknown } } };
+
+          expect(written.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
+          expect(written.rewards.bits).toStrictEqual({ unit: 200, seconds: 100 });
+          expect(written.rewards.happyHourRewards.bits).toStrictEqual({ unit: 200, seconds: 200 });
+        });
+
+        it('signale la conversion dans le journal', async () => {
+          const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+            records: { message: string; context?: Record<string, unknown> }[];
+          };
+          const note = records.find(
+            (record) => record.message === 'paliers de bits convertis en taux unique',
+          );
+
+          expect(note?.context).toStrictEqual({ path: 'rewards.bits', unit: 200, seconds: 100 });
+        });
+
+        it('ne convertit ni ne signale plus rien au lancement suivant', async () => {
+          await application.stop();
+          application = build();
+          port = await application.start();
+
+          const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+            records: { message: string }[];
+          };
+          expect(
+            records.filter((record) => record.message === 'paliers de bits convertis en taux unique'),
+          ).toHaveLength(0);
+        });
+      });
+
+      it('convertit les paliers propres au Happy Hour d’une configuration qui en avait', async () => {
+        await application.stop();
+        await writeFile(
+          join(dataDirectory, 'config.json'),
+          JSON.stringify({
+            schemaVersion: 7,
+            rewards: {
+              happyHour: true,
+              bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60, minBits: 500 }, tiers: [] },
+              happyHourRewards: {
+                bits: { mode: 'tiers', linear: { unit: 100, secondsPerUnit: 120, minBits: 1 }, tiers: [{ minBits: 10, seconds: 30 }] },
+              },
+            },
+          }),
+          'utf8',
+        );
+        application = build();
+        port = await application.start();
+
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 5 });
+
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { rewardSeconds: number }[];
+        };
+        expect(history.entries[0]?.rewardSeconds).toBe(15);
       });
     });
 
@@ -656,7 +781,7 @@ describe('application complète', () => {
 
     it('avance sur un cheer que le barème de temps refuse : les deux barèmes sont indépendants', async () => {
       await patchConfig({
-        rewards: { bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60, minBits: 5_000 } } },
+        rewards: { bits: { unit: 100, seconds: 0 } },
         goals: { bitsPerSub: 500 },
       });
 

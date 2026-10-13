@@ -74,23 +74,12 @@ describe('withDerivedHappyHourRewards', () => {
   });
 
   describe('bits', () => {
-    const CUSTOM_BITS = {
-      mode: 'tiers',
-      linear: { unit: 50, secondsPerUnit: 30, minBits: 200 },
-      tiers: [
-        { minBits: 300, seconds: 45 },
-        { minBits: 900, seconds: 400 },
-      ],
-    };
+    const CUSTOM_BITS = { unit: 50, seconds: 30 };
 
-    it('double les secondes et recopie tels quels le mode, l’unité et les seuils', () => {
+    it('double les secondes du taux et recopie tel quel son nombre de bits', () => {
       expect(derived({ schemaVersion: 6, rewards: { bits: CUSTOM_BITS } }).bits).toStrictEqual({
-        mode: 'tiers',
-        linear: { unit: 50, secondsPerUnit: 60, minBits: 200 },
-        tiers: [
-          { minBits: 300, seconds: 90 },
-          { minBits: 900, seconds: 800 },
-        ],
+        unit: 50,
+        seconds: 60,
       });
     });
 
@@ -101,11 +90,11 @@ describe('withDerivedHappyHourRewards', () => {
       });
 
       expect(outcome.sub.tier1).toBe(999);
-      expect(outcome.bits.linear.secondsPerUnit).toBe(60);
+      expect(outcome.bits.seconds).toBe(60);
     });
 
-    it('ne touche pas à un barème de bits déjà écrit', () => {
-      const bits = { mode: 'linear', linear: { unit: 10, secondsPerUnit: 1, minBits: 5 }, tiers: [] };
+    it('ne touche pas à un taux déjà écrit', () => {
+      const bits = { unit: 10, seconds: 1 };
 
       expect(derived({ rewards: { bits: CUSTOM_BITS, happyHourRewards: { bits } } }).bits).toStrictEqual(
         bits,

@@ -126,8 +126,34 @@ describe('configSchema', () => {
       expect(() => configSchema.parse({ counter: { minRemainingSeconds: -1 } })).toThrow();
     });
 
-    it('refuse un mode de barème de bits inconnu', () => {
-      expect(() => configSchema.parse({ rewards: { bits: { mode: 'aleatoire' } } })).toThrow();
+    it('règle les bits par un taux, 100 bits pour 60 secondes par défaut', () => {
+      expect(configSchema.parse({}).rewards.bits).toStrictEqual({ unit: 100, seconds: 60 });
+    });
+
+    it.each([
+      { unit: 0 },
+      { unit: -1 },
+      { unit: 1.5 },
+      { seconds: -1 },
+      { seconds: 0.6 },
+    ])('refuse le taux de bits %j', (bits) => {
+      expect(() => configSchema.parse({ rewards: { bits } })).toThrow();
+    });
+
+    it('accepte un taux qui part de 1 bit, et un taux à zéro seconde', () => {
+      expect(configSchema.parse({ rewards: { bits: { unit: 1, seconds: 0 } } }).rewards.bits).toStrictEqual({
+        unit: 1,
+        seconds: 0,
+      });
+    });
+
+    // Ces clés ne sont pas refusées mais ignorées : c'est la conversion, en amont, qui les lit.
+    it('écarte les clés des anciens modes de calcul', () => {
+      const parsed = configSchema.parse({
+        rewards: { bits: { mode: 'tiers', linear: { unit: 5 }, tiers: [] } },
+      });
+
+      expect(parsed.rewards.bits).toStrictEqual({ unit: 100, seconds: 60 });
     });
 
     it('refuse une couleur qui n\'est pas une notation hexadécimale', () => {
@@ -193,9 +219,6 @@ describe('configSchema', () => {
       expect(parsed.server.websocket.heartbeatIntervalMs).toBe(15_000);
     });
 
-    it('refuse un barème de bits par paliers vide', () => {
-      expect(() => configSchema.parse({ rewards: { bits: { mode: 'tiers', tiers: [] } } })).toThrow();
-    });
   });
 });
 
@@ -466,8 +489,8 @@ describe('apparence de la page Objectifs', () => {
 });
 
 describe('version du schéma', () => {
-  it('passe à 7 avec le barème Happy Hour des bits, sans quoi le barème dérivé ne serait jamais écrit sur le disque', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(7);
+  it('passe à 8 avec le taux unique des bits, sans quoi les clés des anciens modes resteraient dans le fichier', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(8);
   });
 });
 
@@ -477,22 +500,8 @@ describe('barème Happy Hour', () => {
       sub: { tier1: 360, tier2: 480, tier3: 600, prime: 360 },
       resub: { tier1: 360, tier2: 480, tier3: 600, prime: 360 },
       gift: { tier1: 360, tier2: 480, tier3: 600 },
-      bits: {
-        mode: 'linear',
-        linear: { unit: 100, secondsPerUnit: 120, minBits: 1 },
-        tiers: [
-          { minBits: 100, seconds: 120 },
-          { minBits: 500, seconds: 720 },
-          { minBits: 1_000, seconds: 1_800 },
-        ],
-      },
+      bits: { unit: 100, seconds: 120 },
     });
-  });
-
-  it('refuse le mode par paliers sans palier, comme le barème normal', () => {
-    expect(() =>
-      configSchema.parse({ rewards: { happyHourRewards: { bits: { mode: 'tiers', tiers: [] } } } }),
-    ).toThrow();
   });
 
   it('complète un barème partiel', () => {

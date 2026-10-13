@@ -19,20 +19,9 @@ function scaled<T extends SecondsTable>(table: T): T {
   ) as T;
 }
 
-// Seules les secondes doublent : le mode, l'unité et les seuils d'entrée se recopient tels quels,
-// puisque le doublement d'avant ne les touchait pas.
+// Seules les secondes doublent : le nombre de bits du taux se recopie tel quel.
 function scaledBits(bits: RewardsConfig['bits']): RewardsConfig['bits'] {
-  return {
-    mode: bits.mode,
-    linear: {
-      ...bits.linear,
-      secondsPerUnit: bits.linear.secondsPerUnit * HAPPY_HOUR_DEFAULT_FACTOR,
-    },
-    tiers: bits.tiers.map((tier) => ({
-      minBits: tier.minBits,
-      seconds: tier.seconds * HAPPY_HOUR_DEFAULT_FACTOR,
-    })),
-  };
+  return { unit: bits.unit, seconds: bits.seconds * HAPPY_HOUR_DEFAULT_FACTOR };
 }
 
 /**

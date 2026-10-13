@@ -294,3 +294,33 @@ describe('regroupement', () => {
     }
   });
 });
+
+describe('taux des bits', () => {
+  const bitsFields = (prefix: string): { path: string; label: string; min?: number | undefined }[] =>
+    ADMIN_FIELDS.filter((field) => field.path.startsWith(prefix)).map((field) => ({
+      path: field.path,
+      label: field.label,
+      min: field.min,
+    }));
+
+  it.each(['rewards.bits.', 'rewards.happyHourRewards.bits.'])(
+    'se règle par deux champs qui se lisent comme une phrase : %s',
+    (prefix) => {
+      expect(bitsFields(prefix)).toStrictEqual([
+        { path: `${prefix}unit`, label: 'Pour ce nombre de bits…', min: 1 },
+        { path: `${prefix}seconds`, label: '…créditer ce nombre de secondes', min: 0 },
+      ]);
+    },
+  );
+
+  it('dit dans son aide que chaque bit compte', () => {
+    const unit = ADMIN_FIELDS.find((field) => field.path === 'rewards.bits.unit');
+
+    expect(unit?.hint).toContain('0,6');
+  });
+
+  it('n’a plus d’éditeur de paliers à écarter du schéma', () => {
+    expect(Object.keys(UNBOUND_PATHS).filter((path) => path.includes('bits'))).toStrictEqual([]);
+  });
+});
+

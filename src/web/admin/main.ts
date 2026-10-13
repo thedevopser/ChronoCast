@@ -18,7 +18,7 @@ import {
 } from '../shared/protocol.js';
 import { createWsClient, type WsClientStatus, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
-import { tiersChange, type TierInput } from './bits-tiers.js';
+
 import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
@@ -47,7 +47,6 @@ import {
   patchFrom,
   readAtPath,
   valuesFrom,
-  writeAtPath,
   type FieldError,
 } from './form-binding.js';
 import { resolveWindow } from './next-occurrence.js';
@@ -110,26 +109,6 @@ const REWARD_COPY_SETS: readonly { view: FieldViewId; cards: readonly string[] }
   },
   { view: 'goals', cards: ['goals.points.sub.', 'goals.points.resub.', 'goals.points.gift.'] },
 ];
-
-// Le même éditeur de paliers sert le barème normal et celui du Happy Hour.
-const BITS_TIER_EDITORS = [
-  {
-    view: 'rewards',
-    list: '#bits-tiers',
-    add: '#add-tier',
-    mode: '#reward-bits-mode',
-    path: 'rewards.bits.tiers',
-    errorPrefix: '',
-  },
-  {
-    view: 'happy-hour',
-    list: '#hh-bits-tiers',
-    add: '#add-hh-tier',
-    mode: '#reward-hh-bits-mode',
-    path: 'rewards.happyHourRewards.bits.tiers',
-    errorPrefix: 'Happy Hour — ',
-  },
-] as const;
 
 // L'état du Happy Hour s'affiche et se bascule à deux endroits : la carte du tableau de bord et la
 // vue dédiée.
@@ -673,76 +652,6 @@ function start(): void {
   const containerOf = (view: FieldViewId): HTMLElement =>
     requireElement(document, `#fields-${view}`);
 
-  interface TierEditor {
-    read(): TierInput[];
-    render(tiers: readonly { minBits: number; seconds: number }[]): void;
-  }
-
-  function createTierEditor(listSelector: string, addSelector: string): TierEditor {
-    const tiersList = requireElement(document, listSelector);
-
-    function appendTierRow(minBits: string, seconds: string): void {
-      const row = document.createElement('li');
-      row.className = 'tier';
-
-      const makeField = (label: string, value: string, role: string): HTMLElement => {
-        const wrapper = document.createElement('label');
-        wrapper.className = 'field field--compact';
-
-        const caption = document.createElement('span');
-        caption.className = 'field__label';
-        setText(caption, label);
-
-        const input = document.createElement('input');
-        input.className = 'field__input';
-        input.type = 'number';
-        input.min = '0';
-        input.step = '1';
-        input.value = value;
-        input.dataset['tier'] = role;
-
-        wrapper.append(caption, input);
-        return wrapper;
-      };
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'button button--danger';
-      setText(remove, 'Retirer');
-      remove.addEventListener('click', () => {
-        row.remove();
-      });
-
-      row.append(makeField('Seuil, en bits', minBits, 'min'), makeField('Secondes', seconds, 'seconds'), remove);
-      tiersList.append(row);
-    }
-
-    function readTierRows(): TierInput[] {
-      return [...tiersList.querySelectorAll('.tier')].map((row) => ({
-        minBits: row.querySelector<HTMLInputElement>('[data-tier="min"]')?.value ?? '',
-        seconds: row.querySelector<HTMLInputElement>('[data-tier="seconds"]')?.value ?? '',
-      }));
-    }
-
-    function renderTiers(tiers: readonly { minBits: number; seconds: number }[]): void {
-      clearChildren(tiersList);
-      for (const tier of tiers) {
-        appendTierRow(String(tier.minBits), String(tier.seconds));
-      }
-    }
-
-    requireElement(document, addSelector).addEventListener('click', () => {
-      appendTierRow('', '');
-    });
-
-    return { read: readTierRows, render: renderTiers };
-  }
-
-  const tierEditors = BITS_TIER_EDITORS.map((spec) => ({
-    ...spec,
-    editor: createTierEditor(spec.list, spec.add),
-  }));
-
   const goalTiersList = requireElement(document, '#goal-tiers');
 
   function appendGoalRow(target: string, label: string): void {
@@ -1023,11 +932,6 @@ function start(): void {
       refreshAppearanceState(tab);
     }
 
-    for (const { editor, path } of tierEditors) {
-      const tiers = readAtPath(config, path);
-      editor.render(Array.isArray(tiers) ? (tiers as { minBits: number; seconds: number }[]) : []);
-    }
-
     renderGoalTiers(readGoalTiersFromConfig());
     paintGoal();
     paintGoalView();
@@ -1048,21 +952,6 @@ function start(): void {
 
     const allErrors: FieldError[] = [...errors];
     const tierMessages: string[] = [];
-
-    for (const { editor, path, mode, errorPrefix } of tierEditors.filter(
-      (candidate) => candidate.view === view,
-    )) {
-      const change = tiersChange(
-        editor.read(),
-        container.querySelector<HTMLSelectElement>(mode)?.value,
-        readAtPath(config, path) ?? [],
-      );
-
-      tierMessages.push(...change.errors.map((message) => `${errorPrefix}${message}`));
-      if (change.tiers !== null) {
-        writeAtPath(patch, path, change.tiers);
-      }
-    }
 
     if (view === 'goals') {
       const { tiers, errors: goalErrors } = normalizeGoalTiers(readGoalRows());

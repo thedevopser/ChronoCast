@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 
 import { evaluateChatMessage } from '../chat/command-service.js';
 import { createConfigService, type ConfigService } from '../config/config-service.js';
+import { prepareRawConfig } from '../config/config-migration.js';
 import { withDerivedHappyHourRewards } from '../config/happy-hour-rewards.js';
 import { configSchema, type ChronoCastConfig } from '../config/schema.js';
 import {
@@ -196,9 +197,19 @@ export function createApplication(options: ApplicationOptions): Application {
   const configService: ConfigService = createConfigService({
     store: createAtomicJsonStore<ChronoCastConfig>({
       filePath: paths.resolveDataFile(CONFIG_FILE),
-      // Dérivé ici, sur le fichier tel qu'il est écrit : une fois passé par le schéma, rien ne
-      // distingue plus un barème Happy Hour absent d'un barème laissé à ses valeurs par défaut.
-      parse: (raw) => withDerivedHappyHourRewards(raw, configSchema.parse(raw)),
+      // Converti et dérivé ici, sur le fichier tel qu'il est écrit : une fois passé par le schéma,
+      // les clés d'une version antérieure ont disparu, et rien ne distingue plus un barème Happy
+      // Hour absent d'un barème laissé à ses valeurs par défaut.
+      parse: (raw) => {
+        const prepared = prepareRawConfig(raw);
+        const config = withDerivedHappyHourRewards(prepared.raw, configSchema.parse(prepared.raw));
+
+        for (const note of prepared.notes) {
+          logger.child('config').info(note.message, note.context);
+        }
+
+        return config;
+      },
       createDefault: () => configSchema.parse({}),
       logger: logger.child('config-store'),
     }),

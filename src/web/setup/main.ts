@@ -39,7 +39,7 @@ interface ConfigPayload {
     readonly counter: { readonly initialSeconds: number };
     readonly rewards: {
       readonly sub: { readonly prime: number; readonly tier1: number; readonly tier2: number; readonly tier3: number };
-      readonly bits: { readonly linear: { readonly unit: number; readonly secondsPerUnit: number } };
+      readonly bits: { readonly unit: number; readonly seconds: number };
     };
     readonly setup: { readonly completed: boolean };
   };
@@ -157,7 +157,7 @@ function start(): void {
     input('#reward-tier1').value = String(config.rewards.sub.tier1);
     input('#reward-tier2').value = String(config.rewards.sub.tier2);
     input('#reward-tier3').value = String(config.rewards.sub.tier3);
-    input('#reward-bits').value = String(config.rewards.bits.linear.secondsPerUnit);
+    input('#reward-bits').value = String(config.rewards.bits.seconds);
 
     renderChannel();
     renderOverlayUrl();
@@ -252,7 +252,7 @@ function start(): void {
               tier2: Number(input('#reward-tier2').value),
               tier3: Number(input('#reward-tier3').value),
             },
-            bits: { linear: { secondsPerUnit: Number(input('#reward-bits').value) } },
+            bits: { seconds: Number(input('#reward-bits').value) },
           },
           setup: { completed: true },
         },
