@@ -987,7 +987,10 @@ function start(): void {
     );
   }
 
-  for (const view of ['rewards', 'happy-hour', 'goals', 'appearance', 'settings'] as const) {
+  // Dérivé des vues à formulaire, et non d'une liste tenue à la main : c'est une telle liste qui a
+  // laissé le bouton de l'onglet « Barre d'objectif » sans effet. Twitch a son propre gestionnaire,
+  // qui joint le secret client.
+  for (const view of FIELD_VIEWS.filter((candidate) => candidate !== 'twitch')) {
     const control = button(`#save-${view}`);
     control.addEventListener('click', () => {
       void guarded(control, () => saveView(view));

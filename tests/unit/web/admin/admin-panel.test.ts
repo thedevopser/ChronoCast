@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
+import { fieldsOf } from '../../../../src/web/admin/fields.js';
+import { FIELD_VIEWS } from '../../../../src/web/admin/router.js';
 
 const HTML = readFileSync(resolve(process.cwd(), 'src/web/admin/index.html'), 'utf8')
   .replace('__CHRONOCAST_CSRF__', 'a'.repeat(64))
@@ -341,3 +343,62 @@ describe('gestes de copie du panneau', () => {
     }
   });
 });
+
+describe('enregistrement des vues', () => {
+  function patchesSince(index: number): unknown[] {
+    return requests
+      .filter((request) => request.method === 'PATCH')
+      .slice(index)
+      .map((request) => JSON.parse(request.body ?? '{}') as unknown);
+  }
+
+  const patchCount = (): number => requests.filter((request) => request.method === 'PATCH').length;
+
+  // L'aperçu montre le brouillon : sans enregistrement réel, le réglage semble pris en compte,
+  // n'arrive jamais dans OBS et disparaît à la relance.
+  it('enregistre l’apparence de la barre d’objectif par le bouton de son onglet', async () => {
+    field('#goal-outline-width').value = '7';
+    const before = patchCount();
+
+    element('#save-goal-appearance').click();
+    await settle();
+
+    // Le navigateur rend les couleurs en minuscules : elles partent aussi, sans rien changer.
+    const patches = patchesSince(before);
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toMatchObject({ config: { goals: { overlay: { outline: { width: 7 } } } } });
+  });
+
+  // Dérivé des vues à formulaire : une vue ajoutée sans câblage de son bouton rougit ici.
+  it.each([...FIELD_VIEWS])('enregistre la vue %s quand on clique sur son bouton', async (view) => {
+    const target = fieldsOf(view).find(
+      (candidate) =>
+        candidate.readOnly !== true && ['integer', 'number', 'boolean'].includes(candidate.kind),
+    );
+    if (target === undefined) {
+      throw new Error(`aucun champ modifiable à exercer dans la vue ${view}`);
+    }
+
+    // Une configuration neuve laisse vides des champs de texte obligatoires — l'identifiant client
+    // Twitch — et une vue invalide ne s'enregistre pas : ce n'est pas ce qu'on vérifie ici.
+    for (const required of fieldsOf(view)) {
+      if (required.kind === 'text' && required.allowEmpty !== true && field(required.selector).value === '') {
+        field(required.selector).value = 'valeur';
+      }
+    }
+
+    const control = field(target.selector);
+    if (target.kind === 'boolean') {
+      control.checked = !control.checked;
+    } else {
+      control.value = String(Number(control.value) + 1);
+    }
+    const before = patchCount();
+
+    element(`#save-${view}`).click();
+    await settle();
+
+    expect(patchesSince(before), target.path).toHaveLength(1);
+  });
+});
+
