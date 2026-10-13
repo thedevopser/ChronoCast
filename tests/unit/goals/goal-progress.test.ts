@@ -14,11 +14,10 @@ function goalsWith(patch: unknown): GoalsConfig {
   return configSchema.parse({ goals: patch }).goals;
 }
 
-// Une barre réglée pour compter en abonnements : un point par soutien, cinq cents bits par point.
+// Une barre où chaque abonnement vaut un point.
 const ONE_POINT = { tier1: 1, tier2: 1, tier3: 1, prime: 1 };
 
 const GOALS: GoalsConfig = goalsWith({
-  bitsPerSub: 500,
   points: { sub: ONE_POINT, resub: ONE_POINT, gift: { tier1: 1, tier2: 1, tier3: 1 } },
 });
 
@@ -106,28 +105,16 @@ describe('pointsGained', () => {
   });
 
   describe('bits', () => {
-    it('compte une tranche entière', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 500 };
+    it.each([1, 499, 500, 1_200])('compte un point par bit, sans tranche ni reste : %d bits', (bits) => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits };
 
-      expect(pointsGained(event, GOALS)).toBe(1);
+      expect(pointsGained(event, GOALS)).toBe(bits);
     });
 
-    it('ne conserve aucun reste', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 1_200 };
-
-      expect(pointsGained(event, GOALS)).toBe(2);
-    });
-
-    it('ne compte rien sous la première tranche', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 499 };
-
-      expect(pointsGained(event, GOALS)).toBe(0);
-    });
-
-    it('suit le nombre de bits par abonnement configuré', () => {
+    it('ne dépend d’aucun réglage : l’ancien « bits par point » est sans effet', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 1_000 };
 
-      expect(pointsGained(event, goalsWith({ bitsPerSub: 100 }))).toBe(10);
+      expect(pointsGained(event, goalsWith({ bitsPerSub: 100 }))).toBe(1_000);
     });
 
     it('ne compte rien pour un nombre de bits invalide', () => {
@@ -153,7 +140,6 @@ describe('pointsGained', () => {
 
   describe('barème de points', () => {
     const WEIGHTED = goalsWith({
-      bitsPerSub: 100,
       points: {
         sub: { prime: 2, tier1: 3, tier2: 5, tier3: 8 },
         resub: { prime: 20, tier1: 30, tier2: 50, tier3: 80 },
@@ -209,10 +195,10 @@ describe('pointsGained', () => {
       expect(pointsGained({ ...event, total: -3 }, WEIGHTED)).toBe(0);
     });
 
-    it('ne pondère pas les bits : seule la taille de la tranche les règle', () => {
+    it('ne pondère pas les bits : un bit vaut un point quel que soit le barème', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
 
-      expect(pointsGained(event, WEIGHTED)).toBe(2);
+      expect(pointsGained(event, WEIGHTED)).toBe(250);
     });
 
     it('n’ajoute aucun point pour une commande de chat, quel que soit le barème', () => {
@@ -229,7 +215,7 @@ describe('pointsGained', () => {
 
     // Le cas d'usage qui a motivé le barème : un objectif mensuel en points, tout confondu.
     it('tient « 1 bit = 1 point, 1 sub Tier 1 = 250 points »', () => {
-      const monthly = goalsWith({ bitsPerSub: 1, points: { sub: { tier1: 250 } } });
+      const monthly = goalsWith({ points: { sub: { tier1: 250 } } });
       const cheer: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
       const sub: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
 

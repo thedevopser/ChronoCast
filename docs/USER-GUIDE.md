@@ -138,7 +138,7 @@ Les nuits de changement d'heure, une heure qui n'existe pas — 02:30 au passage
 
 Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesses. « À 50 subs je me rase la tête. » Les objectifs comptent ces promesses et les montrent à vos spectateurs, pour qu'ils voient ce que leur abonnement vient de faire avancer.
 
-**Ce qui fait avancer le compte.** La barre compte en **points**, selon un barème que vous réglez dans la vue *Objectifs* : *Bits par point* pour les bits, et trois cartes — *Points · Abonnements*, *Points · Réabonnements*, *Points · Sub offerts* — pour le poids de chaque tier, Prime compris. Un lot de sub offerts ajoute les points de son tier multipliés par le nombre de sub. Le bouton *Copier vers…* au pied de chaque carte recopie ses valeurs dans les deux autres.
+**Ce qui fait avancer le compte.** La barre compte en **points**. **Un bit vaut toujours un point**, sans réglage. Les abonnements, eux, se règlent dans la vue *Objectifs* : trois cartes — *Points · Abonnements*, *Points · Réabonnements*, *Points · Sub offerts* — donnent le poids de chaque tier, Prime compris. Un lot de sub offerts ajoute les points de son tier multipliés par le nombre de sub. Le bouton *Copier vers…* au pied de chaque carte recopie ses valeurs dans les deux autres.
 
 **Les valeurs de départ sont calées sur les prix**, pour qu'un euro de soutien pèse à peu près pareil quelle que soit sa forme :
 
@@ -150,7 +150,7 @@ Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesse
 | Abonnement ou réabonnement, Tier 3 | 2 500 |
 | Sub offert | 500, 1 000 ou 2 500 selon le tier, par sub offert |
 
-Ce ne sont que des valeurs de départ : réglez-les à votre main. Un poids à 0 retire ce type de soutien de la barre. Pour une barre qui compte **en abonnements** — « à 50 subs je me rase la tête » —, mettez 1 partout, relevez *Bits par point* (à 500, cinq cents bits valent un abonnement) et nommez l'unité « abo. ». Au-delà de 1, les bits comptent par tranches entières et le reste n'est pas conservé.
+Ce ne sont que des valeurs de départ pour les abonnements : réglez-les à votre main. Pour que les bits pèsent moins face aux abonnements, augmentez les points des abonnements ; pour qu'ils pèsent plus, baissez-les. Un poids à 0 retire ce type d'abonnement de la barre.
 
 **Une barre vous attend dès l'installation**, sur un premier palier à 1 000 points nommé « Objectif ». Renommez-le, changez son seuil, ajoutez-en d'autres ou supprimez-le : sans aucun palier, la page reste vide.
 

@@ -86,12 +86,11 @@ interface Harness {
   readonly store: ReturnType<typeof createStoreDouble>;
 }
 
-function createHarness(options: { tiers?: unknown; bitsPerSub?: number; initial?: GoalState } = {}): Harness {
+function createHarness(options: { tiers?: unknown; initial?: GoalState } = {}): Harness {
   const config: ChronoCastConfig = configSchema.parse({
     goals: {
       tiers: options.tiers ?? LADDER,
       // Une barre réglée pour compter en abonnements, comme l'échelle de ces tests.
-      bitsPerSub: options.bitsPerSub ?? 500,
       points: {
         sub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
         resub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
@@ -185,7 +184,7 @@ describe('createGoalService', () => {
 
     it('ne persiste rien quand l’événement ne compte pour rien', async () => {
       const before = harness.store.writes.length;
-      const bits: BitsEvent = { ...baseEvent(), type: 'bits', bits: 10 };
+      const bits: BitsEvent = { ...baseEvent(), type: 'bits', bits: 0 };
 
       await harness.service.applyEvent(bits);
 

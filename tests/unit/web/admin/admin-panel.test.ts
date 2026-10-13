@@ -344,6 +344,13 @@ describe('gestes de copie du panneau', () => {
   });
 });
 
+describe('vue Objectifs', () => {
+  it('ne propose plus de régler les bits : un bit vaut un point', () => {
+    expect(document.querySelector('#goal-bits-per-sub')).toBeNull();
+    expect(element('#view-goals').textContent).toContain('Un bit vaut toujours un point');
+  });
+});
+
 describe('enregistrement des vues', () => {
   function patchesSince(index: number): unknown[] {
     return requests

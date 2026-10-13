@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 9;
+export const CONFIG_SCHEMA_VERSION = 10;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -216,11 +216,10 @@ const goalOverlaySchema = z
 
 const points = z.number().int().nonnegative();
 
-// La barre compte en points, à un point par bit. Les abonnements valent au départ leur prix en
-// bits, pour qu'un euro de soutien pèse à peu près pareil quelle que soit sa forme.
+// La barre compte en points, et un bit vaut toujours un point : il n'y a rien à régler de ce
+// côté-là. Les abonnements valent au départ leur prix en bits, pour qu'un euro de soutien pèse à
+// peu près pareil quelle que soit sa forme.
 const DEFAULT_TIER_POINTS = { tier1: 500, tier2: 1_000, tier3: 2_500, prime: 500 } as const;
-
-const DEFAULT_BITS_PER_POINT = 1;
 
 const DEFAULT_GOAL_UNIT_LABEL = 'points';
 
@@ -255,10 +254,6 @@ const goalPointsSchema = z
 
 const goalsSchema = z
   .object({
-    // Le nombre de bits qui vaut un point. La clé date du temps où la barre ne comptait qu'en
-    // abonnements : la renommer imposerait une migration pour une question de vocabulaire.
-    bitsPerSub: z.number().int().positive().default(DEFAULT_BITS_PER_POINT),
-
     points: goalPointsSchema.default({}),
 
     // Ce que le panneau écrit après le compte. Jamais diffusé aux spectateurs : la page /goal

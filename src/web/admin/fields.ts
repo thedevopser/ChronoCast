@@ -187,15 +187,6 @@ const GOAL_FIELDS: readonly AdminField[] = [
   goalPoints('#goal-points-gift-tier3', 'gift.tier3', 'Tier 3'),
 
   {
-    selector: '#goal-bits-per-sub',
-    path: 'goals.bitsPerSub',
-    label: 'Bits par point',
-    hint: 'À 1, chaque bit vaut un point. Au-delà, les bits comptent par tranches entières et le reste n’est pas conservé : à 500, un don de 1 200 bits ajoute deux points.',
-    view: 'goals',
-    kind: 'integer',
-    min: 1,
-  },
-  {
     selector: '#goal-unit-label',
     path: 'goals.unitLabel',
     label: 'Nom de l’unité',
@@ -808,8 +799,7 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['goals.points.sub.', 'Points · Abonnements'],
   ['goals.points.resub.', 'Points · Réabonnements'],
   ['goals.points.gift.', 'Points · Sub offerts'],
-  ['goals.bitsPerSub', 'Points · Bits et unité'],
-  ['goals.unitLabel', 'Points · Bits et unité'],
+  ['goals.unitLabel', 'Points · Unité'],
   ['goals.overlay.bar.', 'Barre'],
   ['goals.overlay.shadow.', 'Ombre du texte'],
   ['goals.overlay.outline.', 'Contour du texte'],

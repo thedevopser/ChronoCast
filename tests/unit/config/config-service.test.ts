@@ -307,7 +307,6 @@ describe('createConfigService', () => {
 
         const imported = await service.import(JSON.stringify(EXPORTED));
 
-        expect(imported.goals.bitsPerSub).toBe(1);
         expect(imported.goals.unitLabel).toBe('points');
         expect(imported.goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
         expect(imported.goals.overlay.fontSize).toBe(40);
@@ -330,7 +329,7 @@ describe('createConfigService', () => {
           JSON.stringify({ ...EXPORTED, schemaVersion: CONFIG_SCHEMA_VERSION }),
         );
 
-        expect(imported.goals.bitsPerSub).toBe(500);
+        expect(imported.goals.tiers).toStrictEqual([{ target: 50, label: 'Je me rase la tête' }]);
       });
     });
 

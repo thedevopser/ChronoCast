@@ -359,9 +359,6 @@ describe('goals', () => {
     expect(parsed.goals.tiers[0]).toStrictEqual({ target: 50, label: 'Cinquante' });
   });
 
-  it('refuse un nombre de bits par abonnement nul', () => {
-    expect(() => configSchema.parse({ goals: { bitsPerSub: 0 } })).toThrow();
-  });
 });
 
 describe('apparence de la page Objectifs', () => {
@@ -512,8 +509,9 @@ describe('barème de points de la barre d’objectif', () => {
     expect(() => configSchema.parse({ goals: { points: { gift: { tier1 } } } })).toThrow();
   });
 
-  it('garde la clé bitsPerSub, pour ne rien migrer', () => {
-    expect(configSchema.parse({ goals: { bitsPerSub: 1 } }).goals.bitsPerSub).toBe(1);
+  // Un bit vaut un point, sans réglage : la clé d'une version antérieure est ignorée, pas refusée.
+  it('ne porte plus de nombre de bits par point', () => {
+    expect(configSchema.parse({ goals: { bitsPerSub: 500 } }).goals).not.toHaveProperty('bitsPerSub');
   });
 });
 
@@ -529,10 +527,6 @@ describe('libellé d’unité de la barre d’objectif', () => {
 
 describe('valeurs de départ de la barre d’objectif, comptée en points', () => {
   const goals = configSchema.parse({}).goals;
-
-  it('compte un point par bit', () => {
-    expect(goals.bitsPerSub).toBe(1);
-  });
 
   it('cale les points des abonnements sur leur prix en bits', () => {
     expect(goals.points).toStrictEqual({
@@ -554,7 +548,7 @@ describe('valeurs de départ de la barre d’objectif, comptée en points', () =
     expect(configSchema.parse({ goals: { tiers: [] } }).goals.tiers).toStrictEqual([]);
   });
 
-  it('passe le schéma en version 9, pour que la remise à zéro ne joue qu’une fois', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(9);
+  it('passe le schéma en version 10, pour que le nombre de bits par point soit retiré du fichier', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(10);
   });
 });

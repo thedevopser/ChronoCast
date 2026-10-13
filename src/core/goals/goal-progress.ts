@@ -17,14 +17,9 @@ export function pointsGained(event: DomainEvent, goals: GoalsConfig): number {
     case 'gift':
       return event.total > 0 ? event.total * goals.points.gift[event.tier] : 0;
 
-    case 'bits': {
-      if (event.bits <= 0) {
-        return 0;
-      }
-      // Sans reste conservé : le garder demanderait un état de plus à persister, pour une barre
-      // qui avancerait sans qu'aucun événement ne l'explique.
-      return Math.floor(event.bits / goals.bitsPerSub);
-    }
+    // Un bit vaut un point, sans réglage : c'est le poids des abonnements qui se règle.
+    case 'bits':
+      return event.bits > 0 ? event.bits : 0;
 
     // Un crédit accordé à la main par un modérateur ne gonfle pas une promesse faite aux
     // spectateurs : elle en deviendrait mensongère.

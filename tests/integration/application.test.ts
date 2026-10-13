@@ -240,7 +240,6 @@ describe('application complète', () => {
       body: JSON.stringify({
         config: {
           goals: {
-            bitsPerSub: 500,
             points: { sub: one, resub: one, gift: { tier1: 1, tier2: 1, tier3: 1 } },
             tiers: [],
           },
@@ -502,14 +501,14 @@ describe('application complète', () => {
       it('fait avancer la barre d’objectif', async () => {
         await notify('channel.bits.use', { ...(channelBitsUseCustomPowerUp as object), bits: 1500 });
 
-        expect(await goalCount()).toBe(3);
+        expect(await goalCount()).toBe(1_500);
       });
 
       it('compte deux Power-ups identiques envoyés coup sur coup par le même spectateur', async () => {
         await notify('channel.bits.use', { ...(channelBitsUsePowerUp as object), bits: 500 });
         await notify('channel.bits.use', { ...(channelBitsUsePowerUp as object), bits: 500 });
 
-        expect(await goalCount()).toBe(2);
+        expect(await goalCount()).toBe(1_000);
       });
 
       it('ne compte qu’une fois un même envoi rejoué par Twitch', async () => {
@@ -518,7 +517,7 @@ describe('application complète', () => {
         await notify('channel.bits.use', powerUp, 'msg-rejoué');
         await notify('channel.bits.use', powerUp, 'msg-rejoué');
 
-        expect(await goalCount()).toBe(1);
+        expect(await goalCount()).toBe(500);
       });
 
       it('compte pour ses bits une dépense de type inconnu et le journalise', async () => {
@@ -806,7 +805,6 @@ describe('application complète', () => {
     it('avance sur un cheer que le barème de temps refuse : les deux barèmes sont indépendants', async () => {
       await patchConfig({
         rewards: { bits: { unit: 100, seconds: 0 } },
-        goals: { bitsPerSub: 500 },
       });
 
       await notify('channel.bits.use', channelBitsUseCheer);
@@ -815,7 +813,7 @@ describe('application complète', () => {
         entries: { type: string; applied: boolean }[];
       };
       expect(history.entries[0]).toMatchObject({ type: 'bits', applied: false });
-      expect(await goalCount()).toBe(2);
+      expect(await goalCount()).toBe(1_000);
     });
 
     it('n’avance pas sur un événement invalide, que le barème de temps refusait déjà', async () => {
@@ -827,7 +825,7 @@ describe('application complète', () => {
 
     it('pèse chaque soutien selon le barème de points', async () => {
       await patchConfig({
-        goals: { bitsPerSub: 1, points: { sub: { tier1: 250 }, gift: { tier1: 100 } } },
+        goals: { points: { sub: { tier1: 250 }, gift: { tier1: 100 } } },
       });
 
       await notify('channel.subscribe', channelSubscribe);
@@ -1429,7 +1427,7 @@ describe('application complète', () => {
     it('remet le comptage aux valeurs de départ et garde l’apparence de la barre', async () => {
       const config = await goalsConfig();
 
-      expect(config['bitsPerSub']).toBe(1);
+      expect(config).not.toHaveProperty('bitsPerSub');
       expect(config['unitLabel']).toBe('points');
       expect(config['points']).toMatchObject({ sub: { tier1: 500, tier2: 1_000, tier3: 2_500 } });
       expect(config['tiers']).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
@@ -1486,13 +1484,13 @@ describe('application complète', () => {
       await api('/api/config', {
         method: 'PATCH',
         headers: { [CSRF_HEADER]: application.getCsrfToken() },
-        body: JSON.stringify({ config: { goals: { bitsPerSub: 250, tiers: [{ target: 7, label: 'Mien' }] } } }),
+        body: JSON.stringify({ config: { goals: { unitLabel: 'miens', tiers: [{ target: 7, label: 'Mien' }] } } }),
       });
       await mutate('/api/goals/subs', JSON.stringify({ subs: 4 }));
 
       await restart();
 
-      expect((await goalsConfig())['bitsPerSub']).toBe(250);
+      expect((await goalsConfig())['unitLabel']).toBe('miens');
       expect((await goals()).goal.subs).toBe(4);
     });
 

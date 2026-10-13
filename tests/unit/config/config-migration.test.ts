@@ -145,7 +145,6 @@ describe('prepareRawConfig — remise à zéro du comptage de la barre', () => {
     const prepared = prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS });
     const goals = configSchema.parse(prepared.raw).goals;
 
-    expect(goals.bitsPerSub).toBe(1);
     expect(goals.points.sub.tier1).toBe(500);
     expect(goals.unitLabel).toBe('points');
     expect(goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
@@ -190,3 +189,24 @@ describe('prepareRawConfig — remise à zéro du comptage de la barre', () => {
     expect(prepared.goalsReset).toBe(true);
   });
 });
+
+describe('prepareRawConfig — bits par point abandonné', () => {
+  const NOTE = 'bits par point abandonné : un bit vaut désormais un point';
+
+  it('signale l’ancienne valeur quand elle n’était pas 1', () => {
+    const prepared = prepareRawConfig({ schemaVersion: 9, goals: { bitsPerSub: 500 } });
+
+    expect(prepared.notes).toContainEqual({ message: NOTE, context: { previous: 500 } });
+  });
+
+  it.each([{ bitsPerSub: 1 }, {}, { bitsPerSub: 'x' }])('ne signale rien pour %j', (goals) => {
+    const messages = prepareRawConfig({ schemaVersion: 9, goals }).notes.map((note) => note.message);
+
+    expect(messages).not.toContain(NOTE);
+  });
+
+  it('ne rejoue pas la remise à zéro d’une configuration déjà en points', () => {
+    expect(prepareRawConfig({ schemaVersion: 9, goals: { bitsPerSub: 500 } }).goalsReset).toBe(false);
+  });
+});
+

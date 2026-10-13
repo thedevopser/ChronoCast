@@ -155,6 +155,20 @@ function withoutGoalCounting(raw: RawRecord): RawRecord {
     : rest;
 }
 
+const ONE_BIT_PER_POINT = 1;
+
+// Jusqu'à la version 9 du schéma, la barre en points portait un nombre de bits par point. Le schéma
+// écarte la clé de lui-même ; reste à dire au streamer qui l'avait changée que ses bits pèsent
+// désormais un point chacun.
+function abandonedBitsPerPoint(raw: RawRecord): number | undefined {
+  if (predatesGoalsInPoints(raw) || !isRecord(raw['goals'])) {
+    return undefined;
+  }
+
+  const previous = positiveInteger(raw['goals']['bitsPerSub']);
+  return previous === undefined || previous === ONE_BIT_PER_POINT ? undefined : previous;
+}
+
 export function prepareRawConfig(raw: unknown): PreparedConfig {
   if (!isRecord(raw)) {
     return { raw, notes: [], goalsReset: false };
@@ -173,6 +187,14 @@ export function prepareRawConfig(raw: unknown): PreparedConfig {
     notes.push({
       message: 'comptage de la barre d’objectif remis aux valeurs de départ',
       context: { fromSchemaVersion: Number(raw['schemaVersion']) },
+    });
+  }
+
+  const abandoned = abandonedBitsPerPoint(raw);
+  if (abandoned !== undefined) {
+    notes.push({
+      message: 'bits par point abandonné : un bit vaut désormais un point',
+      context: { previous: abandoned },
     });
   }
 
