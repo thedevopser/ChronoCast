@@ -87,3 +87,56 @@ describe('rangées d’actions masquées', () => {
     expect(await adminCss()).toMatch(/\.actions\[hidden\]\s*\{\s*display:\s*none;/);
   });
 });
+
+// Une balise fermée en trop dans une vue referme son parent : la vue suivante sort alors de la
+// mise en page, sous le menu. Aucun test de comportement ne le voit, le DOM se réparant en silence.
+describe('emboîtement des vues', () => {
+  const sections = async (): Promise<Map<string, string>> => {
+    const html = await adminHtml();
+    const bodies = new Map<string, string>();
+
+    for (const opening of html.matchAll(/<section class="view" id="view-([a-z-]+)"/g)) {
+      const end = html.indexOf('</section>', opening.index);
+      bodies.set(opening[1] ?? '', html.slice(opening.index, end));
+    }
+
+    return bodies;
+  };
+
+  it('ouvre et ferme autant de blocs dans chaque vue', async () => {
+    const bodies = await sections();
+    expect(bodies.size).toBeGreaterThan(0);
+
+    for (const [view, body] of bodies) {
+      for (const tag of ['div', 'ul', 'p', 'label', 'section', 'details']) {
+        const opened = [...body.matchAll(new RegExp(`<${tag}[\\s>]`, 'g'))].length;
+        const closed = [...body.matchAll(new RegExp(`</${tag}>`, 'g'))].length;
+
+        expect(closed, `<${tag}> dans la vue ${view}`).toBe(tag === 'section' ? opened - 1 : opened);
+      }
+    }
+  });
+
+  it('équilibre ses blocs sur le document entier', async () => {
+    const html = await adminHtml();
+
+    for (const tag of ['div', 'section', 'main', 'aside', 'nav']) {
+      const opened = [...html.matchAll(new RegExp(`<${tag}[\\s>]`, 'g'))].length;
+      const closed = [...html.matchAll(new RegExp(`</${tag}>`, 'g'))].length;
+
+      expect(closed, `<${tag}>`).toBe(opened);
+    }
+  });
+});
+
+// Une rangée qui mêle des champs libellés et un bouton étire le bouton sur la hauteur du libellé et
+// du champ réunis, à moins d'être alignée par le bas.
+describe('formulaire de plage du Happy Hour', () => {
+  it('aligne son bouton sur la base des champs', async () => {
+    const form = /<div class="([^"]*)" id="happy-hour-schedule-form">/.exec(await adminHtml())?.[1];
+
+    expect(form?.split(' ')).toContain('actions--end');
+    expect(await adminCss()).toMatch(/\.actions--end\s*\{\s*align-items:\s*flex-end;/);
+  });
+});
+

@@ -44,3 +44,11 @@ export function copyReward(
 
   return errors.length > 0 ? { ok: false, errors } : { ok: true, values };
 }
+
+const VIEW_PREFIX_SEPARATOR = ' · ';
+
+/** Le libellé du bouton de copie, à partir des noms des cartes visées, sans leur préfixe de vue. */
+export function copyLabel(targetGroups: readonly string[]): string {
+  const names = targetGroups.map((group) => group.split(VIEW_PREFIX_SEPARATOR).at(-1) ?? group);
+  return `Copier vers ${names.join(' et ')}`;
+}

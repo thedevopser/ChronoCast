@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fieldsOf } from '../../../../src/web/admin/fields.js';
 import type { RawValue } from '../../../../src/web/admin/form-binding.js';
-import { copyReward } from '../../../../src/web/admin/reward-copy.js';
+import { copyLabel, copyReward } from '../../../../src/web/admin/reward-copy.js';
 
 const FIELDS = fieldsOf('rewards');
 
@@ -140,3 +140,20 @@ describe('copyReward', () => {
     });
   });
 });
+
+describe('copyLabel', () => {
+  it('nomme les deux cartes visées', () => {
+    expect(copyLabel(['Réabonnements', 'Sub offerts'])).toBe('Copier vers Réabonnements et Sub offerts');
+  });
+
+  // Dans une vue dédiée, le préfixe du groupe répète le titre de la vue sur chaque bouton.
+  it('tait le préfixe de vue des cartes visées', () => {
+    expect(copyLabel(['Happy Hour · Réabonnements', 'Happy Hour · Sub offerts'])).toBe(
+      'Copier vers Réabonnements et Sub offerts',
+    );
+    expect(copyLabel(['Points · Abonnements', 'Points · Sub offerts'])).toBe(
+      'Copier vers Abonnements et Sub offerts',
+    );
+  });
+});
+

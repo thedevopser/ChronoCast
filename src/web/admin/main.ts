@@ -52,7 +52,7 @@ import {
 } from './form-binding.js';
 import { resolveWindow } from './next-occurrence.js';
 import { draftSubtree } from './overlay-draft.js';
-import { copyReward } from './reward-copy.js';
+import { copyLabel, copyReward } from './reward-copy.js';
 import {
   APPEARANCE_TABS,
   APPEARANCE_TAB_LABELS,
@@ -998,7 +998,7 @@ function start(): void {
         }
 
         const targetPrefixes = cards.filter((prefix) => prefix !== sourcePrefix);
-        const label = `Copier vers ${targetPrefixes.map((prefix) => groupOf(prefix)).join(' et ')}`;
+        const label = copyLabel(targetPrefixes.map((prefix) => groupOf(prefix)));
 
         appendGroupAction(document, containerOf(view), anchor.selector, label, () => {
           copyRewardCard(view, sourcePrefix, targetPrefixes);

@@ -311,6 +311,10 @@
   display: none;
 }
 
+.actions--end {
+  align-items: flex-end;
+}
+
 .button {
   padding: var(--cc-space-2) var(--cc-space-3);
   background: var(--cc-surface-raised);
