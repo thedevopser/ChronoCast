@@ -84,7 +84,8 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | Vue | Contenu |
 | --- | --- |
 | **Tableau de bord** | Le compteur, l'état de la connexion Twitch, les derniers événements, et les commandes : pause, reprise, ajout ou retrait de temps |
-| **Barème** | Combien de secondes ajoute chaque événement, et la bascule du Happy Hour |
+| **Barème** | Combien de secondes ajoute chaque événement |
+| **Happy Hour** | Sa bascule, la programmation d'une plage, et le barème qui s'applique tant qu'il est actif |
 | **Objectifs** | L'échelle de vos promesses, la progression en cours, et l'adresse de la barre à coller dans OBS |
 | **Apparence** | Les deux pages que vous collez dans OBS, chacune sous son onglet — *Compteur* et *Barre d'objectif* — avec un aperçu qui est la page réelle et qui suit votre saisie sans enregistrement |
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
@@ -98,9 +99,9 @@ Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre 
 
 ### Le Happy Hour
 
-Une bascule qui **fait passer les crédits sur un barème à part**, le temps que vous décidez. Elle se trouve sur le **tableau de bord**, dans la carte *Happy Hour*, et aussi dans la vue *Barème* — c'est le même réglage, et les deux restent d'accord même si vous gardez plusieurs onglets ouverts.
+Une bascule qui **fait passer les crédits sur un barème à part**, le temps que vous décidez. **Tout se règle dans la vue *Happy Hour*** du menu : l'état et la bascule, la programmation d'une plage, le barème et ses paliers de bits. Le **tableau de bord** garde une carte *Happy Hour* qui montre l'état et la plage programmée, avec le même bouton *Activer* / *Désactiver* pour basculer d'un clic en plein direct — les deux restent d'accord, même si vous gardez plusieurs onglets ouverts.
 
-**Le Happy Hour a son propre barème**, que vous réglez dans la vue *Barème*, sous la bascule : les cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, puis *Happy Hour · Bits* et ses paliers, avec les mêmes réglages que le barème normal. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
+**Le Happy Hour a son propre barème**, que vous réglez dans la vue *Happy Hour* et enregistrez par son bouton *Enregistrer le barème Happy Hour* : les cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, puis *Happy Hour · Bits* et ses paliers, avec les mêmes réglages que le barème normal. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
 
 Ce barème vaut au départ **le double de votre barème normal** : si vous aviez réglé un sub Tier 1 à cinq minutes, il en vaut dix en Happy Hour, comme avant. Il est ensuite indépendant — modifier le barème normal ne le change plus, et inversement. Le bouton *Copier vers…* au pied de chaque carte d'abonnement recopie ses valeurs dans les deux autres.
 
@@ -112,11 +113,11 @@ La commande `!addtime` n'est **jamais** concernée, parce qu'un modérateur qui 
 
 #### Programmer une plage
 
-Pour ne pas avoir à y penser en plein direct, la carte *Happy Hour* du tableau de bord propose deux heures, *Début* et *Fin*, et un bouton *Programmer*. Le Happy Hour s'allume seul à l'heure de début, s'éteint seul à l'heure de fin, puis la plage s'efface.
+Pour ne pas avoir à y penser en plein direct, la carte *Programmer une plage* de la vue *Happy Hour* propose deux heures, *Début* et *Fin*, et un bouton *Programmer*. Le Happy Hour s'allume seul à l'heure de début, s'éteint seul à l'heure de fin, puis la plage s'efface.
 
 - **Une heure désigne sa prochaine occurrence.** « 21:00 » saisi à 18 h vaut ce soir ; saisi à 22 h, il vaut demain.
 - **Une fin antérieure ou égale au début tombe le lendemain du début** : de 23:00 à 01:00, la plage dure deux heures.
-- **La carte affiche ce qui est programmé**, jour compris quand ce n'est pas aujourd'hui, et pendant la plage jusqu'à quelle heure le Happy Hour est actif. Le bouton *Annuler la plage* l'efface à tout moment, sans changer l'état courant du Happy Hour.
+- **La vue et le tableau de bord affichent ce qui est programmé**, jour compris quand ce n'est pas aujourd'hui, et pendant la plage jusqu'à quelle heure le Happy Hour est actif. Le bouton *Annuler la plage* l'efface à tout moment, sans changer l'état courant du Happy Hour.
 - **La plage ne se répète pas.** Elle joue une fois : pour le lendemain, programmez-en une nouvelle. Une seule plage existe à la fois.
 - **Votre geste garde la main.** Le bouton *Activer* / *Désactiver* reste disponible à tout moment. Éteindre le Happy Hour à la main pendant la plage est respecté : il reste éteint, et la plage s'efface à son heure sans rien rallumer. L'allumer à la main avant le début ne décale rien : il sera éteint à la fin de la plage.
 - **La plage survit à un redémarrage.** Relancée entre le début et la fin, l'application allume le Happy Hour ; relancée après la fin, elle efface la plage sans rien allumer.

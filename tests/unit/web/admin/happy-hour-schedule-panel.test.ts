@@ -172,6 +172,78 @@ describe('carte Happy Hour du tableau de bord', () => {
   });
 });
 
+describe('vue Happy Hour', () => {
+  const view = (): HTMLElement => element('#view-happy-hour');
+
+  it('figure dans le menu, après le barème', () => {
+    const entries = [...document.querySelectorAll<HTMLAnchorElement>('#nav a')].map(
+      (entry) => entry.dataset['view'],
+    );
+
+    expect(entries.indexOf('happy-hour')).toBe(entries.indexOf('rewards') + 1);
+  });
+
+  it('porte la programmation de la plage, qui n’est plus sur le tableau de bord', () => {
+    for (const selector of ['#happy-hour-schedule-form', '#happy-hour-cancel', '#happy-hour-schedule-error']) {
+      expect(view().contains(element(selector)), selector).toBe(true);
+    }
+    expect(element('#view-dashboard').querySelector('input[type="time"]')).toBeNull();
+  });
+
+  it('porte le barème Happy Hour et ses paliers de bits, que la vue Barème ne montre plus', () => {
+    expect(view().contains(element('#reward-hh-sub-tier1'))).toBe(true);
+    expect(view().contains(element('#reward-hh-bits-mode'))).toBe(true);
+    expect(view().contains(element('#hh-bits-tiers'))).toBe(true);
+    expect(element('#view-rewards').querySelector('[id^="reward-hh-"], #hh-bits-tiers')).toBeNull();
+  });
+
+  it('affiche l’état et la plage au même titre que le tableau de bord', async () => {
+    const now = Date.now();
+    deliver({
+      ...HELLO,
+      type: 'config',
+      happyHour: true,
+      happyHourSchedule: { startAt: now - 60_000, endAt: now + 3_600_000 },
+    });
+    await settle();
+
+    for (const prefix of ['#happy-hour', '#hh-view']) {
+      expect(element(`${prefix}-status`).textContent, prefix).toBe('Actif');
+      expect(element(`${prefix}-toggle`).textContent, prefix).toBe('Désactiver');
+    }
+    expect(element('#happy-hour-schedule-summary').textContent).toContain('Actif jusqu’à');
+    expect(element('#hh-view-summary').textContent).toContain('Actif jusqu’à');
+  });
+
+  it('bascule le Happy Hour depuis la vue comme depuis le tableau de bord', async () => {
+    const before = requests.filter((request) => request.method === 'PATCH').length;
+
+    element('#hh-view-toggle').click();
+    await settle();
+    element('#happy-hour-toggle').click();
+    await settle();
+
+    const patches = requests.filter((request) => request.method === 'PATCH').slice(before);
+    expect(patches).toHaveLength(2);
+    expect(JSON.parse(patches[0]?.body ?? '{}')).toStrictEqual({
+      config: { rewards: { happyHour: false } },
+    });
+  });
+
+  it('enregistre son barème par son propre bouton', async () => {
+    field('#reward-hh-sub-tier1').value = '777';
+    const before = requests.filter((request) => request.method === 'PATCH').length;
+
+    element('#save-happy-hour').click();
+    await settle();
+
+    const patch = requests.filter((request) => request.method === 'PATCH').slice(before)[0];
+    expect(JSON.parse(patch?.body ?? '{}')).toStrictEqual({
+      config: { rewards: { happyHourRewards: { sub: { tier1: 777 } } } },
+    });
+  });
+});
+
 describe('gestes de copie du panneau', () => {
   it('recopie une carte du barème dans les deux autres, sans rien enregistrer', () => {
     field('#reward-sub-tier1').value = '321';

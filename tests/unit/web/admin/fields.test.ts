@@ -191,26 +191,40 @@ describe('regroupement', () => {
   });
 
   it('sépare la bascule du Happy Hour de son barème', () => {
-    expect(groupOf('rewards.happyHour')).toBe('Happy Hour');
     expect(groupOf('rewards.happyHourRewards.sub.tier1')).toBe('Happy Hour · Abonnements');
     expect(groupOf('rewards.happyHourRewards.resub.prime')).toBe('Happy Hour · Réabonnements');
     expect(groupOf('rewards.happyHourRewards.gift.tier3')).toBe('Happy Hour · Sub offerts');
     expect(groupOf('rewards.happyHourRewards.bits.linear.unit')).toBe('Happy Hour · Bits');
   });
 
-  it('présente le barème normal, puis la bascule du Happy Hour suivie de son barème', () => {
+  it('ne laisse dans la vue Barème que le barème normal et la commande de chat', () => {
     expect(groupsOf('rewards')).toStrictEqual([
       'Abonnements',
       'Réabonnements',
       'Sub offerts',
       'Bits',
-      'Happy Hour',
+      'Commande de chat',
+    ]);
+  });
+
+  it('réunit tout le barème Happy Hour dans sa propre vue', () => {
+    expect(groupsOf('happy-hour')).toStrictEqual([
       'Happy Hour · Abonnements',
       'Happy Hour · Réabonnements',
       'Happy Hour · Sub offerts',
       'Happy Hour · Bits',
-      'Commande de chat',
     ]);
+
+    for (const field of ADMIN_FIELDS.filter((entry) => entry.path.startsWith('rewards.happyHour'))) {
+      expect(field.view, field.path).toBe('happy-hour');
+    }
+  });
+
+  // La bascule agit tout de suite, depuis le tableau de bord ou la vue : en faire aussi une case à
+  // enregistrer donnerait deux gestes pour un même état.
+  it('ne fait pas de la bascule du Happy Hour un champ à enregistrer', () => {
+    expect(ADMIN_FIELDS.some((field) => field.path === 'rewards.happyHour')).toBe(false);
+    expect(UNBOUND_PATHS['rewards.happyHour']).toBeDefined();
   });
 
   it('range chaque champ dans un groupe nommé', () => {

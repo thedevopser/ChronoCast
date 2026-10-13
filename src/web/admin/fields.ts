@@ -20,6 +20,9 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
   'twitch.broadcasterLogin':
     'Résolu en même temps que l’identifiant, et affiché en lecture seule dans la vue Twitch. Le saisir ne changerait pas la chaîne réellement écoutée.',
 
+  'rewards.happyHour':
+    'Bascule à effet immédiat, tenue par un bouton du tableau de bord et de la vue Happy Hour. En faire aussi une case à enregistrer donnerait deux gestes pour un même état.',
+
   'rewards.bits.tiers':
     'Tableau de paliers à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Barème avec son propre module.',
 
@@ -43,7 +46,7 @@ function happyHourReward(selector: string, leaf: string, label: string): AdminFi
     selector,
     path: `rewards.happyHourRewards.${leaf}`,
     label,
-    view: 'rewards',
+    view: 'happy-hour',
     kind: 'integer',
     min: 0,
     max: 2 * DAY,
@@ -51,15 +54,6 @@ function happyHourReward(selector: string, leaf: string, label: string): AdminFi
 }
 
 const REWARD_FIELDS: readonly AdminField[] = [
-  {
-    selector: '#reward-happy-hour',
-    path: 'rewards.happyHour',
-    label: 'Activer le Happy Hour',
-    hint: 'Abonnements, réabonnements, sub offerts et bits créditent alors le barème Happy Hour ci-dessous, seuils d’entrée des bits compris. La saisie d’un modérateur n’est pas concernée. Se bascule aussi depuis le tableau de bord.',
-    view: 'rewards',
-    kind: 'boolean',
-  },
-
   happyHourReward('#reward-hh-sub-prime', 'sub.prime', 'Prime'),
   happyHourReward('#reward-hh-sub-tier1', 'sub.tier1', 'Tier 1'),
   happyHourReward('#reward-hh-sub-tier2', 'sub.tier2', 'Tier 2'),
@@ -78,7 +72,7 @@ const REWARD_FIELDS: readonly AdminField[] = [
     path: 'rewards.happyHourRewards.bits.mode',
     label: 'Mode de calcul',
     hint: 'Proportionnel au nombre de bits, ou par seuils. Indépendant du mode du barème normal.',
-    view: 'rewards',
+    view: 'happy-hour',
     kind: 'enum',
     options: ['linear', 'tiers'],
   },
@@ -86,7 +80,7 @@ const REWARD_FIELDS: readonly AdminField[] = [
     selector: '#reward-hh-bits-unit',
     path: 'rewards.happyHourRewards.bits.linear.unit',
     label: 'Bits par unité',
-    view: 'rewards',
+    view: 'happy-hour',
     kind: 'integer',
     min: 1,
   },
@@ -96,7 +90,7 @@ const REWARD_FIELDS: readonly AdminField[] = [
     path: 'rewards.happyHourRewards.bits.linear.minBits',
     label: 'Bits minimum',
     hint: 'En deçà de ce seuil, rien n’est crédité pendant le Happy Hour. Se règle à part du seuil normal.',
-    view: 'rewards',
+    view: 'happy-hour',
     kind: 'integer',
     min: 1,
   },
@@ -833,13 +827,12 @@ export function fieldsOf(view: FieldViewId): readonly AdminField[] {
 }
 
 // Un préfixe terminé par un point couvre un sous-arbre ; sans point final, il désigne une feuille
-// et rien d'autre — `rewards.happyHour` ne doit pas capter `rewards.happyHourRewards.*`.
+// et rien d'autre.
 const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.sub.', 'Abonnements'],
   ['rewards.resub.', 'Réabonnements'],
   ['rewards.gift.', 'Sub offerts'],
   ['rewards.bits.', 'Bits'],
-  ['rewards.happyHour', 'Happy Hour'],
   ['rewards.happyHourRewards.sub.', 'Happy Hour · Abonnements'],
   ['rewards.happyHourRewards.resub.', 'Happy Hour · Réabonnements'],
   ['rewards.happyHourRewards.gift.', 'Happy Hour · Sub offerts'],

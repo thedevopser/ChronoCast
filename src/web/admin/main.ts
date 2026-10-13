@@ -101,7 +101,7 @@ import {
 const REWARD_COPY_SETS: readonly { view: FieldViewId; cards: readonly string[] }[] = [
   { view: 'rewards', cards: ['rewards.sub.', 'rewards.resub.', 'rewards.gift.'] },
   {
-    view: 'rewards',
+    view: 'happy-hour',
     cards: [
       'rewards.happyHourRewards.sub.',
       'rewards.happyHourRewards.resub.',
@@ -114,6 +114,7 @@ const REWARD_COPY_SETS: readonly { view: FieldViewId; cards: readonly string[] }
 // Le même éditeur de paliers sert le barème normal et celui du Happy Hour.
 const BITS_TIER_EDITORS = [
   {
+    view: 'rewards',
     list: '#bits-tiers',
     add: '#add-tier',
     mode: '#reward-bits-mode',
@@ -121,12 +122,24 @@ const BITS_TIER_EDITORS = [
     errorPrefix: '',
   },
   {
+    view: 'happy-hour',
     list: '#hh-bits-tiers',
     add: '#add-hh-tier',
     mode: '#reward-hh-bits-mode',
     path: 'rewards.happyHourRewards.bits.tiers',
     errorPrefix: 'Happy Hour — ',
   },
+] as const;
+
+// L'état du Happy Hour s'affiche et se bascule à deux endroits : la carte du tableau de bord et la
+// vue dédiée.
+const HAPPY_HOUR_SURFACES = [
+  {
+    status: '#happy-hour-status',
+    toggle: '#happy-hour-toggle',
+    summary: '#happy-hour-schedule-summary',
+  },
+  { status: '#hh-view-status', toggle: '#hh-view-toggle', summary: '#hh-view-summary' },
 ] as const;
 
 const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {
@@ -312,17 +325,22 @@ function start(): void {
     setText(requireElement(document, '#app-version'), model.appVersion, 32);
 
     const happyHour = happyHourLabels(model.happyHour);
-    const happyHourPill = requireElement(document, '#happy-hour-status');
-    setText(happyHourPill, happyHour.state);
-    happyHourPill.className = model.happyHour ? 'pill pill--ok' : 'pill';
-    setText(button('#happy-hour-toggle'), happyHour.action);
-
     const schedule = happyHourScheduleView(model.happyHourSchedule, model.happyHour, Date.now());
-    const scheduleSummary = requireElement(document, '#happy-hour-schedule-summary');
-    setText(scheduleSummary, schedule.summary, 200);
-    scheduleSummary.hidden = schedule.summary === '';
+
+    // Le même état se lit sur le tableau de bord et dans la vue Happy Hour.
+    for (const prefix of HAPPY_HOUR_SURFACES) {
+      const pill = requireElement(document, prefix.status);
+      setText(pill, happyHour.state);
+      pill.className = model.happyHour ? 'pill pill--ok' : 'pill';
+      setText(button(prefix.toggle), happyHour.action);
+
+      const summary = requireElement(document, prefix.summary);
+      setText(summary, schedule.summary, 200);
+      summary.hidden = schedule.summary === '';
+    }
+
     requireElement(document, '#happy-hour-schedule-form').hidden = !schedule.canSchedule;
-    button('#happy-hour-cancel').hidden = !schedule.canCancel;
+    requireElement(document, '#happy-hour-cancel-row').hidden = !schedule.canCancel;
 
     const reconnect = requireElement(document, '#twitch-reconnect-needed');
     reconnect.hidden = model.missingScopes.length === 0;
@@ -448,14 +466,9 @@ function start(): void {
         }
         break;
 
-      // Un autre onglet vient d'enregistrer : la case du barème doit suivre sans qu'on recharge
-      // toute la configuration, ce qui effacerait une saisie en cours.
+      // Le tableau de bord suit le Happy Hour et la progression par le modèle seul : recharger la
+      // configuration effacerait une saisie en cours dans un éditeur resté ouvert.
       case 'config':
-        syncHappyHourField(message.happyHour);
-        break;
-
-      // Le tableau de bord suit la progression par le modèle seul : recharger la configuration
-      // effacerait une saisie en cours dans l'éditeur d'échelle resté ouvert.
       case 'goal':
       case 'hello':
       case 'twitch:status':
@@ -553,12 +566,14 @@ function start(): void {
   }
 
   // Le message « config » diffusé en retour repeint la carte : aucune mise à jour optimiste.
-  const happyHourToggle = button('#happy-hour-toggle');
-  happyHourToggle.addEventListener('click', () => {
-    void guarded(happyHourToggle, async () => {
-      await api.patch('/api/config', { config: { rewards: { happyHour: !model.happyHour } } });
+  for (const surface of HAPPY_HOUR_SURFACES) {
+    const happyHourToggle = button(surface.toggle);
+    happyHourToggle.addEventListener('click', () => {
+      void guarded(happyHourToggle, async () => {
+        await api.patch('/api/config', { config: { rewards: { happyHour: !model.happyHour } } });
+      });
     });
-  });
+  }
 
   // L'affichage de la plage vient du WebSocket et non de la réponse : deux panneaux ouverts
   // montrent ainsi la même chose. Un refus s'écrit à côté des champs, saisie intacte.
@@ -657,20 +672,6 @@ function start(): void {
 
   const containerOf = (view: FieldViewId): HTMLElement =>
     requireElement(document, `#fields-${view}`);
-
-  const HAPPY_HOUR_PATH = 'rewards.happyHour';
-  const HAPPY_HOUR_FIELDS = fieldsOf('rewards').filter((field) => field.path === HAPPY_HOUR_PATH);
-
-  function syncHappyHourField(active: boolean): void {
-    const rewards = (config as { rewards?: Record<string, unknown> }).rewards;
-    if (rewards !== undefined) {
-      rewards['happyHour'] = active;
-    }
-
-    for (const field of HAPPY_HOUR_FIELDS) {
-      writeFieldValues(containerOf(field.view), [field], { [field.selector]: active });
-    }
-  }
 
   interface TierEditor {
     read(): TierInput[];
@@ -1048,18 +1049,18 @@ function start(): void {
     const allErrors: FieldError[] = [...errors];
     const tierMessages: string[] = [];
 
-    if (view === 'rewards') {
-      for (const { editor, path, mode, errorPrefix } of tierEditors) {
-        const change = tiersChange(
-          editor.read(),
-          container.querySelector<HTMLSelectElement>(mode)?.value,
-          readAtPath(config, path) ?? [],
-        );
+    for (const { editor, path, mode, errorPrefix } of tierEditors.filter(
+      (candidate) => candidate.view === view,
+    )) {
+      const change = tiersChange(
+        editor.read(),
+        container.querySelector<HTMLSelectElement>(mode)?.value,
+        readAtPath(config, path) ?? [],
+      );
 
-        tierMessages.push(...change.errors.map((message) => `${errorPrefix}${message}`));
-        if (change.tiers !== null) {
-          writeAtPath(patch, path, change.tiers);
-        }
+      tierMessages.push(...change.errors.map((message) => `${errorPrefix}${message}`));
+      if (change.tiers !== null) {
+        writeAtPath(patch, path, change.tiers);
       }
     }
 
@@ -1095,7 +1096,7 @@ function start(): void {
     );
   }
 
-  for (const view of ['rewards', 'goals', 'appearance', 'settings'] as const) {
+  for (const view of ['rewards', 'happy-hour', 'goals', 'appearance', 'settings'] as const) {
     const control = button(`#save-${view}`);
     control.addEventListener('click', () => {
       void guarded(control, () => saveView(view));

@@ -79,34 +79,13 @@
               <p class="card__value">
                 <span class="pill" id="happy-hour-status">—</span>
               </p>
-              <p class="card__hint">
-                Abonnements, réabonnements, sub offerts et bits créditent le barème Happy Hour,
-                réglable dans la vue Barème. La commande de chat ne bouge pas.
-              </p>
+              <p class="card__hint" id="happy-hour-schedule-summary" hidden></p>
               <div class="actions">
                 <button class="button" type="button" id="happy-hour-toggle">Activer</button>
               </div>
-
-              <p class="card__hint" id="happy-hour-schedule-summary" hidden></p>
-
-              <div class="actions actions--wrap" id="happy-hour-schedule-form">
-                <label class="field field--compact">
-                  <span class="field__label">Début</span>
-                  <input class="field__input" type="time" id="happy-hour-start" />
-                </label>
-                <label class="field field--compact">
-                  <span class="field__label">Fin</span>
-                  <input class="field__input" type="time" id="happy-hour-end" />
-                </label>
-                <button class="button" type="button" id="happy-hour-schedule">Programmer</button>
-              </div>
-              <p class="field__error" id="happy-hour-schedule-error"></p>
-
-              <div class="actions">
-                <button class="button" type="button" id="happy-hour-cancel" hidden>
-                  Annuler la plage
-                </button>
-              </div>
+              <p class="card__hint">
+                <a href="#happy-hour">Programmer une plage ou régler le barème Happy Hour</a>
+              </p>
             </div>
 
             <div class="card">
@@ -220,6 +199,61 @@
             </div>
           </div>
 
+          </div>
+
+          <div class="actions">
+            <button class="button button--primary" type="button" id="save-rewards">
+              Enregistrer le barème
+            </button>
+          </div>
+        </section>
+
+        <section class="view" id="view-happy-hour" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Happy Hour</h1>
+            <p class="view__subtitle">
+              Tant qu'il est actif, abonnements, réabonnements, sub offerts et bits créditent le
+              barème ci-dessous à la place du barème normal. La commande de chat n'est pas concernée.
+            </p>
+          </header>
+
+          <div class="card" id="happy-hour-state-card">
+            <p class="card__label">État</p>
+            <p class="card__value">
+              <span class="pill" id="hh-view-status">—</span>
+            </p>
+            <p class="card__hint" id="hh-view-summary" hidden></p>
+            <div class="actions">
+              <button class="button" type="button" id="hh-view-toggle">Activer</button>
+            </div>
+          </div>
+
+          <div class="card" id="happy-hour-schedule-card">
+            <p class="card__label">Programmer une plage</p>
+            <p class="card__hint">
+              Le Happy Hour s'allume seul à l'heure de début et s'éteint seul à l'heure de fin, une
+              fois. Une heure désigne sa prochaine occurrence ; une fin antérieure au début tombe le
+              lendemain. Le bouton ci-dessus garde la main à tout moment.
+            </p>
+            <div class="actions actions--wrap" id="happy-hour-schedule-form">
+              <label class="field field--compact">
+                <span class="field__label">Début</span>
+                <input class="field__input" type="time" id="happy-hour-start" />
+              </label>
+              <label class="field field--compact">
+                <span class="field__label">Fin</span>
+                <input class="field__input" type="time" id="happy-hour-end" />
+              </label>
+              <button class="button" type="button" id="happy-hour-schedule">Programmer</button>
+            </div>
+            <p class="field__error" id="happy-hour-schedule-error"></p>
+            <div class="actions" id="happy-hour-cancel-row" hidden>
+              <button class="button" type="button" id="happy-hour-cancel">Annuler la plage</button>
+            </div>
+          </div>
+
+          <div class="fields" id="fields-happy-hour"></div>
+
           <div class="card" id="hh-bits-tiers-card">
             <p class="card__label">Paliers de bits du Happy Hour</p>
             <p class="card__hint">
@@ -230,11 +264,10 @@
             <div class="actions">
               <button class="button" type="button" id="add-hh-tier">Ajouter un palier</button>
             </div>
-          </div>
 
           <div class="actions">
-            <button class="button button--primary" type="button" id="save-rewards">
-              Enregistrer le barème
+            <button class="button button--primary" type="button" id="save-happy-hour">
+              Enregistrer le barème Happy Hour
             </button>
           </div>
         </section>

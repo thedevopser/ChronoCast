@@ -92,18 +92,18 @@ describe('copyReward', () => {
   });
 
   it('recopie de même entre les cartes du barème Happy Hour, sans toucher au barème normal', () => {
-    const values = copied(
-      'rewards.happyHourRewards.gift.',
-      ['rewards.happyHourRewards.sub.', 'rewards.happyHourRewards.resub.'],
+    const outcome = copyReward(
+      fieldsOf('happy-hour'),
       {
-        ...DRAFT,
         '#reward-hh-gift-tier1': '31',
         '#reward-hh-gift-tier2': '32',
         '#reward-hh-gift-tier3': '33',
       },
+      'rewards.happyHourRewards.gift.',
+      ['rewards.happyHourRewards.sub.', 'rewards.happyHourRewards.resub.'],
     );
 
-    expect(values).toStrictEqual({
+    expect(outcome.ok ? outcome.values : null).toStrictEqual({
       '#reward-hh-sub-tier1': '31',
       '#reward-hh-sub-tier2': '32',
       '#reward-hh-sub-tier3': '33',
