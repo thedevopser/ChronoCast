@@ -91,7 +91,8 @@ function start(): void {
     }
 
     countdownElement.classList.remove(className);
-    void countdownElement.offsetWidth;
+    // Force un recalcul de mise en page : sans lui, retirer puis reposer la classe ne rejoue pas l'animation.
+    countdownElement.getBoundingClientRect();
     countdownElement.classList.add(className);
 
     if (animationTimer !== null) {
