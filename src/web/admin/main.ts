@@ -39,9 +39,10 @@ import {
   type DashboardModel,
 } from './dashboard-model.js';
 import { inactiveGroups, mutedSelectors } from './field-dependencies.js';
-import { fieldsOf, groupsOf } from './fields.js';
+import { fieldsOf, groupOf, groupsOf } from './fields.js';
 import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
 import { draftSubtree } from './overlay-draft.js';
+import { copyReward } from './reward-copy.js';
 import {
   APPEARANCE_TABS,
   APPEARANCE_TAB_LABELS,
@@ -66,6 +67,7 @@ import {
   type LogRecord,
 } from './log-view.js';
 import {
+  appendGroupAction,
   clearFieldErrors,
   readFieldValues,
   renderFieldGroups,
@@ -83,6 +85,11 @@ import {
   type AdminViewId,
   type FieldViewId,
 } from './router.js';
+
+// Chaque jeu réunit les barèmes qui se recopient l'un dans l'autre, désignés par leur préfixe.
+const REWARD_COPY_SETS: readonly (readonly string[])[] = [
+  ['rewards.sub.', 'rewards.resub.', 'rewards.gift.'],
+];
 
 const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {
   connecting: 'dot dot--warning',
@@ -852,6 +859,44 @@ function start(): void {
     showAppearanceTab(activeTab);
   }
 
+  function copyRewardCard(sourcePrefix: string, targetPrefixes: readonly string[]): void {
+    const fields = fieldsOf('rewards');
+    const container = containerOf('rewards');
+    const sourceFields = fields.filter((field) => field.path.startsWith(sourcePrefix));
+
+    clearFieldErrors(container, sourceFields);
+    const outcome = copyReward(fields, readFieldValues(container, fields), sourcePrefix, targetPrefixes);
+
+    if (!outcome.ok) {
+      showFieldErrors(container, outcome.errors);
+      return;
+    }
+
+    const targetFields = fields.filter((field) => Object.hasOwn(outcome.values, field.selector));
+    clearFieldErrors(container, targetFields);
+    writeFieldValues(container, targetFields, outcome.values);
+  }
+
+  function buildRewardCopyActions(): void {
+    const fields = fieldsOf('rewards');
+
+    for (const cards of REWARD_COPY_SETS) {
+      for (const sourcePrefix of cards) {
+        const anchor = fields.find((field) => field.path.startsWith(sourcePrefix));
+        if (anchor === undefined) {
+          continue;
+        }
+
+        const targetPrefixes = cards.filter((prefix) => prefix !== sourcePrefix);
+        const label = `Copier vers ${targetPrefixes.map((prefix) => groupOf(prefix)).join(' et ')}`;
+
+        appendGroupAction(document, containerOf('rewards'), anchor.selector, label, () => {
+          copyRewardCard(sourcePrefix, targetPrefixes);
+        });
+      }
+    }
+  }
+
   function paintFields(): void {
     for (const view of FIELD_VIEWS) {
       const fields = fieldsOf(view);
@@ -1291,6 +1336,8 @@ function start(): void {
       collapsible: view === 'appearance' || view === 'goals',
     });
   }
+
+  buildRewardCopyActions();
 
   buildNav();
   buildAppearanceTabs();

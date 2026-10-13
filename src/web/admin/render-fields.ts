@@ -211,6 +211,34 @@ export function renderFieldGroups(
   }
 }
 
+/** Pose un bouton d'action au pied du groupe qui porte le champ désigné. */
+export function appendGroupAction(
+  source: Document,
+  container: ParentNode,
+  selector: string,
+  label: string,
+  onClick: () => void,
+): HTMLButtonElement | null {
+  const group = container.querySelector(selector)?.closest('.group');
+  if (group === null || group === undefined) {
+    return null;
+  }
+
+  const actions = source.createElement('div');
+  actions.className = 'actions';
+
+  const button = source.createElement('button');
+  button.className = 'button';
+  button.type = 'button';
+  setText(button, label, 120);
+  button.addEventListener('click', onClick);
+
+  actions.append(button);
+  group.append(actions);
+
+  return button;
+}
+
 export function setGroupsCollapsed(container: ParentNode, collapsed: readonly string[]): void {
   const shut = new Set(collapsed);
 
