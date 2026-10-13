@@ -184,13 +184,13 @@ describe('createWsHub', () => {
 
     it("n'envoie du sous-arbre des objectifs que son apparence", () => {
       config = configSchema.parse({
-        goals: { bitsPerSub: 250, tiers: [{ target: 50, label: 'Je me rase la tête' }] },
+        goals: { mode: 'subs', tiers: [{ target: 50, label: 'Je me rase la tête' }] },
       });
 
       hub.accept(client.socket, {});
 
       const serialized = JSON.stringify(client.sent[0]);
-      expect(serialized).not.toContain('bitsPerSub');
+      expect(serialized).not.toContain('subWeights');
       expect(serialized).not.toContain('Je me rase la tête');
     });
 

@@ -5,6 +5,7 @@ import {
   ADMIN_FIELDS,
   UNBOUND_PATHS,
   fieldsOf,
+  goalGroupsFor,
   groupOf,
   groupsOf,
 } from '../../../../src/web/admin/fields.js';
@@ -268,9 +269,12 @@ describe('regroupement', () => {
       'Points · Abonnements',
       'Points · Réabonnements',
       'Points · Sub offerts',
-      'Points · Unité',
+      'Subs · Abonnements',
+      'Subs · Réabonnements',
+      'Subs · Sub offerts',
+      'Unité',
     ]);
-    expect(groupOf('goals.unitLabel')).toBe('Points · Unité');
+    expect(groupOf('goals.unitLabel')).toBe('Unité');
 
     expect(groupsOf('goal-appearance')).toStrictEqual([
       'Barre',
@@ -318,6 +322,45 @@ describe('taux des bits', () => {
 
   it('n’a plus d’éditeur de paliers à écarter du schéma', () => {
     expect(Object.keys(UNBOUND_PATHS).filter((path) => path.includes('bits'))).toStrictEqual([]);
+  });
+});
+
+describe('mode de la barre d’objectif', () => {
+  // Changer de mode remet le compte à zéro : c'est un geste confirmé, pas une case à enregistrer.
+  it('n’est pas un champ du formulaire', () => {
+    expect(ADMIN_FIELDS.some((field) => field.path === 'goals.mode')).toBe(false);
+    expect(UNBOUND_PATHS['goals.mode']).toBeDefined();
+  });
+
+  it('ne montre en mode points que les cartes de points', () => {
+    expect(goalGroupsFor('points')).toStrictEqual([
+      'Points · Abonnements',
+      'Points · Réabonnements',
+      'Points · Sub offerts',
+      'Unité',
+    ]);
+  });
+
+  it('ne montre en mode subs que les cartes de poids des abonnements', () => {
+    expect(goalGroupsFor('subs')).toStrictEqual([
+      'Subs · Abonnements',
+      'Subs · Réabonnements',
+      'Subs · Sub offerts',
+      'Unité',
+    ]);
+  });
+
+  it('montre toujours l’un ou l’autre : aucun groupe de la vue n’est orphelin', () => {
+    const shown = new Set([...goalGroupsFor('points'), ...goalGroupsFor('subs')]);
+
+    expect([...shown].toSorted()).toStrictEqual([...groupsOf('goals')].toSorted());
+  });
+
+  it('porte onze poids pour le mode subs, à un par abonnement au plus bas', () => {
+    const weights = ADMIN_FIELDS.filter((field) => field.path.startsWith('goals.subWeights.'));
+
+    expect(weights).toHaveLength(11);
+    expect(weights.every((field) => field.view === 'goals' && field.min === 0)).toBe(true);
   });
 });
 

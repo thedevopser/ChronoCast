@@ -216,10 +216,21 @@ const goalOverlaySchema = z
 
 const points = z.number().int().nonnegative();
 
-// La barre compte en points, et un bit vaut toujours un point : il n'y a rien à régler de ce
-// côté-là. Les abonnements valent au départ leur prix en bits, pour qu'un euro de soutien pèse à
-// peu près pareil quelle que soit sa forme.
-const DEFAULT_TIER_POINTS = { tier1: 500, tier2: 1_000, tier3: 2_500, prime: 500 } as const;
+interface TierWeights {
+  readonly tier1: number;
+  readonly tier2: number;
+  readonly tier3: number;
+  readonly prime: number;
+}
+
+// En mode points, un bit vaut toujours un point : il n'y a rien à régler de ce côté-là. Les
+// abonnements valent au départ leur prix en bits, pour qu'un euro de soutien pèse à peu près pareil
+// quelle que soit sa forme.
+const DEFAULT_TIER_POINTS: TierWeights = { tier1: 500, tier2: 1_000, tier3: 2_500, prime: 500 };
+
+// En mode subs, la barre compte des abonnements : un par abonnement, quel que soit le tier, tant
+// que le streamer n'en décide pas autrement.
+const DEFAULT_SUB_WEIGHTS: TierWeights = { tier1: 1, tier2: 1, tier3: 1, prime: 1 };
 
 const DEFAULT_GOAL_UNIT_LABEL = 'points';
 
@@ -227,34 +238,46 @@ const DEFAULT_GOAL_UNIT_LABEL = 'points';
 // se montre et que le modèle se comprenne.
 const DEFAULT_GOAL_TIERS = [{ target: 1_000, label: 'Objectif' }] as const;
 
-const tieredPointsSchema = z
-  .object({
-    tier1: points.default(DEFAULT_TIER_POINTS.tier1),
-    tier2: points.default(DEFAULT_TIER_POINTS.tier2),
-    tier3: points.default(DEFAULT_TIER_POINTS.tier3),
-    prime: points.default(DEFAULT_TIER_POINTS.prime),
-  })
-  .strip();
+// Le poids de chaque soutien dans la barre, par type et par tier. Les deux modes ont la même forme
+// et chacun sa table : passer de l'un à l'autre ne doit pas faire valoir 500 un abonnement compté
+// en abonnements.
+function goalWeights(defaults: TierWeights) {
+  const tiered = z
+    .object({
+      tier1: points.default(defaults.tier1),
+      tier2: points.default(defaults.tier2),
+      tier3: points.default(defaults.tier3),
+      prime: points.default(defaults.prime),
+    })
+    .strip();
 
-const giftPointsSchema = z
-  .object({
-    tier1: points.default(DEFAULT_TIER_POINTS.tier1),
-    tier2: points.default(DEFAULT_TIER_POINTS.tier2),
-    tier3: points.default(DEFAULT_TIER_POINTS.tier3),
-  })
-  .strip();
+  const gift = z
+    .object({
+      tier1: points.default(defaults.tier1),
+      tier2: points.default(defaults.tier2),
+      tier3: points.default(defaults.tier3),
+    })
+    .strip();
 
-const goalPointsSchema = z
-  .object({
-    sub: tieredPointsSchema.default({}),
-    resub: tieredPointsSchema.default({}),
-    gift: giftPointsSchema.default({}),
-  })
-  .strip();
+  return z
+    .object({
+      sub: tiered.default({}),
+      resub: tiered.default({}),
+      gift: gift.default({}),
+    })
+    .strip();
+}
 
 const goalsSchema = z
   .object({
-    points: goalPointsSchema.default({}),
+    // Ce que compte la barre : des points, où un bit vaut un point et un abonnement ce que dit
+    // `points`, ou des abonnements seuls, où les bits ne comptent pas et un abonnement vaut ce que
+    // dit `subWeights`.
+    mode: z.enum(['points', 'subs']).default('points'),
+
+    points: goalWeights(DEFAULT_TIER_POINTS).default({}),
+
+    subWeights: goalWeights(DEFAULT_SUB_WEIGHTS).default({}),
 
     // Ce que le panneau écrit après le compte. Jamais diffusé aux spectateurs : la page /goal
     // affiche « 12 / 50 » sans unité.

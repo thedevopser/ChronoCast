@@ -552,3 +552,33 @@ describe('valeurs de départ de la barre d’objectif, comptée en points', () =
     expect(CONFIG_SCHEMA_VERSION).toBe(10);
   });
 });
+
+describe('mode de la barre d’objectif', () => {
+  it('compte en points sur une installation neuve', () => {
+    expect(configSchema.parse({}).goals.mode).toBe('points');
+  });
+
+  it('accepte le mode subs et refuse tout autre mode', () => {
+    expect(configSchema.parse({ goals: { mode: 'subs' } }).goals.mode).toBe('subs');
+    expect(() => configSchema.parse({ goals: { mode: 'bits' } })).toThrow();
+  });
+
+  it('pèse un abonnement pour un en mode subs, quel que soit le tier, tant que rien n’est réglé', () => {
+    expect(configSchema.parse({}).goals.subWeights).toStrictEqual({
+      sub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
+      resub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
+      gift: { tier1: 1, tier2: 1, tier3: 1 },
+    });
+  });
+
+  it('garde les deux tables de poids indépendantes', () => {
+    const goals = configSchema.parse({ goals: { subWeights: { sub: { tier3: 6 } } } }).goals;
+
+    expect(goals.subWeights.sub.tier3).toBe(6);
+    expect(goals.points.sub.tier3).toBe(2_500);
+  });
+
+  it.each([-1, 1.5])('refuse un poids de %d en mode subs', (tier1) => {
+    expect(() => configSchema.parse({ goals: { subWeights: { gift: { tier1 } } } })).toThrow();
+  });
+});

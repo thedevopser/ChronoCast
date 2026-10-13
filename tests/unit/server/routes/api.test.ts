@@ -565,7 +565,7 @@ describe('createApiRoutes', () => {
     });
 
     it('rend l’annonce en attente, avec l’ancien compte de la barre', async () => {
-      await doubles.context.updateNotice.announceGoalsReset(37);
+      await doubles.leaveUpdateNotice({ goalsReset: { previousCount: 37 } });
 
       expect(body(await call('GET', '/api/update-notice'))).toStrictEqual({
         notice: { goalsReset: { previousCount: 37 } },
@@ -573,13 +573,66 @@ describe('createApiRoutes', () => {
     });
 
     it('l’acquitte pour de bon', async () => {
-      await doubles.context.updateNotice.announceGoalsReset(37);
+      await doubles.leaveUpdateNotice({ goalsReset: { previousCount: 37 } });
 
       const response = await call('POST', '/api/update-notice/acknowledge');
 
       expect(response.status).toBe(200);
       expect(body(response)).toStrictEqual({ notice: null });
       expect(body(await call('GET', '/api/update-notice'))).toStrictEqual({ notice: null });
+    });
+  });
+
+  describe('POST /api/goals/mode', () => {
+    function post(payload: unknown): Promise<HttpResponse> {
+      return call('POST', '/api/goals/mode', { body: JSON.stringify(payload) });
+    }
+
+    it('écrit le mode et l’unité qui va avec, puis remet le compte à zéro', async () => {
+      const response = await post({ mode: 'subs' });
+
+      expect(response.status).toBe(200);
+      expect(doubles.config.goals.mode).toBe('subs');
+      expect(doubles.config.goals.unitLabel).toBe('abo.');
+      expect(doubles.calls).toContain('goals.reset');
+      expect(body(response)).toMatchObject({ mode: 'subs', goal: { subs: 0 } });
+    });
+
+    it('revient en points avec l’unité « points »', async () => {
+      await post({ mode: 'subs' });
+
+      await post({ mode: 'points' });
+
+      expect(doubles.config.goals.mode).toBe('points');
+      expect(doubles.config.goals.unitLabel).toBe('points');
+    });
+
+    it('garde les paliers', async () => {
+      const before = doubles.config.goals.tiers;
+
+      await post({ mode: 'subs' });
+
+      expect(doubles.config.goals.tiers).toStrictEqual(before);
+    });
+
+    // Redemander le mode courant ne doit rien effacer : un double clic ne coûte pas une progression.
+    it('ne remet rien à zéro quand la barre est déjà dans ce mode', async () => {
+      const response = await post({ mode: 'points' });
+
+      expect(response.status).toBe(200);
+      expect(doubles.calls).not.toContain('goals.reset');
+      expect(doubles.calls).not.toContain('config.update');
+    });
+
+    it.each([{}, { mode: 'bits' }, { mode: 1 }, { mode: null }])('refuse %j', async (payload) => {
+      const response = await post(payload);
+
+      expect(response.status).toBe(400);
+      expect(doubles.calls).not.toContain('goals.reset');
+    });
+
+    it('refuse un corps illisible', async () => {
+      expect((await call('POST', '/api/goals/mode', { body: 'pas du json' })).status).toBe(400);
     });
   });
 });

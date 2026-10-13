@@ -40,6 +40,8 @@ export interface ApiDoubles {
 
   /** Le palier dont l'aperçu a été diffusé, ou `null` si la route ne l'a pas fait. */
   previewed: GoalTier | null;
+
+  leaveUpdateNotice(notice: UpdateNoticeState): Promise<void>;
 }
 
 export function createApiDoubles(): ApiDoubles {
@@ -71,7 +73,16 @@ export function createApiDoubles(): ApiDoubles {
     get: () => doubles.config,
     update: (patch: DeepPartial<ChronoCastConfig>) => {
       calls.push('config.update');
-      doubles.config = configSchema.parse({ ...doubles.config, ...patch });
+      // Fusion sur deux niveaux, assez pour qu'un correctif d'un sous-arbre n'efface pas ses voisins.
+      const merged: Record<string, unknown> = { ...doubles.config };
+      for (const [key, value] of Object.entries(patch)) {
+        const current = merged[key];
+        merged[key] =
+          typeof value === 'object' && value !== null && typeof current === 'object' && current !== null
+            ? { ...current, ...value }
+            : value;
+      }
+      doubles.config = configSchema.parse(merged);
       return Promise.resolve(doubles.config);
     },
     export: () => {
@@ -274,5 +285,14 @@ export function createApiDoubles(): ApiDoubles {
     logger,
   };
 
-  return Object.assign(doubles, { context, calls, ringBuffer });
+  return Object.assign(doubles, {
+    context,
+    calls,
+    ringBuffer,
+    /** Pose l'annonce qu'une 1.4.0 aurait laissée sur le disque, et la fait relire. */
+    async leaveUpdateNotice(notice: UpdateNoticeState): Promise<void> {
+      noticeState = notice;
+      await updateNotice.start();
+    },
+  });
 }

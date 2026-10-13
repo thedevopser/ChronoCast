@@ -241,4 +241,68 @@ describe('pointsGained', () => {
       expect(pointsGained(tier3, DEFAULTS)).toBe(2_500);
     });
   });
+
+  describe('mode subs', () => {
+    const SUBS = goalsWith({ mode: 'subs' });
+    const WEIGHTED_SUBS = goalsWith({
+      mode: 'subs',
+      subWeights: {
+        sub: { prime: 1, tier1: 1, tier2: 2, tier3: 6 },
+        resub: { prime: 1, tier1: 1, tier2: 2, tier3: 6 },
+        gift: { tier1: 1, tier2: 2, tier3: 6 },
+      },
+    });
+
+    it('ne compte pas les bits, quel qu’en soit le montant', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100_000 };
+
+      expect(pointsGained(event, SUBS)).toBe(0);
+    });
+
+    it.each(['prime', 'tier1', 'tier2', 'tier3'] as const)(
+      'compte un abonnement %s pour un tant que rien n’est réglé',
+      (tier) => {
+        const sub: SubEvent = { ...baseEvent(), type: 'sub', tier };
+        const resub: ResubEvent = { ...baseEvent(), type: 'resub', tier, cumulativeMonths: 3 };
+
+        expect(pointsGained(sub, SUBS)).toBe(1);
+        expect(pointsGained(resub, SUBS)).toBe(1);
+      },
+    );
+
+    it('compte un lot de subs offerts pour le nombre de subs', () => {
+      const event: GiftEvent = { ...baseEvent(), type: 'gift', tier: 'tier3', total: 7, isAnonymous: false };
+
+      expect(pointsGained(event, SUBS)).toBe(7);
+    });
+
+    it('suit les poids par tier propres au mode subs, et non le barème de points', () => {
+      const tier3: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier3' };
+      const gift: GiftEvent = { ...baseEvent(), type: 'gift', tier: 'tier2', total: 5, isAnonymous: false };
+
+      expect(pointsGained(tier3, WEIGHTED_SUBS)).toBe(6);
+      expect(pointsGained(gift, WEIGHTED_SUBS)).toBe(10);
+    });
+
+    it('ne compte rien pour une commande de chat', () => {
+      const event: CommandEvent = {
+        ...baseEvent(),
+        source: 'chat-command',
+        type: 'command',
+        command: 'addtime',
+        seconds: 300,
+      };
+
+      expect(pointsGained(event, SUBS)).toBe(0);
+    });
+  });
+
+  describe('mode points', () => {
+    it('ignore les poids du mode subs', () => {
+      const goals = goalsWith({ mode: 'points', subWeights: { sub: { tier1: 9 } } });
+      const sub: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(pointsGained(sub, goals)).toBe(500);
+    });
+  });
 });

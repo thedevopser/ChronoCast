@@ -141,6 +141,29 @@ describe('copyReward', () => {
   });
 });
 
+describe('cartes du mode subs', () => {
+  it('se recopient entre elles comme les autres barèmes', () => {
+    const outcome = copyReward(
+      fieldsOf('goals'),
+      { '#goal-subs-gift-tier1': '1', '#goal-subs-gift-tier2': '2', '#goal-subs-gift-tier3': '6' },
+      'goals.subWeights.gift.',
+      ['goals.subWeights.sub.', 'goals.subWeights.resub.'],
+    );
+
+    expect(outcome).toStrictEqual({
+      ok: true,
+      values: {
+        '#goal-subs-sub-tier1': '1',
+        '#goal-subs-sub-tier2': '2',
+        '#goal-subs-sub-tier3': '6',
+        '#goal-subs-resub-tier1': '1',
+        '#goal-subs-resub-tier2': '2',
+        '#goal-subs-resub-tier3': '6',
+      },
+    });
+  });
+});
+
 describe('copyLabel', () => {
   it('nomme les deux cartes visées', () => {
     expect(copyLabel(['Réabonnements', 'Sub offerts'])).toBe('Copier vers Réabonnements et Sub offerts');

@@ -21,6 +21,9 @@ const requests: { method: string; url: string; body: string | null }[] = [];
 let scheduleResponse: () => Response = () => new Response('{"schedule":null}', { status: 200 });
 let pendingNotice: unknown = { goalsReset: { previousCount: 37 } };
 
+// La configuration que sert le faux serveur : le changement de mode la fait évoluer.
+let servedConfig: typeof DEFAULT_CONFIG = structuredClone(DEFAULT_CONFIG);
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
@@ -117,8 +120,15 @@ beforeAll(async () => {
       pendingNotice = null;
       return Promise.resolve(json({ notice: null }));
     }
+    if (input === '/api/goals/mode') {
+      const { mode } = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        mode: 'points' | 'subs';
+      };
+      servedConfig = { ...servedConfig, goals: { ...servedConfig.goals, mode } };
+      return Promise.resolve(json({ mode, goal: null }));
+    }
     if (input === '/api/config') {
-      return Promise.resolve(json({ config: DEFAULT_CONFIG, hasClientSecret: false }));
+      return Promise.resolve(json({ config: servedConfig, hasClientSecret: false }));
     }
     return Promise.resolve(json({ entries: [], records: [], subscriptions: [], goal: null, tiers: [] }));
   }) as typeof window.fetch;
@@ -348,6 +358,65 @@ describe('vue Objectifs', () => {
   it('ne propose plus de régler les bits : un bit vaut un point', () => {
     expect(document.querySelector('#goal-bits-per-sub')).toBeNull();
     expect(element('#view-goals').textContent).toContain('Un bit vaut toujours un point');
+  });
+});
+
+describe('mode de la barre dans la vue Objectifs', () => {
+  function shownGroups(): string[] {
+    return [...document.querySelectorAll<HTMLElement>('#fields-goals .group')]
+      .filter((group) => !group.hidden)
+      .map((group) => group.dataset['group'] ?? '');
+  }
+
+  const modeRequests = (): typeof requests =>
+    requests.filter((request) => request.url === '/api/goals/mode');
+
+  it('dit que la barre compte en points et ne montre que les cartes de points', () => {
+    expect(element('#goal-mode-title').textContent).toBe('Points');
+    expect(element('#view-goals').contains(element('#goal-mode-card'))).toBe(true);
+    expect(shownGroups()).toStrictEqual([
+      'Points · Abonnements',
+      'Points · Réabonnements',
+      'Points · Sub offerts',
+      'Unité',
+    ]);
+  });
+
+  it('demande confirmation avant de changer de mode : le premier clic n’envoie rien', () => {
+    element('#goal-mode-switch').click();
+
+    expect(modeRequests()).toHaveLength(0);
+    expect(element('#goal-mode-switch').textContent).toBe('Confirmer : le compte repart de zéro');
+  });
+
+  it('change de mode au second clic, puis montre les cartes du mode subs', async () => {
+    element('#goal-mode-switch').click();
+    await settle();
+
+    expect(modeRequests().map((request) => request.body)).toStrictEqual(['{"mode":"subs"}']);
+    expect(element('#goal-mode-title').textContent).toBe('Abonnements seuls');
+    expect(element('#goal-mode-switch').textContent).toBe('Compter en points');
+    expect(shownGroups()).toStrictEqual([
+      'Subs · Abonnements',
+      'Subs · Réabonnements',
+      'Subs · Sub offerts',
+      'Unité',
+    ]);
+  });
+
+  it('pose un bouton de copie sur les cartes du mode subs', () => {
+    for (const selector of ['#goal-subs-sub-tier1', '#goal-subs-resub-tier1', '#goal-subs-gift-tier1']) {
+      expect(element(selector).closest('.group')?.querySelector('button'), selector).not.toBeNull();
+    }
+  });
+
+  it('revient en points de la même façon', async () => {
+    element('#goal-mode-switch').click();
+    element('#goal-mode-switch').click();
+    await settle();
+
+    expect(modeRequests().at(-1)?.body).toBe('{"mode":"points"}');
+    expect(element('#goal-mode-title').textContent).toBe('Points');
   });
 });
 

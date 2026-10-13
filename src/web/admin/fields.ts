@@ -20,6 +20,9 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
   'twitch.broadcasterLogin':
     'Résolu en même temps que l’identifiant, et affiché en lecture seule dans la vue Twitch. Le saisir ne changerait pas la chaîne réellement écoutée.',
 
+  'goals.mode':
+    'Changer ce que compte la barre remet son compte à zéro : c’est un geste confirmé, tenu par un bouton de la vue Objectifs, et non une case à enregistrer avec le reste.',
+
   'rewards.happyHour':
     'Bascule à effet immédiat, tenue par un bouton du tableau de bord et de la vue Happy Hour. En faire aussi une case à enregistrer donnerait deux gestes pour un même état.',
 
@@ -171,6 +174,19 @@ function goalPoints(selector: string, leaf: string, label: string): AdminField {
   };
 }
 
+// Le poids d'un abonnement quand la barre ne compte que des abonnements.
+function goalSubWeight(selector: string, leaf: string, label: string): AdminField {
+  return {
+    selector,
+    path: `goals.subWeights.${leaf}`,
+    label,
+    view: 'goals',
+    kind: 'integer',
+    min: 0,
+    max: MAX_GOAL_POINTS,
+  };
+}
+
 const GOAL_FIELDS: readonly AdminField[] = [
   goalPoints('#goal-points-sub-prime', 'sub.prime', 'Prime'),
   goalPoints('#goal-points-sub-tier1', 'sub.tier1', 'Tier 1'),
@@ -185,6 +201,20 @@ const GOAL_FIELDS: readonly AdminField[] = [
   goalPoints('#goal-points-gift-tier1', 'gift.tier1', 'Tier 1'),
   goalPoints('#goal-points-gift-tier2', 'gift.tier2', 'Tier 2'),
   goalPoints('#goal-points-gift-tier3', 'gift.tier3', 'Tier 3'),
+
+  goalSubWeight('#goal-subs-sub-prime', 'sub.prime', 'Prime'),
+  goalSubWeight('#goal-subs-sub-tier1', 'sub.tier1', 'Tier 1'),
+  goalSubWeight('#goal-subs-sub-tier2', 'sub.tier2', 'Tier 2'),
+  goalSubWeight('#goal-subs-sub-tier3', 'sub.tier3', 'Tier 3'),
+
+  goalSubWeight('#goal-subs-resub-prime', 'resub.prime', 'Prime'),
+  goalSubWeight('#goal-subs-resub-tier1', 'resub.tier1', 'Tier 1'),
+  goalSubWeight('#goal-subs-resub-tier2', 'resub.tier2', 'Tier 2'),
+  goalSubWeight('#goal-subs-resub-tier3', 'resub.tier3', 'Tier 3'),
+
+  goalSubWeight('#goal-subs-gift-tier1', 'gift.tier1', 'Tier 1'),
+  goalSubWeight('#goal-subs-gift-tier2', 'gift.tier2', 'Tier 2'),
+  goalSubWeight('#goal-subs-gift-tier3', 'gift.tier3', 'Tier 3'),
 
   {
     selector: '#goal-unit-label',
@@ -799,7 +829,10 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['goals.points.sub.', 'Points · Abonnements'],
   ['goals.points.resub.', 'Points · Réabonnements'],
   ['goals.points.gift.', 'Points · Sub offerts'],
-  ['goals.unitLabel', 'Points · Unité'],
+  ['goals.subWeights.sub.', 'Subs · Abonnements'],
+  ['goals.subWeights.resub.', 'Subs · Réabonnements'],
+  ['goals.subWeights.gift.', 'Subs · Sub offerts'],
+  ['goals.unitLabel', 'Unité'],
   ['goals.overlay.bar.', 'Barre'],
   ['goals.overlay.shadow.', 'Ombre du texte'],
   ['goals.overlay.outline.', 'Contour du texte'],
@@ -845,6 +878,29 @@ export function groupsOf(view: FieldViewId): readonly string[] {
   }
 
   return seen;
+}
+
+export type GoalMode = 'points' | 'subs';
+
+// Chaque mode de la barre a sa table de poids ; l'autre n'a pas à encombrer la vue.
+const GOAL_MODE_PREFIXES: Readonly<Record<GoalMode, string>> = {
+  points: 'goals.points.',
+  subs: 'goals.subWeights.',
+};
+
+/** Les groupes de la vue Objectifs à montrer quand la barre est dans ce mode. */
+export function goalGroupsFor(mode: GoalMode): readonly string[] {
+  const hidden = Object.entries(GOAL_MODE_PREFIXES)
+    .filter(([candidate]) => candidate !== mode)
+    .map(([, prefix]) => prefix);
+
+  const shown = new Set(
+    fieldsOf('goals')
+      .filter((field) => !hidden.some((prefix) => field.path.startsWith(prefix)))
+      .map((field) => groupOf(field.path)),
+  );
+
+  return groupsOf('goals').filter((group) => shown.has(group));
 }
 
 export function groupOf(path: string): string {

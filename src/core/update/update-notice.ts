@@ -7,7 +7,8 @@ import type { AtomicJsonStore } from '../storage/atomic-json-store.js';
  * Ce qu'une mise à jour a changé sans que le streamer l'ait demandé, et qu'il n'a pas encore lu.
  *
  * Un état et non un réglage : il vit dans son propre fichier, ne s'exporte pas, et disparaît dès
- * qu'il est acquitté.
+ * qu'il est acquitté. Seule la 1.4.0 en a écrit un, en remettant la barre d'objectif à zéro ; plus
+ * rien n'en écrit, mais celui qu'elle a laissé doit pouvoir être lu et acquitté.
  */
 export interface UpdateNoticeState {
   readonly goalsReset: {
@@ -20,8 +21,6 @@ export interface UpdateNotice {
   start(): Promise<void>;
 
   get(): UpdateNoticeState | null;
-
-  announceGoalsReset(previousCount: number): Promise<void>;
 
   acknowledge(): Promise<void>;
 }
@@ -62,11 +61,6 @@ export function createUpdateNotice(options: UpdateNoticeOptions): UpdateNotice {
 
     get(): UpdateNoticeState | null {
       return state;
-    },
-
-    async announceGoalsReset(previousCount: number): Promise<void> {
-      state = { goalsReset: { previousCount } };
-      await persist();
     },
 
     async acknowledge(): Promise<void> {

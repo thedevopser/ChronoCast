@@ -290,7 +290,7 @@ describe('createConfigService', () => {
       expect(double.persisted).toMatchObject({ rewards: { happyHour: false } });
     });
 
-    describe('import d’une configuration exportée avant la barre en points', () => {
+    describe('import d’une configuration exportée quand la barre comptait en abonnements', () => {
       const EXPORTED = {
         schemaVersion: 5,
         goals: {
@@ -301,14 +301,15 @@ describe('createConfigService', () => {
         rewards: { bits: { mode: 'tiers', linear: {}, tiers: [{ minBits: 200, seconds: 100 }] } },
       };
 
-      it('remet le comptage de la barre aux valeurs de départ et garde son apparence', async () => {
+      it('garde sa barre, en mode subs, avec ses paliers et son apparence', async () => {
         const { service } = createService();
         await service.load();
 
         const imported = await service.import(JSON.stringify(EXPORTED));
 
-        expect(imported.goals.unitLabel).toBe('points');
-        expect(imported.goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+        expect(imported.goals.mode).toBe('subs');
+        expect(imported.goals.unitLabel).toBe('abo.');
+        expect(imported.goals.tiers).toStrictEqual([{ target: 50, label: 'Je me rase la tête' }]);
         expect(imported.goals.overlay.fontSize).toBe(40);
       });
 
@@ -321,7 +322,7 @@ describe('createConfigService', () => {
         expect(imported.rewards.bits).toStrictEqual({ unit: 200, seconds: 100 });
       });
 
-      it('respecte le comptage d’une configuration exportée depuis', async () => {
+      it('laisse en mode points une configuration exportée depuis', async () => {
         const { service } = createService();
         await service.load();
 
@@ -329,6 +330,7 @@ describe('createConfigService', () => {
           JSON.stringify({ ...EXPORTED, schemaVersion: CONFIG_SCHEMA_VERSION }),
         );
 
+        expect(imported.goals.mode).toBe('points');
         expect(imported.goals.tiers).toStrictEqual([{ target: 50, label: 'Je me rase la tête' }]);
       });
     });
