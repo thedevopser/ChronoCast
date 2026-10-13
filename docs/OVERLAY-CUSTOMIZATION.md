@@ -180,7 +180,7 @@ Celles de la page `/goal` portent toutes le préfixe `--cc-goal-`, si bien qu'au
 | `--cc-goal-text-align` | Alignement dans la barre |
 | `--cc-goal-text-shadow` | Ombre portée **et** halo, empilés |
 | `--cc-goal-outline-width`, `--cc-goal-outline-color` | Contour des lettres |
-| `--cc-goal-bar-height`, `--cc-goal-bar-radius` | Géométrie de la barre |
+| `--cc-goal-bar-width`, `--cc-goal-bar-height`, `--cc-goal-bar-radius` | Géométrie de la barre. La largeur vaut `100%` tant que le réglage *Largeur* est à 0 : la barre occupe alors toute la source ; réglée en pixels, elle se centre et ne déborde jamais d'une source plus étroite |
 | `--cc-goal-bar-fill`, `--cc-goal-bar-track` | Remplissage de la part parcourue, et fond de la barre |
 | `--cc-goal-bar-border-width`, `--cc-goal-bar-border-color` | Trait de la barre |
 | `--cc-goal-announce-color`, `--cc-goal-announce-duration` | Bandeau d'un palier franchi |

@@ -369,6 +369,7 @@ describe('apparence de la page Objectifs', () => {
     const { bar } = appearance();
 
     expect(bar).toStrictEqual({
+      width: 0,
       height: 48,
       radius: 24,
       fillColor: '#9146FF',
@@ -421,6 +422,16 @@ describe('apparence de la page Objectifs', () => {
     const parsed = configSchema.parse({ goals: { overlay: { announce: { text: '' } } } });
 
     expect(parsed.goals.overlay.announce.text).toBe('');
+  });
+
+  it('accepte une largeur de barre qui couvre une source 4K', () => {
+    const parsed = configSchema.parse({ goals: { overlay: { bar: { width: 3840 } } } });
+
+    expect(parsed.goals.overlay.bar.width).toBe(3840);
+  });
+
+  it.each([-1, 3841, 600.5])('refuse une largeur de barre de %d pixels', (width) => {
+    expect(() => configSchema.parse({ goals: { overlay: { bar: { width } } } })).toThrow();
   });
 
   it('refuse une hauteur de barre négative', () => {

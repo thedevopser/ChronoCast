@@ -5,6 +5,11 @@ function barFill(config: GoalOverlayConfig): string {
   return config.gradient.onBar ? composeGradient(config.gradient) : config.bar.fillColor;
 }
 
+// Une largeur nulle veut dire « toute la source » : `0px` ferait disparaître la barre.
+function barWidth(width: number): string {
+  return width === 0 ? '100%' : `${String(width)}px`;
+}
+
 /**
  * Traduit l'apparence de la page `/goal` en variables CSS.
  *
@@ -31,6 +36,7 @@ export function goalCssVariables(config: GoalOverlayConfig): Record<string, stri
     '--cc-goal-outline-width': config.outline.enabled ? `${String(config.outline.width)}px` : '0px',
     '--cc-goal-outline-color': config.outline.color,
 
+    '--cc-goal-bar-width': barWidth(bar.width),
     '--cc-goal-bar-height': `${String(bar.height)}px`,
     '--cc-goal-bar-radius': `${String(bar.radius)}px`,
     '--cc-goal-bar-fill': barFill(config),

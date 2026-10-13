@@ -144,6 +144,7 @@ export interface GoalOverlayConfig {
   textAlign: 'left' | 'center' | 'right';
   showCount: boolean;
   bar: {
+    width: number;
     height: number;
     radius: number;
     fillColor: string;

@@ -211,6 +211,17 @@ const GOAL_FIELDS: readonly AdminField[] = [
     kind: 'boolean',
   },
 
+  {
+    selector: '#goal-bar-width',
+    path: 'goals.overlay.bar.width',
+    label: 'Largeur',
+    hint: 'À 0, la barre occupe toute la largeur de la source. Au-delà, elle se centre.',
+    view: 'goal-appearance',
+    kind: 'integer',
+    min: 0,
+    max: 3840,
+    unit: 'px',
+  },
   goalPixels('#goal-bar-height', 'goals.overlay.bar.height', 'Hauteur', 0, 400),
   goalPixels('#goal-bar-radius', 'goals.overlay.bar.radius', 'Arrondi des coins', 0, 200),
   goalColor(

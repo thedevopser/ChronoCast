@@ -165,6 +165,7 @@ const goalOverlaySchema = z
 
     bar: z
       .object({
+        width: z.number().int().nonnegative().max(3840).default(0),
         height: z.number().nonnegative().max(400).default(48),
         radius: z.number().nonnegative().max(200).default(24),
         fillColor: hexColor.default('#9146FF'),

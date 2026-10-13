@@ -50,6 +50,19 @@ describe('page /goal', () => {
       expect(await goalCss()).toContain('calc(var(--cc-goal-progress) * 100%)');
     });
 
+    it('borne la barre à la largeur réglée et la centre dans la source', async () => {
+      const bar = /\.bar\s*\{[^}]*\}/.exec(await goalCss())?.[0] ?? '';
+
+      expect(bar).toContain('max-width: var(--cc-goal-bar-width)');
+      expect(bar).toContain('margin-inline: auto');
+    });
+
+    it('ne laisse pas l’annonce dépasser la largeur de la barre', async () => {
+      const label = /\.announce__label\s*\{[^}]*\}/.exec(await goalCss())?.[0] ?? '';
+
+      expect(label).toContain('max-width: min(100vw, var(--cc-goal-bar-width))');
+    });
+
     it('ne préfixe que --cc-goal-, pour ne jamais heurter les variables de l’overlay', async () => {
       const declared = [...(await goalCss()).matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map(
         (match) => match[1] ?? '',
