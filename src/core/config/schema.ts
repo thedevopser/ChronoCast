@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 5;
+export const CONFIG_SCHEMA_VERSION = 9;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -58,56 +58,60 @@ const counterSchema = z
   })
   .strip();
 
-const tieredRewardSchema = z
+const DEFAULT_TIER_SECONDS = { tier1: 180, tier2: 240, tier3: 300, prime: 180 } as const;
+
+// Le Happy Hour valait le double du barème avant d'avoir le sien : ses défauts gardent ce rapport.
+export const HAPPY_HOUR_DEFAULT_FACTOR = 2;
+
+function tieredReward(factor: number) {
+  return z
+    .object({
+      tier1: seconds.default(DEFAULT_TIER_SECONDS.tier1 * factor),
+      tier2: seconds.default(DEFAULT_TIER_SECONDS.tier2 * factor),
+      tier3: seconds.default(DEFAULT_TIER_SECONDS.tier3 * factor),
+      prime: seconds.default(DEFAULT_TIER_SECONDS.prime * factor),
+    })
+    .strip();
+}
+
+function giftReward(factor: number) {
+  return z
+    .object({
+      tier1: seconds.default(DEFAULT_TIER_SECONDS.tier1 * factor),
+      tier2: seconds.default(DEFAULT_TIER_SECONDS.tier2 * factor),
+      tier3: seconds.default(DEFAULT_TIER_SECONDS.tier3 * factor),
+    })
+    .strip();
+}
+
+const tieredRewardSchema = tieredReward(1);
+const giftRewardSchema = giftReward(1);
+
+const DEFAULT_BITS_UNIT = 100;
+
+const DEFAULT_BITS_SECONDS = 60;
+
+// Un taux, « `unit` bits = `seconds` secondes », appliqué au bit près : au défaut, un bit crédite
+// 0,6 seconde. Deux entiers plutôt qu'un décimal par bit, pour qu'on n'ait rien à convertir.
+function bitsReward(factor: number) {
+  return z
+    .object({
+      unit: z.number().int().positive().default(DEFAULT_BITS_UNIT),
+      seconds: seconds.default(DEFAULT_BITS_SECONDS * factor),
+    })
+    .strip();
+}
+
+const bitsRewardSchema = bitsReward(1);
+
+const happyHourRewardsSchema = z
   .object({
-    tier1: seconds.default(180),
-    tier2: seconds.default(240),
-    tier3: seconds.default(300),
-    prime: seconds.default(180),
+    sub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    resub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    gift: giftReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    bits: bitsReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
   })
   .strip();
-
-const giftRewardSchema = z
-  .object({
-    tier1: seconds.default(180),
-    tier2: seconds.default(240),
-    tier3: seconds.default(300),
-  })
-  .strip();
-
-const bitsTierSchema = z
-  .object({
-    minBits: z.number().int().positive(),
-    seconds,
-  })
-  .strip();
-
-const bitsRewardSchema = z
-  .object({
-    mode: z.enum(['linear', 'tiers']).default('linear'),
-
-    linear: z
-      .object({
-        unit: z.number().int().positive().default(100),
-        secondsPerUnit: seconds.default(60),
-        minBits: z.number().int().positive().default(1),
-      })
-      .strip()
-      .default({}),
-
-    tiers: z
-      .array(bitsTierSchema)
-      .default([
-        { minBits: 100, seconds: 60 },
-        { minBits: 500, seconds: 360 },
-        { minBits: 1_000, seconds: 900 },
-      ]),
-  })
-  .strip()
-  .refine((value) => value.mode !== 'tiers' || value.tiers.length > 0, {
-    message: 'le mode « tiers » exige au moins un palier',
-    path: ['tiers'],
-  });
 
 const chatCommandSchema = z
   .object({
@@ -126,9 +130,10 @@ const chatCommandSchema = z
 
 const rewardsSchema = z
   .object({
-    // Double les secondes créditées par les abonnements, les réabonnements, les subs offerts et
-    // les bits, jamais les seuils d'entrée ni la saisie d'un modérateur.
+    // Actif, abonnements, réabonnements, subs offerts et bits se lisent dans `happyHourRewards`.
+    // La saisie d'un modérateur n'est jamais concernée.
     happyHour: z.boolean().default(false),
+    happyHourRewards: happyHourRewardsSchema.default({}),
 
     chatCommand: chatCommandSchema.default({}),
     sub: tieredRewardSchema.default({}),
@@ -165,6 +170,7 @@ const goalOverlaySchema = z
 
     bar: z
       .object({
+        width: z.number().int().nonnegative().max(3840).default(0),
         height: z.number().nonnegative().max(400).default(48),
         radius: z.number().nonnegative().max(200).default(24),
         fillColor: hexColor.default('#9146FF'),
@@ -208,13 +214,60 @@ const goalOverlaySchema = z
   })
   .strip();
 
+const points = z.number().int().nonnegative();
+
+// La barre compte en points, à un point par bit. Les abonnements valent au départ leur prix en
+// bits, pour qu'un euro de soutien pèse à peu près pareil quelle que soit sa forme.
+const DEFAULT_TIER_POINTS = { tier1: 500, tier2: 1_000, tier3: 2_500, prime: 500 } as const;
+
+const DEFAULT_BITS_PER_POINT = 1;
+
+const DEFAULT_GOAL_UNIT_LABEL = 'points';
+
+// Sans palier, la page /goal reste vide : une installation neuve en porte un, pour que la barre
+// se montre et que le modèle se comprenne.
+const DEFAULT_GOAL_TIERS = [{ target: 1_000, label: 'Objectif' }] as const;
+
+const tieredPointsSchema = z
+  .object({
+    tier1: points.default(DEFAULT_TIER_POINTS.tier1),
+    tier2: points.default(DEFAULT_TIER_POINTS.tier2),
+    tier3: points.default(DEFAULT_TIER_POINTS.tier3),
+    prime: points.default(DEFAULT_TIER_POINTS.prime),
+  })
+  .strip();
+
+const giftPointsSchema = z
+  .object({
+    tier1: points.default(DEFAULT_TIER_POINTS.tier1),
+    tier2: points.default(DEFAULT_TIER_POINTS.tier2),
+    tier3: points.default(DEFAULT_TIER_POINTS.tier3),
+  })
+  .strip();
+
+const goalPointsSchema = z
+  .object({
+    sub: tieredPointsSchema.default({}),
+    resub: tieredPointsSchema.default({}),
+    gift: giftPointsSchema.default({}),
+  })
+  .strip();
+
 const goalsSchema = z
   .object({
-    bitsPerSub: z.number().int().positive().default(500),
+    // Le nombre de bits qui vaut un point. La clé date du temps où la barre ne comptait qu'en
+    // abonnements : la renommer imposerait une migration pour une question de vocabulaire.
+    bitsPerSub: z.number().int().positive().default(DEFAULT_BITS_PER_POINT),
+
+    points: goalPointsSchema.default({}),
+
+    // Ce que le panneau écrit après le compte. Jamais diffusé aux spectateurs : la page /goal
+    // affiche « 12 / 50 » sans unité.
+    unitLabel: z.string().max(GOAL_LABEL_MAX_LENGTH).default(DEFAULT_GOAL_UNIT_LABEL),
 
     // Ni tri ni unicité ici : un refine qui rejette ferait tomber toute la configuration au
     // chargement. L'échelle se normalise à la lecture, et la saisie se valide dans le panneau.
-    tiers: z.array(goalTierSchema).default([]),
+    tiers: z.array(goalTierSchema).default(DEFAULT_GOAL_TIERS.map((tier) => ({ ...tier }))),
 
     overlay: goalOverlaySchema.default({}),
   })

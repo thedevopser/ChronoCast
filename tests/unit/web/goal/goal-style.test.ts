@@ -46,6 +46,15 @@ describe('goalCssVariables', () => {
       expect(css['--cc-goal-bar-border-width']).toBe('3px');
     });
 
+    it('laisse la barre occuper toute la source tant qu’aucune largeur n’est réglée', () => {
+      expect(variables()['--cc-goal-bar-width']).toBe('100%');
+      expect(variables({ bar: { width: 0 } })['--cc-goal-bar-width']).toBe('100%');
+    });
+
+    it('reporte une largeur réglée en pixels', () => {
+      expect(variables({ bar: { width: 600 } })['--cc-goal-bar-width']).toBe('600px');
+    });
+
     it('applique l’opacité au fond de la barre plutôt qu’à la barre entière', () => {
       expect(variables({ bar: { trackColor: '#112233', trackOpacity: 0.5 } })['--cc-goal-bar-track'])
         .toBe('#11223380');

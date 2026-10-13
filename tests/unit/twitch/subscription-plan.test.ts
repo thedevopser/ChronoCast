@@ -32,12 +32,30 @@ describe('SUBSCRIPTION_PLAN', () => {
     const types = SUBSCRIPTION_PLAN.map((definition) => definition.type);
 
     expect(types.toSorted()).toEqual([
+      'channel.bits.use',
       'channel.chat.message',
       'channel.chat.notification',
-      'channel.cheer',
       'channel.subscribe',
       'channel.subscription.gift',
       'channel.subscription.message',
+    ]);
+  });
+
+  it('écoute les bits par channel.bits.use, qui couvre cheers et Power-ups, et plus par channel.cheer', () => {
+    const types = SUBSCRIPTION_PLAN.map((definition) => definition.type);
+    const bitsUse = SUBSCRIPTION_PLAN.find((definition) => definition.type === 'channel.bits.use');
+
+    expect(types).not.toContain('channel.cheer');
+    expect(bitsUse).toMatchObject({ version: '1', scopes: ['bits:read'], required: true });
+  });
+
+  // Un scope de plus imposerait à tous les installés de se reconnecter.
+  it('ne demande aucun scope de plus qu’avant les Power-ups', () => {
+    expect(requiredScopes(DEFAULT_CONFIG.twitch).toSorted()).toStrictEqual([
+      'bits:read',
+      'channel:read:subscriptions',
+      'user:bot',
+      'user:read:chat',
     ]);
   });
 
@@ -60,7 +78,7 @@ describe('resolveSubscriptions', () => {
         'channel.subscribe',
         'channel.subscription.message',
         'channel.subscription.gift',
-        'channel.cheer',
+        'channel.bits.use',
       ]),
     );
   });

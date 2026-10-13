@@ -8,6 +8,9 @@ import type { CounterEventOutcome, CounterService } from '../../counter/counter-
 import type { DomainEvent, DomainEventType } from '../../events/domain-event.js';
 import { normalizeLadder } from '../../goals/goal-ladder.js';
 import type { GoalService } from '../../goals/goal-service.js';
+import type { HappyHourSchedule } from '../../happy-hour/happy-hour-schedule.js';
+import { InvalidWindowError } from '../../schedule/one-shot-window.js';
+import type { UpdateNotice } from '../../update/update-notice.js';
 import type { EventHistoryService } from '../../history/event-history-service.js';
 import type { Logger, LogLevel } from '../../logging/logger.js';
 import type { RingBufferSink } from '../../logging/sinks/ring-buffer-sink.js';
@@ -47,6 +50,8 @@ export interface ApiContext {
   readonly config: ConfigService;
   readonly counter: CounterService;
   readonly goals: GoalService;
+  readonly happyHourSchedule: HappyHourSchedule;
+  readonly updateNotice: UpdateNotice;
   readonly history: EventHistoryService;
 
   readonly system?: SystemSettingsOpener | undefined;
@@ -74,8 +79,9 @@ const MAX_ADJUSTMENT_SECONDS = 86_400;
 
 const MAX_INITIAL_SECONDS = 2_592_000;
 
-// Aucune chaîne Twitch n'atteindra ce compte : le plafond n'est là que pour borner une saisie.
-const MAX_GOAL_SUBS = 1_000_000;
+// Le compte s'exprime en points, et un abonnement peut en valoir des centaines : le plafond n'est
+// là que pour borner une saisie.
+const MAX_GOAL_COUNT = 1_000_000_000;
 
 const secondsSchema = z.number().int().positive().max(MAX_ADJUSTMENT_SECONDS);
 
@@ -91,7 +97,14 @@ const initialSchema = z
   .strip();
 
 const goalSubsSchema = z
-  .object({ subs: z.number().int().min(0).max(MAX_GOAL_SUBS) })
+  .object({ subs: z.number().int().min(0).max(MAX_GOAL_COUNT) })
+  .strip();
+
+const scheduleSchema = z
+  .object({
+    startAt: z.number().int().nonnegative(),
+    endAt: z.number().int().nonnegative(),
+  })
   .strip();
 
 const configPatchSchema = z
@@ -166,6 +179,8 @@ export function createApiRoutes(context: ApiContext): Route[] {
     config,
     counter,
     goals,
+    happyHourSchedule,
+    updateNotice,
     previewGoal,
     history,
     logs,
@@ -354,6 +369,56 @@ export function createApiRoutes(context: ApiContext): Route[] {
         return jsonResponse(200, {
           counter: await counter.setInitialSeconds(parsed.data.seconds),
         });
+      },
+    },
+
+    {
+      method: 'GET',
+      path: '/api/update-notice',
+      handler: () => jsonResponse(200, { notice: updateNotice.get() }),
+    },
+
+    {
+      method: 'POST',
+      path: '/api/update-notice/acknowledge',
+      handler: async () => {
+        await updateNotice.acknowledge();
+        return jsonResponse(200, { notice: updateNotice.get() });
+      },
+    },
+
+    {
+      method: 'GET',
+      path: '/api/happy-hour/schedule',
+      handler: () => jsonResponse(200, { schedule: happyHourSchedule.get() }),
+    },
+
+    {
+      method: 'PUT',
+      path: '/api/happy-hour/schedule',
+      handler: async (request) => {
+        const parsed = scheduleSchema.safeParse(parseJsonBody(request));
+        if (!parsed.success) {
+          return badRequest('Plage refusée : deux horodatages entiers attendus, début et fin.');
+        }
+
+        try {
+          return jsonResponse(200, { schedule: await happyHourSchedule.set(parsed.data) });
+        } catch (error) {
+          if (error instanceof InvalidWindowError) {
+            return errorResponse(400, 'invalid_schedule', `Plage refusée : ${error.message}.`);
+          }
+          throw error;
+        }
+      },
+    },
+
+    {
+      method: 'DELETE',
+      path: '/api/happy-hour/schedule',
+      handler: async () => {
+        await happyHourSchedule.cancel();
+        return jsonResponse(200, { schedule: happyHourSchedule.get() });
       },
     },
 

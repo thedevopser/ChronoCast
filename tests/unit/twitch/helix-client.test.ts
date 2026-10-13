@@ -137,7 +137,7 @@ describe('createHelixClient', () => {
         jsonResponse(200, {
           data: [
             { id: 'sub-1', type: 'channel.subscribe', version: '1', status: 'enabled' },
-            { id: 'sub-2', type: 'channel.cheer', version: '1', status: 'enabled' },
+            { id: 'sub-2', type: 'channel.bits.use', version: '1', status: 'enabled' },
           ],
         }),
       );

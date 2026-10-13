@@ -18,6 +18,7 @@ const ROOT: Shape = {
 
 const BRANCHES: Readonly<Record<string, Shape>> = {
   bar: {
+    width: 'number',
     height: 'number',
     radius: 'number',
     fillColor: 'string',

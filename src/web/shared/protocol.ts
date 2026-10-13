@@ -55,6 +55,7 @@ export interface GiftEvent extends BaseDomainEvent {
 export interface BitsEvent extends BaseDomainEvent {
   readonly type: 'bits';
   readonly bits: number;
+  readonly usage?: 'cheer' | 'power_up' | 'custom_power_up' | 'unknown';
 }
 
 export interface CommandEvent extends BaseDomainEvent {
@@ -144,6 +145,7 @@ export interface GoalOverlayConfig {
   textAlign: 'left' | 'center' | 'right';
   showCount: boolean;
   bar: {
+    width: number;
     height: number;
     radius: number;
     fillColor: string;
@@ -184,12 +186,18 @@ export interface GoalOverlayConfig {
   };
 }
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'goal'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export const DEFAULT_CHANNELS: readonly Channel[] = CHANNELS;
+
+/** La plage programmée du Happy Hour : deux horodatages absolus, en millisecondes. */
+export interface HappyHourSchedule {
+  readonly startAt: number;
+  readonly endAt: number;
+}
 
 export interface HelloMessage {
   readonly type: 'hello';
@@ -200,6 +208,7 @@ export interface HelloMessage {
   readonly overlay: OverlayConfig;
   readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
+  readonly happyHourSchedule: HappyHourSchedule | null;
 }
 
 export interface StateMessage {
@@ -245,6 +254,7 @@ export interface ConfigMessage {
   readonly overlay: OverlayConfig;
   readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
+  readonly happyHourSchedule: HappyHourSchedule | null;
 }
 
 export interface GoalMessage {

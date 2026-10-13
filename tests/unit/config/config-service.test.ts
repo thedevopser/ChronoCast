@@ -115,7 +115,7 @@ describe('createConfigService', () => {
 
       expect(updated.rewards.sub.tier1).toBe(600);
       expect(updated.rewards.sub.tier2).toBe(DEFAULT_CONFIG.rewards.sub.tier2);
-      expect(updated.rewards.bits.mode).toBe(DEFAULT_CONFIG.rewards.bits.mode);
+      expect(updated.rewards.bits.unit).toBe(DEFAULT_CONFIG.rewards.bits.unit);
     });
 
     it('persiste immédiatement la nouvelle configuration', async () => {
@@ -131,11 +131,18 @@ describe('createConfigService', () => {
       const { service } = createService();
       await service.load();
 
-      const updated = await service.update({
-        rewards: { bits: { tiers: [{ minBits: 50, seconds: 30 }] } },
+      await service.update({
+        goals: {
+          tiers: [
+            { target: 5, label: 'Premier' },
+            { target: 10, label: 'Second' },
+          ],
+        },
       });
 
-      expect(updated.rewards.bits.tiers).toEqual([{ minBits: 50, seconds: 30 }]);
+      const updated = await service.update({ goals: { tiers: [{ target: 50, label: 'Seul' }] } });
+
+      expect(updated.goals.tiers).toEqual([{ target: 50, label: 'Seul' }]);
     });
 
     it('refuse une valeur invalide sans rien persister', async () => {
@@ -281,6 +288,84 @@ describe('createConfigService', () => {
 
       expect(loaded.rewards.happyHour).toBe(false);
       expect(double.persisted).toMatchObject({ rewards: { happyHour: false } });
+    });
+
+    describe('import d’une configuration exportée avant la barre en points', () => {
+      const EXPORTED = {
+        schemaVersion: 5,
+        goals: {
+          bitsPerSub: 500,
+          tiers: [{ target: 50, label: 'Je me rase la tête' }],
+          overlay: { fontSize: 40 },
+        },
+        rewards: { bits: { mode: 'tiers', linear: {}, tiers: [{ minBits: 200, seconds: 100 }] } },
+      };
+
+      it('remet le comptage de la barre aux valeurs de départ et garde son apparence', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(JSON.stringify(EXPORTED));
+
+        expect(imported.goals.bitsPerSub).toBe(1);
+        expect(imported.goals.unitLabel).toBe('points');
+        expect(imported.goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+        expect(imported.goals.overlay.fontSize).toBe(40);
+      });
+
+      it('convertit ses paliers de bits en taux unique', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(JSON.stringify(EXPORTED));
+
+        expect(imported.rewards.bits).toStrictEqual({ unit: 200, seconds: 100 });
+      });
+
+      it('respecte le comptage d’une configuration exportée depuis', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(
+          JSON.stringify({ ...EXPORTED, schemaVersion: CONFIG_SCHEMA_VERSION }),
+        );
+
+        expect(imported.goals.bitsPerSub).toBe(500);
+      });
+    });
+
+    describe('import d’une configuration qui ne porte pas de barème Happy Hour', () => {
+      const LEGACY = {
+        schemaVersion: 5,
+        rewards: {
+          happyHour: true,
+          sub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+        },
+      };
+
+      it('le dérive du barème importé, doublé', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(JSON.stringify(LEGACY));
+
+        expect(imported.rewards.happyHourRewards.sub.tier1).toBe(600);
+        expect(imported.rewards.happyHourRewards.gift.tier1).toBe(360);
+      });
+
+      it('respecte un barème Happy Hour déjà réglé', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(
+          JSON.stringify({
+            ...LEGACY,
+            rewards: { ...LEGACY.rewards, happyHourRewards: { sub: { tier1: 42 } } },
+          }),
+        );
+
+        expect(imported.rewards.happyHourRewards.sub.tier1).toBe(42);
+      });
     });
 
     it('ne réécrit rien lorsque la version est déjà à jour', async () => {

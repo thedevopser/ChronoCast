@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { AdminField } from '../../../../src/web/admin/fields.js';
 import {
+  appendGroupAction,
   clearFieldErrors,
   readFieldValues,
   renderFieldGroups,
@@ -381,5 +382,26 @@ describe('curseurs et unités', () => {
     writeFieldValues(root, SLIDERS, { '#s-size': '300' });
 
     expect(root.querySelector<HTMLInputElement>('#s-size-range')?.value).toBe('300');
+  });
+});
+
+describe('appendGroupAction', () => {
+  it('pose dans le groupe du champ un bouton qui ne soumet rien', () => {
+    let clicks = 0;
+    const button = appendGroupAction(document, root, '#a-int', 'Copier', () => {
+      clicks += 1;
+    });
+
+    expect(button?.type).toBe('button');
+    expect(button?.textContent).toBe('Copier');
+    expect(button?.closest('.group')).toBe(root.querySelector('#a-int')?.closest('.group'));
+
+    button?.click();
+    expect(clicks).toBe(1);
+  });
+
+  it('ne pose rien quand le champ n’est pas rendu', () => {
+    expect(appendGroupAction(document, root, '#absent', 'Copier', () => undefined)).toBeNull();
+    expect(root.querySelectorAll('button')).toHaveLength(0);
   });
 });

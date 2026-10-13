@@ -1,6 +1,7 @@
 export const ADMIN_VIEWS = [
   'dashboard',
   'rewards',
+  'happy-hour',
   'goals',
   'appearance',
   'twitch',
@@ -22,6 +23,7 @@ export type AdminViewId = (typeof ADMIN_VIEWS)[number];
  */
 export const FIELD_VIEWS = [
   'rewards',
+  'happy-hour',
   'goals',
   'appearance',
   'goal-appearance',
@@ -36,6 +38,7 @@ export const DEFAULT_VIEW: AdminViewId = 'dashboard';
 export const VIEW_LABELS: Readonly<Record<AdminViewId, string>> = {
   dashboard: 'Tableau de bord',
   rewards: 'Barème',
+  'happy-hour': 'Happy Hour',
   goals: 'Objectifs',
   appearance: 'Apparence',
   twitch: 'Twitch',

@@ -57,28 +57,73 @@ export const channelSubscriptionGiftAnonymous: unknown = {
   is_anonymous: true,
 };
 
-export const channelCheer: unknown = {
-  is_anonymous: false,
+// Forme documentée de `channel.bits.use` (référence EventSub, version 1), relevée le 13 octobre
+// 2026. La Twitch CLI 1.1.24 ne sait pas encore émettre cet événement.
+export const channelBitsUseCheer: unknown = {
   user_id: '1234',
   user_login: 'cool_user',
   user_name: 'Cool_User',
   broadcaster_user_id: '1337',
   broadcaster_user_login: 'cooler_user',
   broadcaster_user_name: 'Cooler_User',
-  message: 'pogchamp',
   bits: 1000,
+  type: 'cheer',
+  power_up: null,
+  custom_power_up: null,
+  message: {
+    text: 'cheer1000 pogchamp',
+    fragments: [
+      { type: 'cheermote', text: 'cheer1000', cheermote: { prefix: 'cheer', bits: 1000, tier: 1 }, emote: null },
+      { type: 'text', text: ' pogchamp', cheermote: null, emote: null },
+    ],
+  },
 };
 
-export const channelCheerAnonymous: unknown = {
-  is_anonymous: true,
+export const channelBitsUseAnonymous: unknown = {
+  ...(channelBitsUseCheer as object),
   user_id: null,
   user_login: null,
   user_name: null,
-  broadcaster_user_id: '1337',
-  broadcaster_user_login: 'cooler_user',
-  broadcaster_user_name: 'Cooler_User',
-  message: 'anonymous cheer',
   bits: 500,
+};
+
+export const channelBitsUsePowerUp: unknown = {
+  ...(channelBitsUseCheer as object),
+  bits: 30,
+  type: 'power_up',
+  power_up: {
+    type: 'gigantify_an_emote',
+    emote: { id: '304456832', name: 'FevziGG' },
+    message_effect_id: null,
+  },
+  message: {
+    text: 'FevziGG',
+    fragments: [
+      {
+        type: 'emote',
+        text: 'FevziGG',
+        cheermote: null,
+        emote: { id: '304456832', emote_set_id: '1', owner_id: '1337', format: ['static'] },
+      },
+    ],
+  },
+};
+
+export const channelBitsUseCelebration: unknown = {
+  ...(channelBitsUseCheer as object),
+  bits: 50,
+  type: 'power_up',
+  power_up: { type: 'celebration', emote: null, message_effect_id: null },
+  message: null,
+};
+
+export const channelBitsUseCustomPowerUp: unknown = {
+  ...(channelBitsUseCheer as object),
+  bits: 200,
+  type: 'custom_power_up',
+  power_up: null,
+  custom_power_up: { title: 'Change la musique', reward_id: 'reward-42' },
+  message: null,
 };
 
 const chatNotificationBase = {

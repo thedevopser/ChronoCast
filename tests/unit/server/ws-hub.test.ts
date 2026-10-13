@@ -53,6 +53,7 @@ describe('createWsHub', () => {
   let hub: WsHub;
   let timers: ReturnType<typeof createTimersDouble>;
   let config: ChronoCastConfig;
+  let schedule: { startAt: number; endAt: number } | null;
   let counter: CounterState;
   let goal: GoalSnapshot;
   let monotonic: number;
@@ -66,6 +67,7 @@ describe('createWsHub', () => {
     bus = createEventBus<AppEvents>();
     timers = createTimersDouble();
     config = DEFAULT_CONFIG;
+    schedule = null;
     counter = createInitialState({ initialMs: 43_200_000, now: 1_000 });
     goal = {
       subs: 7,
@@ -78,6 +80,7 @@ describe('createWsHub', () => {
     hub = createWsHub({
       bus,
       getConfig: () => config,
+      getHappyHourSchedule: () => schedule,
       getSnapshot: () => ({ counter, twitch: { status: 'ready' }, goal }),
       clock: { now: () => 1_000, monotonicMs: () => monotonic },
       timers: timers.timers,
@@ -118,6 +121,7 @@ describe('createWsHub', () => {
       const incomplet = createWsHub({
         bus,
         getConfig: () => config,
+        getHappyHourSchedule: () => schedule,
         getSnapshot: () => ({
           counter,
           twitch: { status: 'ready', missingScopes: ['user:read:chat', 'user:bot'] },
@@ -147,6 +151,7 @@ describe('createWsHub', () => {
       const separate = createWsHub({
         bus,
         getConfig: () => config,
+        getHappyHourSchedule: () => schedule,
         getSnapshot: () => ({ counter, twitch: { status: 'ready' }, goal }),
         clock: { now: () => 1_000, monotonicMs: () => monotonic },
         timers: timers.timers,
@@ -187,6 +192,19 @@ describe('createWsHub', () => {
       const serialized = JSON.stringify(client.sent[0]);
       expect(serialized).not.toContain('bitsPerSub');
       expect(serialized).not.toContain('Je me rase la tête');
+    });
+
+    it('annonce dès l’accueil la plage programmée du Happy Hour, ou son absence', () => {
+      hub.accept(client.socket, {});
+      expect(client.sent[0]).toMatchObject({ type: 'hello', happyHourSchedule: null });
+
+      schedule = { startAt: 2_000, endAt: 3_000 };
+      const other = createSocketDouble();
+      hub.accept(other.socket, {});
+      expect(other.sent[0]).toMatchObject({
+        type: 'hello',
+        happyHourSchedule: { startAt: 2_000, endAt: 3_000 },
+      });
     });
 
     it("annonce l'état du Happy Hour dès l'accueil", () => {
@@ -407,6 +425,18 @@ describe('createWsHub', () => {
       hub.publishConfig();
 
       expect(messagesOfType(client, 'config')[0]?.['goalOverlay']).toMatchObject({ fontSize: 64 });
+    });
+
+    it('diffuse la plage du Happy Hour à chaque changement', () => {
+      schedule = { startAt: 2_000, endAt: 3_000 };
+      hub.publishConfig();
+
+      schedule = null;
+      hub.publishConfig();
+
+      const messages = messagesOfType(client, 'config');
+      expect(messages[0]?.['happyHourSchedule']).toStrictEqual({ startAt: 2_000, endAt: 3_000 });
+      expect(messages[1]?.['happyHourSchedule']).toBeNull();
     });
 
     it('diffuse la bascule du Happy Hour, qui tient les onglets ouverts d’accord', () => {

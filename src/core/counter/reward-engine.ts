@@ -1,5 +1,10 @@
 import type { RewardsConfig } from '../config/schema.js';
-import type { DomainEvent, GiftTier, SubscriptionTier } from '../events/domain-event.js';
+import type {
+  BitsUsage,
+  DomainEvent,
+  GiftTier,
+  SubscriptionTier,
+} from '../events/domain-event.js';
 
 export interface RewardComputation {
   readonly seconds: number;
@@ -54,50 +59,54 @@ function giftTierSeconds(
   }
 }
 
-function computeBitsReward(bits: number, config: RewardsConfig['bits']): RewardComputation {
+const BITS_USAGE_MENTIONS: Readonly<Record<BitsUsage, string>> = {
+  cheer: '',
+  power_up: ' en Power-up',
+  custom_power_up: ' en Power-up personnalisé',
+  unknown: ' d’origine inconnue',
+};
+
+const MILLISECONDS_PER_SECOND = 1_000;
+
+// Chaque bit compte : le taux s'applique au bit près, et le crédit garde ses décimales jusqu'à la
+// milliseconde, qui est la précision du compteur.
+function computeBitsReward(
+  bits: number,
+  usage: BitsUsage,
+  rate: RewardsConfig['bits'],
+): RewardComputation {
   if (bits <= 0) {
     return refused('nombre de bits invalide');
   }
 
-  if (config.mode === 'tiers') {
-    const matching = config.tiers.filter((tier) => bits >= tier.minBits);
-    if (matching.length === 0) {
-      return refused(`${String(bits)} bits, sous le premier palier`);
-    }
+  const spent = `${String(bits)} bits${BITS_USAGE_MENTIONS[usage]}`;
+  const seconds =
+    Math.round(((bits * rate.seconds) / rate.unit) * MILLISECONDS_PER_SECOND) /
+    MILLISECONDS_PER_SECOND;
 
-    const best = matching.reduce((highest, candidate) =>
-      candidate.minBits > highest.minBits ? candidate : highest,
-    );
-
-    return granted(best.seconds, `${String(bits)} bits, palier ${String(best.minBits)}`);
-  }
-
-  if (bits < config.linear.minBits) {
-    return refused(`${String(bits)} bits, sous le seuil de ${String(config.linear.minBits)}`);
-  }
-
-  const units = Math.floor(bits / config.linear.unit);
-  if (units <= 0) {
-    return refused(`${String(bits)} bits, moins d'une unité de ${String(config.linear.unit)}`);
-  }
-
-  return granted(
-    units * config.linear.secondsPerUnit,
-    `${String(bits)} bits, ${String(units)} unité(s)`,
-  );
+  return seconds > 0 ? granted(seconds, spent) : refused(`${spent}, sans crédit à ce taux`);
 }
 
-const HAPPY_HOUR_MULTIPLIER = 2;
+const HAPPY_HOUR_MENTION = 'Happy Hour';
 
-function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
+function mentioned(reward: RewardComputation, mention: string): RewardComputation {
+  return reward.applied ? { ...reward, reason: `${reward.reason}${mention}` } : reward;
+}
+
+// Le Happy Hour n'est qu'un choix de barème, seuils d'entrée compris. La commande de chat n'en a
+// pas : un modérateur qui tape 300 veut créditer 300.
+export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
+  const table = rewards.happyHour ? rewards.happyHourRewards : rewards;
+  const mention = rewards.happyHour ? `, ${HAPPY_HOUR_MENTION}` : '';
+
   switch (event.type) {
     case 'sub':
-      return granted(tierSeconds(rewards.sub, event.tier), `abonnement ${event.tier}`);
+      return granted(tierSeconds(table.sub, event.tier), `abonnement ${event.tier}${mention}`);
 
     case 'resub':
       return granted(
-        tierSeconds(rewards.resub, event.tier),
-        `réabonnement ${event.tier}, ${String(event.cumulativeMonths)} mois`,
+        tierSeconds(table.resub, event.tier),
+        `réabonnement ${event.tier}, ${String(event.cumulativeMonths)} mois${mention}`,
       );
 
     case 'gift': {
@@ -105,15 +114,15 @@ function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardCo
         return refused("nombre d'abonnements offerts invalide");
       }
 
-      const unitSeconds = giftTierSeconds(rewards.gift, event.tier);
+      const unitSeconds = giftTierSeconds(table.gift, event.tier);
       return granted(
         unitSeconds * event.total,
-        `${String(event.total)} abonnement(s) offert(s) ${event.tier}`,
+        `${String(event.total)} abonnement(s) offert(s) ${event.tier}${mention}`,
       );
     }
 
     case 'bits':
-      return computeBitsReward(event.bits, rewards.bits);
+      return mentioned(computeBitsReward(event.bits, event.usage ?? 'cheer', table.bits), mention);
 
     case 'command': {
       if (!Number.isFinite(event.seconds) || event.seconds <= 0) {
@@ -127,20 +136,4 @@ function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardCo
       );
     }
   }
-}
-
-export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
-  const base = computeBaseReward(event, rewards);
-
-  // Seul le résultat est multiplié : les seuils d'entrée sont hors d'atteinte par construction, et
-  // un modérateur qui tape 300 veut créditer 300.
-  if (!rewards.happyHour || !base.applied || event.type === 'command') {
-    return base;
-  }
-
-  return {
-    ...base,
-    seconds: base.seconds * HAPPY_HOUR_MULTIPLIER,
-    reason: `${base.reason}, Happy Hour ×${String(HAPPY_HOUR_MULTIPLIER)}`,
-  };
 }

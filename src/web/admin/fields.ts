@@ -20,8 +20,8 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
   'twitch.broadcasterLogin':
     'Résolu en même temps que l’identifiant, et affiché en lecture seule dans la vue Twitch. Le saisir ne changerait pas la chaîne réellement écoutée.',
 
-  'rewards.bits.tiers':
-    'Tableau de paliers à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Barème avec son propre module.',
+  'rewards.happyHour':
+    'Bascule à effet immédiat, tenue par un bouton du tableau de bord et de la vue Happy Hour. En faire aussi une case à enregistrer donnerait deux gestes pour un même état.',
 
   'goals.tiers':
     'Échelle de paliers nommés, à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Objectifs avec son propre module.',
@@ -29,19 +29,52 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
 
 const DAY = 86_400;
 
+// Les deux champs du taux des bits se lisent à la suite, comme une phrase.
+const BITS_UNIT_LABEL = 'Pour ce nombre de bits…';
+const BITS_SECONDS_LABEL = '…créditer ce nombre de secondes';
+
 function reward(selector: string, path: string, label: string, view: FieldViewId = 'rewards'): AdminField {
   return { selector, path, label, view, kind: 'integer', min: 0, max: DAY };
 }
 
+// Le barème Happy Hour d'une configuration mise à jour vaut le double du barème normal : sa borne
+// doit laisser passer le double de la borne normale.
+function happyHourReward(selector: string, leaf: string, label: string): AdminField {
+  return {
+    selector,
+    path: `rewards.happyHourRewards.${leaf}`,
+    label,
+    view: 'happy-hour',
+    kind: 'integer',
+    min: 0,
+    max: 2 * DAY,
+  };
+}
+
 const REWARD_FIELDS: readonly AdminField[] = [
+  happyHourReward('#reward-hh-sub-prime', 'sub.prime', 'Prime'),
+  happyHourReward('#reward-hh-sub-tier1', 'sub.tier1', 'Tier 1'),
+  happyHourReward('#reward-hh-sub-tier2', 'sub.tier2', 'Tier 2'),
+  happyHourReward('#reward-hh-sub-tier3', 'sub.tier3', 'Tier 3'),
+
+  happyHourReward('#reward-hh-resub-prime', 'resub.prime', 'Prime'),
+  happyHourReward('#reward-hh-resub-tier1', 'resub.tier1', 'Tier 1'),
+  happyHourReward('#reward-hh-resub-tier2', 'resub.tier2', 'Tier 2'),
+  happyHourReward('#reward-hh-resub-tier3', 'resub.tier3', 'Tier 3'),
+
+  happyHourReward('#reward-hh-gift-tier1', 'gift.tier1', 'Tier 1'),
+  happyHourReward('#reward-hh-gift-tier2', 'gift.tier2', 'Tier 2'),
+  happyHourReward('#reward-hh-gift-tier3', 'gift.tier3', 'Tier 3'),
   {
-    selector: '#reward-happy-hour',
-    path: 'rewards.happyHour',
-    label: 'Doubler les secondes créditées',
-    hint: 'Abonnements, réabonnements, sub offerts et bits comptent double. La saisie d’un modérateur et les seuils d’entrée ne bougent pas. Se bascule aussi depuis le tableau de bord.',
-    view: 'rewards',
-    kind: 'boolean',
+    selector: '#reward-hh-bits-unit',
+    path: 'rewards.happyHourRewards.bits.unit',
+    label: BITS_UNIT_LABEL,
+    hint: 'Le taux du Happy Hour, indépendant du taux normal. Chaque bit compte : à 100 bits pour 120 secondes, 1 bit ajoute 1,2 s.',
+    view: 'happy-hour',
+    kind: 'integer',
+    min: 1,
   },
+  happyHourReward('#reward-hh-bits-seconds', 'bits.seconds', BITS_SECONDS_LABEL),
 
   reward('#reward-sub-prime', 'rewards.sub.prime', 'Prime'),
   reward('#reward-sub-tier1', 'rewards.sub.tier1', 'Tier 1'),
@@ -57,32 +90,15 @@ const REWARD_FIELDS: readonly AdminField[] = [
   reward('#reward-gift-tier2', 'rewards.gift.tier2', 'Tier 2'),
   reward('#reward-gift-tier3', 'rewards.gift.tier3', 'Tier 3'),
   {
-    selector: '#reward-bits-mode',
-    path: 'rewards.bits.mode',
-    label: 'Mode de calcul',
-    hint: 'Proportionnel au nombre de bits, ou par seuils.',
-    view: 'rewards',
-    kind: 'enum',
-    options: ['linear', 'tiers'],
-  },
-  {
     selector: '#reward-bits-unit',
-    path: 'rewards.bits.linear.unit',
-    label: 'Bits par unité',
+    path: 'rewards.bits.unit',
+    label: BITS_UNIT_LABEL,
+    hint: 'Les deux champs forment un taux, et chaque bit compte : à 100 bits pour 60 secondes, 1 bit ajoute 0,6 s et 150 bits ajoutent 90 s.',
     view: 'rewards',
     kind: 'integer',
     min: 1,
   },
-  reward('#reward-bits-seconds', 'rewards.bits.linear.secondsPerUnit', 'Secondes par unité'),
-  {
-    selector: '#reward-bits-min',
-    path: 'rewards.bits.linear.minBits',
-    label: 'Bits minimum',
-    hint: 'En deçà de ce seuil, rien n’est crédité.',
-    view: 'rewards',
-    kind: 'integer',
-    min: 1,
-  },
+  reward('#reward-bits-seconds', 'rewards.bits.seconds', BITS_SECONDS_LABEL),
   {
     selector: '#reward-command-name',
     path: 'rewards.chatCommand.name',
@@ -141,15 +157,53 @@ function goalPixels(
   };
 }
 
+const MAX_GOAL_POINTS = 1_000_000;
+
+function goalPoints(selector: string, leaf: string, label: string): AdminField {
+  return {
+    selector,
+    path: `goals.points.${leaf}`,
+    label,
+    view: 'goals',
+    kind: 'integer',
+    min: 0,
+    max: MAX_GOAL_POINTS,
+  };
+}
+
 const GOAL_FIELDS: readonly AdminField[] = [
+  goalPoints('#goal-points-sub-prime', 'sub.prime', 'Prime'),
+  goalPoints('#goal-points-sub-tier1', 'sub.tier1', 'Tier 1'),
+  goalPoints('#goal-points-sub-tier2', 'sub.tier2', 'Tier 2'),
+  goalPoints('#goal-points-sub-tier3', 'sub.tier3', 'Tier 3'),
+
+  goalPoints('#goal-points-resub-prime', 'resub.prime', 'Prime'),
+  goalPoints('#goal-points-resub-tier1', 'resub.tier1', 'Tier 1'),
+  goalPoints('#goal-points-resub-tier2', 'resub.tier2', 'Tier 2'),
+  goalPoints('#goal-points-resub-tier3', 'resub.tier3', 'Tier 3'),
+
+  goalPoints('#goal-points-gift-tier1', 'gift.tier1', 'Tier 1'),
+  goalPoints('#goal-points-gift-tier2', 'gift.tier2', 'Tier 2'),
+  goalPoints('#goal-points-gift-tier3', 'gift.tier3', 'Tier 3'),
+
   {
     selector: '#goal-bits-per-sub',
     path: 'goals.bitsPerSub',
-    label: 'Bits pour un abonnement',
-    hint: 'Les bits comptent en abonnements entiers ; le reste n’est pas conservé. À 500, un don de 1 200 bits fait avancer de deux.',
+    label: 'Bits par point',
+    hint: 'À 1, chaque bit vaut un point. Au-delà, les bits comptent par tranches entières et le reste n’est pas conservé : à 500, un don de 1 200 bits ajoute deux points.',
     view: 'goals',
     kind: 'integer',
     min: 1,
+  },
+  {
+    selector: '#goal-unit-label',
+    path: 'goals.unitLabel',
+    label: 'Nom de l’unité',
+    hint: 'Écrit après le compte dans ce panneau : « points », « abo. »… Vos spectateurs ne le voient pas, la barre affiche « 620 / 1000 » sans unité.',
+    view: 'goals',
+    kind: 'text',
+    allowEmpty: true,
+    max: 40,
   },
 
   {
@@ -211,6 +265,17 @@ const GOAL_FIELDS: readonly AdminField[] = [
     kind: 'boolean',
   },
 
+  {
+    selector: '#goal-bar-width',
+    path: 'goals.overlay.bar.width',
+    label: 'Largeur',
+    hint: 'À 0, la barre occupe toute la largeur de la source. Au-delà, elle se centre.',
+    view: 'goal-appearance',
+    kind: 'integer',
+    min: 0,
+    max: 3840,
+    unit: 'px',
+  },
   goalPixels('#goal-bar-height', 'goals.overlay.bar.height', 'Hauteur', 0, 400),
   goalPixels('#goal-bar-radius', 'goals.overlay.bar.radius', 'Arrondi des coins', 0, 200),
   goalColor(
@@ -725,19 +790,26 @@ export function fieldsOf(view: FieldViewId): readonly AdminField[] {
   return ADMIN_FIELDS.filter((field) => field.view === view);
 }
 
+// Un préfixe terminé par un point couvre un sous-arbre ; sans point final, il désigne une feuille
+// et rien d'autre.
 const GROUPS: readonly (readonly [string, string])[] = [
-  // Sans point final : la feuille n'a pas de sous-objet.
-  ['rewards.happyHour', 'Happy Hour'],
   ['rewards.sub.', 'Abonnements'],
   ['rewards.resub.', 'Réabonnements'],
   ['rewards.gift.', 'Sub offerts'],
   ['rewards.bits.', 'Bits'],
+  ['rewards.happyHourRewards.sub.', 'Happy Hour · Abonnements'],
+  ['rewards.happyHourRewards.resub.', 'Happy Hour · Réabonnements'],
+  ['rewards.happyHourRewards.gift.', 'Happy Hour · Sub offerts'],
+  ['rewards.happyHourRewards.bits.', 'Happy Hour · Bits'],
   ['rewards.chatCommand.', 'Commande de chat'],
 
-  // Sans point final : le comptage n'a qu'une feuille, tout le reste de `goals.` est l'apparence
-  // de la page /goal. Une feuille de comptage ajoutée plus tard tombera dans « Divers », et le
-  // garde-fou la signalera — c'est voulu.
-  ['goals.bitsPerSub', 'Objectifs'],
+  // Tout ce qui n'est pas comptage dans `goals.` est l'apparence de la page /goal. Une feuille de
+  // comptage ajoutée plus tard tombera dans « Divers », et le garde-fou la signalera — c'est voulu.
+  ['goals.points.sub.', 'Points · Abonnements'],
+  ['goals.points.resub.', 'Points · Réabonnements'],
+  ['goals.points.gift.', 'Points · Sub offerts'],
+  ['goals.bitsPerSub', 'Points · Bits et unité'],
+  ['goals.unitLabel', 'Points · Bits et unité'],
   ['goals.overlay.bar.', 'Barre'],
   ['goals.overlay.shadow.', 'Ombre du texte'],
   ['goals.overlay.outline.', 'Contour du texte'],
@@ -766,12 +838,16 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['history.', 'Historique'],
 ];
 
+function covers(prefix: string, path: string): boolean {
+  return prefix.endsWith('.') ? path.startsWith(prefix) : path === prefix;
+}
+
 export function groupsOf(view: FieldViewId): readonly string[] {
   const seen: string[] = [];
 
   for (const [prefix, label] of GROUPS) {
     const matches = ADMIN_FIELDS.some(
-      (field) => field.view === view && groupOf(field.path) === label && field.path.startsWith(prefix),
+      (field) => field.view === view && groupOf(field.path) === label && covers(prefix, field.path),
     );
     if (matches && !seen.includes(label)) {
       seen.push(label);
@@ -783,7 +859,7 @@ export function groupsOf(view: FieldViewId): readonly string[] {
 
 export function groupOf(path: string): string {
   for (const [prefix, label] of GROUPS) {
-    if (path.startsWith(prefix)) {
+    if (covers(prefix, path)) {
       return label;
     }
   }

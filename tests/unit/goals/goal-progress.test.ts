@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import { configSchema, type GoalsConfig } from '../../../src/core/config/schema.js';
 import type {
   BitsEvent,
@@ -9,13 +8,19 @@ import type {
   ResubEvent,
   SubEvent,
 } from '../../../src/core/events/domain-event.js';
-import { subsGained } from '../../../src/core/goals/goal-progress.js';
-
-const GOALS: GoalsConfig = DEFAULT_CONFIG.goals;
+import { pointsGained } from '../../../src/core/goals/goal-progress.js';
 
 function goalsWith(patch: unknown): GoalsConfig {
   return configSchema.parse({ goals: patch }).goals;
 }
+
+// Une barre réglée pour compter en abonnements : un point par soutien, cinq cents bits par point.
+const ONE_POINT = { tier1: 1, tier2: 1, tier3: 1, prime: 1 };
+
+const GOALS: GoalsConfig = goalsWith({
+  bitsPerSub: 500,
+  points: { sub: ONE_POINT, resub: ONE_POINT, gift: { tier1: 1, tier2: 1, tier3: 1 } },
+});
 
 function baseEvent(): {
   id: string;
@@ -33,20 +38,20 @@ function baseEvent(): {
   };
 }
 
-describe('subsGained', () => {
+describe('pointsGained', () => {
   describe('abonnements', () => {
     it('compte un abonnement pour un sub', () => {
       const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
 
-      expect(subsGained(event, GOALS)).toBe(1);
+      expect(pointsGained(event, GOALS)).toBe(1);
     });
 
-    it('ne pondère pas le tier : un Tier 3 vaut un, comme un Tier 1', () => {
+    it('vaut un quel que soit le tier quand tous les poids sont à un', () => {
       const tier3: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier3' };
       const prime: SubEvent = { ...baseEvent(), type: 'sub', tier: 'prime' };
 
-      expect(subsGained(tier3, GOALS)).toBe(1);
-      expect(subsGained(prime, GOALS)).toBe(1);
+      expect(pointsGained(tier3, GOALS)).toBe(1);
+      expect(pointsGained(prime, GOALS)).toBe(1);
     });
 
     it('compte un abonnement pour un réabonnement, quel que soit son ancienneté', () => {
@@ -57,7 +62,7 @@ describe('subsGained', () => {
         cumulativeMonths: 48,
       };
 
-      expect(subsGained(event, GOALS)).toBe(1);
+      expect(pointsGained(event, GOALS)).toBe(1);
     });
   });
 
@@ -71,7 +76,7 @@ describe('subsGained', () => {
         isAnonymous: false,
       };
 
-      expect(subsGained(event, GOALS)).toBe(10);
+      expect(pointsGained(event, GOALS)).toBe(10);
     });
 
     it('compte un don anonyme comme les autres', () => {
@@ -83,7 +88,7 @@ describe('subsGained', () => {
         isAnonymous: true,
       };
 
-      expect(subsGained(event, GOALS)).toBe(3);
+      expect(pointsGained(event, GOALS)).toBe(3);
     });
 
     it('ne compte rien pour un total invalide', () => {
@@ -95,8 +100,8 @@ describe('subsGained', () => {
         isAnonymous: false,
       };
 
-      expect(subsGained(event, GOALS)).toBe(0);
-      expect(subsGained({ ...event, total: -5 }, GOALS)).toBe(0);
+      expect(pointsGained(event, GOALS)).toBe(0);
+      expect(pointsGained({ ...event, total: -5 }, GOALS)).toBe(0);
     });
   });
 
@@ -104,32 +109,32 @@ describe('subsGained', () => {
     it('compte une tranche entière', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 500 };
 
-      expect(subsGained(event, GOALS)).toBe(1);
+      expect(pointsGained(event, GOALS)).toBe(1);
     });
 
     it('ne conserve aucun reste', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 1_200 };
 
-      expect(subsGained(event, GOALS)).toBe(2);
+      expect(pointsGained(event, GOALS)).toBe(2);
     });
 
     it('ne compte rien sous la première tranche', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 499 };
 
-      expect(subsGained(event, GOALS)).toBe(0);
+      expect(pointsGained(event, GOALS)).toBe(0);
     });
 
     it('suit le nombre de bits par abonnement configuré', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 1_000 };
 
-      expect(subsGained(event, goalsWith({ bitsPerSub: 100 }))).toBe(10);
+      expect(pointsGained(event, goalsWith({ bitsPerSub: 100 }))).toBe(10);
     });
 
     it('ne compte rien pour un nombre de bits invalide', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 0 };
 
-      expect(subsGained(event, GOALS)).toBe(0);
-      expect(subsGained({ ...event, bits: -100 }, GOALS)).toBe(0);
+      expect(pointsGained(event, GOALS)).toBe(0);
+      expect(pointsGained({ ...event, bits: -100 }, GOALS)).toBe(0);
     });
   });
 
@@ -142,7 +147,112 @@ describe('subsGained', () => {
         seconds: 3_600,
       };
 
-      expect(subsGained(event, GOALS)).toBe(0);
+      expect(pointsGained(event, GOALS)).toBe(0);
+    });
+  });
+
+  describe('barème de points', () => {
+    const WEIGHTED = goalsWith({
+      bitsPerSub: 100,
+      points: {
+        sub: { prime: 2, tier1: 3, tier2: 5, tier3: 8 },
+        resub: { prime: 20, tier1: 30, tier2: 50, tier3: 80 },
+        gift: { tier1: 4, tier2: 6, tier3: 9 },
+      },
+    });
+
+    it.each([
+      ['prime', 2],
+      ['tier1', 3],
+      ['tier2', 5],
+      ['tier3', 8],
+    ] as const)('ajoute pour un abonnement %s les points de son tier', (tier, points) => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier };
+
+      expect(pointsGained(event, WEIGHTED)).toBe(points);
+    });
+
+    it.each([
+      ['prime', 20],
+      ['tier1', 30],
+      ['tier2', 50],
+      ['tier3', 80],
+    ] as const)('ajoute pour un réabonnement %s les points de son tier', (tier, points) => {
+      const event: ResubEvent = { ...baseEvent(), type: 'resub', tier, cumulativeMonths: 3 };
+
+      expect(pointsGained(event, WEIGHTED)).toBe(points);
+    });
+
+    it.each([
+      ['tier1', 20],
+      ['tier2', 30],
+      ['tier3', 45],
+    ] as const)('ajoute pour un lot de cinq subs offerts %s cinq fois les points du tier', (tier, points) => {
+      const event: GiftEvent = { ...baseEvent(), type: 'gift', tier, total: 5, isAnonymous: false };
+
+      expect(pointsGained(event, WEIGHTED)).toBe(points);
+    });
+
+    it('retire de la barre un type d’événement dont le poids est nul', () => {
+      const muted = goalsWith({ points: { sub: { tier1: 0 }, gift: { tier1: 0 } } });
+      const sub: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+      const gift: GiftEvent = { ...baseEvent(), type: 'gift', tier: 'tier1', total: 10, isAnonymous: false };
+
+      expect(pointsGained(sub, muted)).toBe(0);
+      expect(pointsGained(gift, muted)).toBe(0);
+    });
+
+    it('ne compte rien pour un lot au total invalide, même pondéré', () => {
+      const event: GiftEvent = { ...baseEvent(), type: 'gift', tier: 'tier1', total: 0, isAnonymous: false };
+
+      expect(pointsGained(event, WEIGHTED)).toBe(0);
+      expect(pointsGained({ ...event, total: -3 }, WEIGHTED)).toBe(0);
+    });
+
+    it('ne pondère pas les bits : seule la taille de la tranche les règle', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
+
+      expect(pointsGained(event, WEIGHTED)).toBe(2);
+    });
+
+    it('n’ajoute aucun point pour une commande de chat, quel que soit le barème', () => {
+      const event: CommandEvent = {
+        ...baseEvent(),
+        source: 'chat-command',
+        type: 'command',
+        command: 'addtime',
+        seconds: 300,
+      };
+
+      expect(pointsGained(event, WEIGHTED)).toBe(0);
+    });
+
+    // Le cas d'usage qui a motivé le barème : un objectif mensuel en points, tout confondu.
+    it('tient « 1 bit = 1 point, 1 sub Tier 1 = 250 points »', () => {
+      const monthly = goalsWith({ bitsPerSub: 1, points: { sub: { tier1: 250 } } });
+      const cheer: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
+      const sub: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(pointsGained(cheer, monthly)).toBe(250);
+      expect(pointsGained(sub, monthly)).toBe(250);
+    });
+  });
+
+  describe('valeurs de départ', () => {
+    const DEFAULTS = goalsWith({});
+
+    it('ajoute un point par bit', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 137 };
+
+      expect(pointsGained(event, DEFAULTS)).toBe(137);
+    });
+
+    it('pèse un abonnement à son prix en bits, selon son tier', () => {
+      const tier1: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+      const tier3: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier3' };
+
+      expect(pointsGained(tier1, DEFAULTS)).toBe(500);
+      expect(pointsGained(tier3, DEFAULTS)).toBe(2_500);
     });
   });
 });

@@ -145,93 +145,60 @@ describe('computeReward', () => {
     });
   });
 
-  describe('bits en mode linéaire', () => {
-    it('crédite une unité complète', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100 };
+  describe('bits', () => {
+    function bits(amount: number): BitsEvent {
+      return { ...baseEvent(), type: 'bits', bits: amount };
+    }
 
-      expect(computeReward(event, REWARDS).seconds).toBe(60);
+    it('crédite le taux par défaut : 100 bits pour 60 secondes', () => {
+      expect(computeReward(bits(100), REWARDS).seconds).toBe(60);
     });
 
-    it('ne crédite que les unités entières', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
-
-      expect(computeReward(event, REWARDS).seconds).toBe(120);
+    it('crédite au bit près, et non par tranches entières', () => {
+      expect(computeReward(bits(150), REWARDS).seconds).toBe(90);
+      expect(computeReward(bits(50), REWARDS).seconds).toBe(30);
     });
 
-    it('ne crédite rien sous le seuil d\'une unité', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50 };
+    it('fait compter chaque bit : un seul ajoute 0,6 seconde', () => {
+      const reward = computeReward(bits(1), REWARDS);
 
-      expect(computeReward(event, REWARDS).seconds).toBe(0);
-      expect(computeReward(event, REWARDS).applied).toBe(false);
+      expect(reward.applied).toBe(true);
+      expect(reward.seconds).toBe(0.6);
     });
 
-    it('respecte un seuil minimal configuré', () => {
-      const rewards = rewardsWith({
-        bits: { mode: 'linear', linear: { unit: 1, secondsPerUnit: 1, minBits: 500 } },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100 };
+    it('garde les décimales d’un don qui ne tombe pas juste', () => {
+      expect(computeReward(bits(7), REWARDS).seconds).toBe(4.2);
+    });
 
-      expect(computeReward(event, rewards).applied).toBe(false);
+    it('arrondit à la milliseconde un taux sans écriture décimale finie', () => {
+      const thirds = rewardsWith({ bits: { unit: 3, seconds: 1 } });
+
+      expect(computeReward(bits(1), thirds).seconds).toBe(0.333);
+      expect(computeReward(bits(2), thirds).seconds).toBe(0.667);
+    });
+
+    it('suit le taux réglé', () => {
+      expect(computeReward(bits(250), rewardsWith({ bits: { unit: 1, seconds: 2 } })).seconds).toBe(500);
     });
 
     it('crédite intégralement un don massif', () => {
-      const rewards = rewardsWith({
-        bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60 } },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100_000 };
-
-      expect(computeReward(event, rewards).seconds).toBe(60_000);
-    });
-  });
-
-  describe('bits en mode paliers', () => {
-    it('retient le palier le plus élevé atteint', () => {
-      const rewards = rewardsWith({
-        bits: {
-          mode: 'tiers',
-          tiers: [
-            { minBits: 100, seconds: 60 },
-            { minBits: 500, seconds: 360 },
-            { minBits: 1_000, seconds: 900 },
-          ],
-        },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 700 };
-
-      expect(computeReward(event, rewards).seconds).toBe(360);
+      expect(computeReward(bits(100_000), REWARDS).seconds).toBe(60_000);
     });
 
-    it('ne crédite rien sous le premier palier', () => {
-      const rewards = rewardsWith({
-        bits: { mode: 'tiers', tiers: [{ minBits: 100, seconds: 60 }] },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50 };
+    it('ne crédite rien quand le taux vaut zéro seconde', () => {
+      const off = rewardsWith({ bits: { unit: 100, seconds: 0 } });
 
-      expect(computeReward(event, rewards).applied).toBe(false);
+      expect(computeReward(bits(500), off)).toMatchObject({ seconds: 0, applied: false });
     });
 
-    it('retient le palier le plus élevé même si les paliers sont mal ordonnés', () => {
-      const rewards = rewardsWith({
-        bits: {
-          mode: 'tiers',
-          tiers: [
-            { minBits: 1_000, seconds: 900 },
-            { minBits: 100, seconds: 60 },
-          ],
-        },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 5_000 };
+    it('ne crédite rien quand le crédit n’atteint pas la milliseconde', () => {
+      const tiny = rewardsWith({ bits: { unit: 1_000_000, seconds: 1 } });
 
-      expect(computeReward(event, rewards).seconds).toBe(900);
+      expect(computeReward(bits(1), tiny)).toMatchObject({ seconds: 0, applied: false });
     });
 
-    it('crédite intégralement un palier de plus d\'une heure', () => {
-      const rewards = rewardsWith({
-        bits: { mode: 'tiers', tiers: [{ minBits: 10_000, seconds: 36_000 }] },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50_000 };
-
-      expect(computeReward(event, rewards).seconds).toBe(36_000);
+    it.each([0, -5])('refuse un nombre de bits de %d', (amount) => {
+      expect(computeReward(bits(amount), REWARDS).applied).toBe(false);
     });
   });
 
@@ -296,6 +263,42 @@ describe('commande de chat', () => {
   });
 });
 
+describe('origine d’une dépense de bits', () => {
+  function bits(usage?: BitsEvent['usage']): BitsEvent {
+    return { ...baseEvent(), type: 'bits', bits: 250, ...(usage === undefined ? {} : { usage }) };
+  }
+
+  it('crédite un Power-up comme un cheer du même montant', () => {
+    expect(computeReward(bits('power_up'), REWARDS).seconds).toBe(
+      computeReward(bits('cheer'), REWARDS).seconds,
+    );
+    expect(computeReward(bits('custom_power_up'), REWARDS).seconds).toBe(
+      computeReward(bits(), REWARDS).seconds,
+    );
+  });
+
+  it('laisse le motif d’un cheer tel qu’il était', () => {
+    expect(computeReward(bits('cheer'), REWARDS).reason).toBe('250 bits');
+    expect(computeReward(bits(), REWARDS).reason).toBe('250 bits');
+  });
+
+  it.each([
+    ['power_up', '250 bits en Power-up'],
+    ['custom_power_up', '250 bits en Power-up personnalisé'],
+    ['unknown', '250 bits d’origine inconnue'],
+  ] as const)('dit dans le motif qu’une dépense %s n’est pas un cheer', (usage, reason) => {
+    expect(computeReward(bits(usage), REWARDS).reason).toBe(reason);
+  });
+
+  it('le dit aussi sur un refus', () => {
+    const small: BitsEvent = { ...baseEvent(), type: 'bits', bits: 30, usage: 'power_up' };
+    const off = rewardsWith({ bits: { unit: 100, seconds: 0 } });
+
+    expect(computeReward(small, off).applied).toBe(false);
+    expect(computeReward(small, off).reason).toContain('30 bits en Power-up');
+  });
+});
+
 describe('Happy Hour', () => {
   const DOUBLED: RewardsConfig = rewardsWith({ happyHour: true });
 
@@ -304,26 +307,44 @@ describe('Happy Hour', () => {
   }
 
   describe('ce qui double', () => {
-    it('double les secondes d’un abonnement', () => {
-      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
-
-      expect(computeReward(event, DOUBLED).seconds).toBe(360);
+    const CUSTOM: RewardsConfig = rewardsWith({
+      happyHour: true,
+      sub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+      resub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+      gift: { tier1: 300, tier2: 600, tier3: 900 },
+      happyHourRewards: {
+        sub: { prime: 110, tier1: 700, tier2: 710, tier3: 720 },
+        resub: { prime: 120, tier1: 800, tier2: 810, tier3: 820 },
+        gift: { tier1: 50, tier2: 60, tier3: 70 },
+      },
     });
 
-    it('double les secondes d’un réabonnement', () => {
+    it('crédite un abonnement selon le barème Happy Hour, et non le double du barème normal', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, CUSTOM).seconds).toBe(700);
+    });
+
+    it('lit le tier et le Prime dans le barème Happy Hour', () => {
+      const tier3: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier3' };
+      const prime: SubEvent = { ...baseEvent(), type: 'sub', tier: 'prime' };
+
+      expect(computeReward(tier3, CUSTOM).seconds).toBe(720);
+      expect(computeReward(prime, CUSTOM).seconds).toBe(110);
+    });
+
+    it('crédite un réabonnement selon le barème Happy Hour', () => {
       const event: ResubEvent = {
         ...baseEvent(),
         type: 'resub',
-        tier: 'tier1',
+        tier: 'tier2',
         cumulativeMonths: 12,
       };
 
-      expect(computeReward(event, DOUBLED).seconds).toBe(
-        computeReward(event, REWARDS).seconds * 2,
-      );
+      expect(computeReward(event, CUSTOM).seconds).toBe(810);
     });
 
-    it('double une salve d’abonnements offerts, déjà multipliée par le total', () => {
+    it('crédite une salve d’abonnements offerts au tarif Happy Hour du tier, fois le total', () => {
       const event: GiftEvent = {
         ...baseEvent(),
         type: 'gift',
@@ -332,29 +353,42 @@ describe('Happy Hour', () => {
         isAnonymous: false,
       };
 
-      expect(computeReward(event, DOUBLED).seconds).toBe(1_800);
+      expect(computeReward(event, CUSTOM).seconds).toBe(250);
     });
 
-    it('double un don de bits en mode linéaire', () => {
+    it('revient au barème normal une fois éteint', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, { ...CUSTOM, happyHour: false }).seconds).toBe(300);
+    });
+
+    it('vaut le double du barème par défaut tant que rien n’est réglé', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, DOUBLED).seconds).toBe(360);
+    });
+
+    it('vaut pour les bits le double du taux par défaut tant que rien n’est réglé', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
 
-      expect(computeReward(event, DOUBLED).seconds).toBe(240);
+      expect(computeReward(event, DOUBLED).seconds).toBe(300);
     });
 
-    it('double le palier retenu en mode paliers, sans toucher à la table', () => {
+    it('évalue un don de bits au taux du Happy Hour, et non au taux normal', () => {
       const rewards = rewardsWith({
         happyHour: true,
-        bits: {
-          mode: 'tiers',
-          tiers: [
-            { minBits: 100, seconds: 60 },
-            { minBits: 500, seconds: 360 },
-          ],
-        },
+        bits: { unit: 100, seconds: 60 },
+        happyHourRewards: { bits: { unit: 50, seconds: 7 } },
       });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 700 };
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
 
-      expect(computeReward(event, rewards).seconds).toBe(720);
+      expect(computeReward(event, rewards).seconds).toBe(35);
+    });
+
+    it('fait compter chaque bit en Happy Hour aussi', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 1 };
+
+      expect(computeReward(event, DOUBLED).seconds).toBe(1.2);
     });
   });
 
@@ -367,24 +401,6 @@ describe('Happy Hour', () => {
       const rewards = rewardsWith({ happyHour: true, chatCommand: { maxSeconds: 600 } });
 
       expect(computeReward(commandEvent(99_999), rewards).seconds).toBe(600);
-    });
-
-    it('laisse le seuil de bits où il est, un don sous le seuil restant refusé', () => {
-      const rewards = rewardsWith({
-        happyHour: true,
-        bits: { mode: 'linear', linear: { unit: 1, secondsPerUnit: 1, minBits: 500 } },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100 };
-
-      expect(computeReward(event, rewards).applied).toBe(false);
-      expect(computeReward(event, rewards).seconds).toBe(0);
-    });
-
-    it('laisse l’unité linéaire où elle est, un don sous une unité restant refusé', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50 };
-
-      expect(computeReward(event, DOUBLED).applied).toBe(false);
-      expect(computeReward(event, DOUBLED).seconds).toBe(0);
     });
 
     it('laisse un refus à zéro seconde', () => {
@@ -402,10 +418,16 @@ describe('Happy Hour', () => {
   });
 
   describe('motif', () => {
-    it('dit le doublement, pour que l’historique ne mente pas sur le calcul', () => {
+    it('dit que le crédit vient du barème Happy Hour, pour que l’historique ne mente pas sur le calcul', () => {
       const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
 
-      expect(computeReward(event, DOUBLED).reason).toContain('Happy Hour ×2');
+      expect(computeReward(event, DOUBLED).reason).toBe('abonnement tier1, Happy Hour');
+    });
+
+    it('dit de même pour les bits, sans plus annoncer de multiplicateur', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
+
+      expect(computeReward(event, DOUBLED).reason).toBe('250 bits, Happy Hour');
     });
 
     it('conserve le motif de base devant la mention', () => {
@@ -415,7 +437,7 @@ describe('Happy Hour', () => {
     });
 
     it('ne mentionne rien sur un refus', () => {
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 50 };
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: -50 };
 
       expect(computeReward(event, DOUBLED).reason).not.toContain('Happy Hour');
     });

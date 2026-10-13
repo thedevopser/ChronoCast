@@ -23,10 +23,13 @@ import type {
 import { CSRF_HEADER } from '../../src/core/server/security/csrf.js';
 import { makeRequest } from '../helpers/http-request.js';
 import {
-  channelCheer,
+  channelBitsUseCheer,
+  channelBitsUseCustomPowerUp,
+  channelBitsUsePowerUp,
   channelSubscribe,
   channelSubscribeGifted,
   channelSubscriptionGift,
+  channelSubscriptionMessage,
   chatMessageBroadcasterPause,
   chatMessageBroadcasterResume,
   chatMessageModeratorAddTime,
@@ -121,6 +124,11 @@ describe('application complète', () => {
   let socketFactory: EventSubSocketFactory | null = null;
   let openedSocketUrls: string[] = [];
 
+  // Décale l'horloge murale de l'application sans toucher à l'horloge monotone du décompte.
+  let clockOffsetMs = 0;
+
+  const systemClock = createSystemClock();
+
   function build(): Application {
     ticker = createManualTicker();
 
@@ -133,7 +141,10 @@ describe('application complète', () => {
         resolveDataFile: (...segments) => join(dataDirectory, ...segments),
       },
       secrets: createMemorySecretStore(seededSecrets),
-      clock: createSystemClock(),
+      clock: {
+        now: () => systemClock.now() + clockOffsetMs,
+        monotonicMs: () => systemClock.monotonicMs(),
+      },
       browser: { open: () => Promise.resolve() },
       ticker,
       appVersion: '0.1.0',
@@ -203,6 +214,7 @@ describe('application complète', () => {
     oauthEvents = [];
     appFetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
     oauthRouter = null;
+    clockOffsetMs = 0;
     application = build();
     port = await application.start();
   });
@@ -217,6 +229,26 @@ describe('application complète', () => {
     await application.stop();
     await rm(dataDirectory, { recursive: true, force: true });
   });
+
+  // Règle la barre pour compter en abonnements, sans palier : un point par soutien, cinq cents
+  // bits par point. Les valeurs de départ, elles, comptent en points sur un palier à 1 000.
+  async function countGoalsInSubscriptions(): Promise<void> {
+    const one = { tier1: 1, tier2: 1, tier3: 1, prime: 1 };
+    const response = await api('/api/config', {
+      method: 'PATCH',
+      headers: { [CSRF_HEADER]: application.getCsrfToken() },
+      body: JSON.stringify({
+        config: {
+          goals: {
+            bitsPerSub: 500,
+            points: { sub: one, resub: one, gift: { tier1: 1, tier2: 1, tier3: 1 } },
+            tiers: [],
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+  }
 
   function connectOverlay(): WebSocket {
     const socket = new WebSocket(`ws://127.0.0.1:${String(port)}/ws`);
@@ -287,7 +319,7 @@ describe('application complète', () => {
       expect(overlay.ofType('event')).toHaveLength(1);
     });
 
-    it('double le crédit d’un abonnement une fois le Happy Hour activé', async () => {
+    it('crédite un abonnement au barème Happy Hour une fois celui-ci activé', async () => {
       const response = await api('/api/config', {
         method: 'PATCH',
         headers: { [CSRF_HEADER]: application.getCsrfToken() },
@@ -306,7 +338,326 @@ describe('application complète', () => {
         entries: { rewardSeconds: number; reason: string }[];
       };
       expect(history.entries[0]?.rewardSeconds).toBe(360);
-      expect(history.entries[0]?.reason).toContain('Happy Hour ×2');
+      expect(history.entries[0]?.reason).toContain('Happy Hour');
+    });
+
+    describe('configuration écrite avant le barème Happy Hour', () => {
+      beforeEach(async () => {
+        await application.stop();
+
+        await writeFile(
+          join(dataDirectory, 'config.json'),
+          JSON.stringify({
+            schemaVersion: 5,
+            rewards: {
+              happyHour: true,
+              sub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+              resub: { prime: 100, tier1: 400, tier2: 600, tier3: 900 },
+              gift: { tier1: 500, tier2: 600, tier3: 900 },
+              bits: { mode: 'linear', linear: { unit: 50, secondsPerUnit: 30, minBits: 100 } },
+            },
+          }),
+          'utf8',
+        );
+
+        application = build();
+        port = await application.start();
+      });
+
+      async function lastRewardSeconds(): Promise<number | undefined> {
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { rewardSeconds: number }[];
+        };
+        return history.entries[0]?.rewardSeconds;
+      }
+
+      it('crédite chaque type d’abonnement le double du barème réglé, comme avant la mise à jour', async () => {
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(600);
+
+        await notify('channel.subscription.message', channelSubscriptionMessage);
+        expect(await lastRewardSeconds()).toBe(800);
+
+        await notify('channel.subscription.gift', channelSubscriptionGift);
+        expect(await lastRewardSeconds()).toBe(2_000);
+      });
+
+      it('crédite un don de bits au double du taux réglé, au bit près et sans plus de seuil', async () => {
+        await notify('channel.bits.use', channelBitsUseCheer);
+        expect(await lastRewardSeconds()).toBe(1_200);
+
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 99 });
+        expect(await lastRewardSeconds()).toBe(118.8);
+      });
+
+      it('dérive le barème des bits d’une configuration qui ne porte que celui des abonnements', async () => {
+        await application.stop();
+        await writeFile(
+          join(dataDirectory, 'config.json'),
+          JSON.stringify({
+            schemaVersion: 6,
+            rewards: {
+              happyHour: true,
+              bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 45, minBits: 1 } },
+              happyHourRewards: { sub: { tier1: 777 } },
+            },
+          }),
+          'utf8',
+        );
+        application = build();
+        port = await application.start();
+
+        await notify('channel.bits.use', channelBitsUseCheer);
+        expect(await lastRewardSeconds()).toBe(900);
+
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(777);
+
+        const raw = await readFile(join(dataDirectory, 'config.json'), 'utf8');
+        expect(JSON.parse(raw)).toMatchObject({
+          schemaVersion: CONFIG_SCHEMA_VERSION,
+          rewards: { bits: { unit: 100, seconds: 45 }, happyHourRewards: { bits: { unit: 100, seconds: 90 } } },
+        });
+      });
+
+      it('écrit le barème dérivé sur le disque, sous la version courante du schéma', async () => {
+        const raw = await readFile(join(dataDirectory, 'config.json'), 'utf8');
+
+        expect(JSON.parse(raw)).toMatchObject({
+          schemaVersion: CONFIG_SCHEMA_VERSION,
+          rewards: {
+            happyHourRewards: {
+              sub: { prime: 200, tier1: 600, tier2: 1_200, tier3: 1_800 },
+              resub: { prime: 200, tier1: 800, tier2: 1_200, tier3: 1_800 },
+              gift: { tier1: 1_000, tier2: 1_200, tier3: 1_800 },
+              bits: { unit: 50, seconds: 60 },
+            },
+          },
+        });
+      });
+
+      it('ne dérive qu’une fois : régler ensuite le barème normal ne touche plus au barème Happy Hour', async () => {
+        const response = await api('/api/config', {
+          method: 'PATCH',
+          headers: { [CSRF_HEADER]: application.getCsrfToken() },
+          body: JSON.stringify({ config: { rewards: { sub: { tier1: 1_000 } } } }),
+        });
+        expect(response.status).toBe(200);
+
+        await application.stop();
+        application = build();
+        port = await application.start();
+
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(600);
+      });
+
+      it('laisse régler le barème Happy Hour sans toucher au barème normal', async () => {
+        const response = await api('/api/config', {
+          method: 'PATCH',
+          headers: { [CSRF_HEADER]: application.getCsrfToken() },
+          body: JSON.stringify({ config: { rewards: { happyHourRewards: { sub: { tier1: 42 } } } } }),
+        });
+        expect(response.status).toBe(200);
+
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(42);
+
+        const { config } = (await (await api('/api/config')).json()) as {
+          config: { rewards: { sub: { tier1: number } } };
+        };
+        expect(config.rewards.sub.tier1).toBe(300);
+      });
+    });
+
+    describe('Power-ups', () => {
+      beforeEach(countGoalsInSubscriptions);
+
+      async function lastEntry(): Promise<{ type: string; rewardSeconds: number; reason: string } | undefined> {
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { type: string; rewardSeconds: number; reason: string }[];
+        };
+        return history.entries[0];
+      }
+
+      async function goalCount(): Promise<number> {
+        return ((await (await api('/api/goals')).json()) as { goal: { subs: number } }).goal.subs;
+      }
+
+      it('crédite un Power-up comme un cheer du même montant et le distingue dans l’historique', async () => {
+        const powerUp = { ...(channelBitsUsePowerUp as object), bits: 1000 };
+
+        await notify('channel.bits.use', channelBitsUseCheer);
+        const cheer = await lastEntry();
+        await notify('channel.bits.use', powerUp);
+        const spent = await lastEntry();
+
+        expect(spent?.type).toBe('bits');
+        expect(spent?.rewardSeconds).toBe(cheer?.rewardSeconds);
+        expect(spent?.rewardSeconds).toBe(600);
+        expect(spent?.reason).toContain('Power-up');
+        expect(cheer?.reason).not.toContain('Power-up');
+      });
+
+      it('fait avancer la barre d’objectif', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUseCustomPowerUp as object), bits: 1500 });
+
+        expect(await goalCount()).toBe(3);
+      });
+
+      it('compte deux Power-ups identiques envoyés coup sur coup par le même spectateur', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUsePowerUp as object), bits: 500 });
+        await notify('channel.bits.use', { ...(channelBitsUsePowerUp as object), bits: 500 });
+
+        expect(await goalCount()).toBe(2);
+      });
+
+      it('ne compte qu’une fois un même envoi rejoué par Twitch', async () => {
+        const powerUp = { ...(channelBitsUsePowerUp as object), bits: 500 };
+
+        await notify('channel.bits.use', powerUp, 'msg-rejoué');
+        await notify('channel.bits.use', powerUp, 'msg-rejoué');
+
+        expect(await goalCount()).toBe(1);
+      });
+
+      it('compte pour ses bits une dépense de type inconnu et le journalise', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), type: 'combo' });
+
+        expect((await lastEntry())?.rewardSeconds).toBe(600);
+
+        const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+          records: { message: string }[];
+        };
+        expect(records.map((record) => record.message)).toContain(
+          'dépense de bits de type inconnu, comptée pour ses bits',
+        );
+      });
+    });
+
+    describe('taux unique des bits', () => {
+      it('ajoute 0,6 seconde au compteur pour un seul bit, au taux par défaut', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 1 });
+
+        const state = (await (await api('/api/state')).json()) as {
+          counter: { remainingMs: number };
+        };
+        expect(state.counter.remainingMs).toBe(43_200_000 + 600);
+        expect((await readPersistedCounter()).remainingMs).toBe(43_200_600);
+
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { rewardSeconds: number; applied: boolean }[];
+        };
+        expect(history.entries[0]).toMatchObject({ rewardSeconds: 0.6, applied: true });
+      });
+
+      it('garde le compteur en millisecondes entières sur un taux sans écriture décimale finie', async () => {
+        await api('/api/config', {
+          method: 'PATCH',
+          headers: { [CSRF_HEADER]: application.getCsrfToken() },
+          body: JSON.stringify({ config: { rewards: { bits: { unit: 3, seconds: 1 } } } }),
+        });
+
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 1 });
+
+        const state = (await (await api('/api/state')).json()) as {
+          counter: { remainingMs: number };
+        };
+        expect(state.counter.remainingMs).toBe(43_200_333);
+      });
+
+      describe('configuration 1.3.0 réglée par paliers', () => {
+        const TIERS = {
+          mode: 'tiers',
+          linear: { unit: 100, secondsPerUnit: 60, minBits: 1 },
+          tiers: [
+            { minBits: 500, seconds: 360 },
+            { minBits: 200, seconds: 100 },
+            { minBits: 1_000, seconds: 900 },
+          ],
+        };
+
+        beforeEach(async () => {
+          await application.stop();
+          await writeFile(
+            join(dataDirectory, 'config.json'),
+            JSON.stringify({ schemaVersion: 5, rewards: { happyHour: false, bits: TIERS } }),
+            'utf8',
+          );
+          application = build();
+          port = await application.start();
+        });
+
+        it('convertit sur le palier le plus bas et crédite au bit près', async () => {
+          await notify('channel.bits.use', channelBitsUseCheer);
+
+          const history = (await (await api('/api/history')).json()) as {
+            entries: { rewardSeconds: number }[];
+          };
+          expect(history.entries[0]?.rewardSeconds).toBe(500);
+        });
+
+        it('réécrit le fichier sous le taux unique, sans les clés des anciens modes', async () => {
+          const written = JSON.parse(
+            await readFile(join(dataDirectory, 'config.json'), 'utf8'),
+          ) as { schemaVersion: number; rewards: { bits: unknown; happyHourRewards: { bits: unknown } } };
+
+          expect(written.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
+          expect(written.rewards.bits).toStrictEqual({ unit: 200, seconds: 100 });
+          expect(written.rewards.happyHourRewards.bits).toStrictEqual({ unit: 200, seconds: 200 });
+        });
+
+        it('signale la conversion dans le journal', async () => {
+          const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+            records: { message: string; context?: Record<string, unknown> }[];
+          };
+          const note = records.find(
+            (record) => record.message === 'paliers de bits convertis en taux unique',
+          );
+
+          expect(note?.context).toStrictEqual({ path: 'rewards.bits', unit: 200, seconds: 100 });
+        });
+
+        it('ne convertit ni ne signale plus rien au lancement suivant', async () => {
+          await application.stop();
+          application = build();
+          port = await application.start();
+
+          const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+            records: { message: string }[];
+          };
+          expect(
+            records.filter((record) => record.message === 'paliers de bits convertis en taux unique'),
+          ).toHaveLength(0);
+        });
+      });
+
+      it('convertit les paliers propres au Happy Hour d’une configuration qui en avait', async () => {
+        await application.stop();
+        await writeFile(
+          join(dataDirectory, 'config.json'),
+          JSON.stringify({
+            schemaVersion: 7,
+            rewards: {
+              happyHour: true,
+              bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60, minBits: 500 }, tiers: [] },
+              happyHourRewards: {
+                bits: { mode: 'tiers', linear: { unit: 100, secondsPerUnit: 120, minBits: 1 }, tiers: [{ minBits: 10, seconds: 30 }] },
+              },
+            },
+          }),
+          'utf8',
+        );
+        application = build();
+        port = await application.start();
+
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 5 });
+
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { rewardSeconds: number }[];
+        };
+        expect(history.entries[0]?.rewardSeconds).toBe(15);
+      });
     });
 
     it('ignore le rejeu du même message_id', async () => {
@@ -349,7 +700,7 @@ describe('application complète', () => {
     });
 
     it('crédite les bits selon le barème', async () => {
-      await notify('channel.cheer', channelCheer);
+      await notify('channel.bits.use', channelBitsUseCheer);
 
       const history = (await (await api('/api/history')).json()) as {
         entries: { type: string; applied: boolean }[];
@@ -366,6 +717,8 @@ describe('application complète', () => {
   });
 
   describe('objectifs', () => {
+    beforeEach(countGoalsInSubscriptions);
+
     async function readPersistedGoals(): Promise<{ subs: number; reached: { target: number }[] }> {
       const raw = await readFile(join(dataDirectory, 'goals.json'), 'utf8');
       return JSON.parse(raw) as { subs: number; reached: { target: number }[] };
@@ -435,6 +788,71 @@ describe('application complète', () => {
       };
       expect(message.subs).toBe(1);
       expect(message.crossed.map((tier) => tier.label)).toEqual(['Je me rase la tête']);
+    });
+
+    async function patchConfig(config: unknown): Promise<void> {
+      const response = await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config }),
+      });
+      expect(response.status).toBe(200);
+    }
+
+    async function goalCount(): Promise<number> {
+      return ((await (await api('/api/goals')).json()) as { goal: { subs: number } }).goal.subs;
+    }
+
+    it('avance sur un cheer que le barème de temps refuse : les deux barèmes sont indépendants', async () => {
+      await patchConfig({
+        rewards: { bits: { unit: 100, seconds: 0 } },
+        goals: { bitsPerSub: 500 },
+      });
+
+      await notify('channel.bits.use', channelBitsUseCheer);
+
+      const history = (await (await api('/api/history')).json()) as {
+        entries: { type: string; applied: boolean }[];
+      };
+      expect(history.entries[0]).toMatchObject({ type: 'bits', applied: false });
+      expect(await goalCount()).toBe(2);
+    });
+
+    it('n’avance pas sur un événement invalide, que le barème de temps refusait déjà', async () => {
+      await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: -500 });
+      await notify('channel.subscription.gift', { ...(channelSubscriptionGift as object), total: 0 });
+
+      expect(await goalCount()).toBe(0);
+    });
+
+    it('pèse chaque soutien selon le barème de points', async () => {
+      await patchConfig({
+        goals: { bitsPerSub: 1, points: { sub: { tier1: 250 }, gift: { tier1: 100 } } },
+      });
+
+      await notify('channel.subscribe', channelSubscribe);
+      await notify('channel.bits.use', channelBitsUseCheer);
+      await notify('channel.subscription.gift', channelSubscriptionGift);
+
+      expect(await goalCount()).toBe(250 + 1_000 + 200);
+    });
+
+    it('annonce l’un après l’autre les paliers qu’un lot pondéré traverse', async () => {
+      await setLadder();
+      await patchConfig({ goals: { points: { gift: { tier1: 5 } } } });
+
+      await notify('channel.subscription.gift', channelSubscriptionGift);
+
+      const persisted = await readPersistedGoals();
+      expect(persisted.subs).toBe(10);
+      expect(persisted.reached.map((entry) => entry.target)).toEqual([1, 2, 10]);
+    });
+
+    it('accepte l’écriture d’un compte en points, mille fois plus grand qu’un compte d’abonnements', async () => {
+      const response = await mutate('/api/goals/subs', JSON.stringify({ subs: 2_500_000 }));
+
+      expect(response.status).toBe(200);
+      expect(await goalCount()).toBe(2_500_000);
     });
 
     it('n’avance pas sur une commande de chat, qui est une saisie humaine', async () => {
@@ -775,6 +1193,331 @@ describe('application complète', () => {
 
       expect((await readPersistedCounter()).status).toBe('paused');
       expect((await api('/api/state')).status).toBe(200);
+    });
+  });
+
+  describe('plage ponctuelle du Happy Hour', () => {
+    const MINUTE = 60_000;
+
+    function schedule(method: 'PUT' | 'DELETE', body?: unknown): Promise<Response> {
+      return api('/api/happy-hour/schedule', {
+        method,
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    }
+
+    function windowFromNow(): { startAt: number; endAt: number } {
+      const now = Date.now();
+      return { startAt: now + 10 * MINUTE, endAt: now + 70 * MINUTE };
+    }
+
+    async function happyHour(): Promise<boolean> {
+      const { config } = (await (await api('/api/config')).json()) as {
+        config: { rewards: { happyHour: boolean } };
+      };
+      return config.rewards.happyHour;
+    }
+
+    async function currentSchedule(): Promise<unknown> {
+      return ((await (await api('/api/happy-hour/schedule')).json()) as { schedule: unknown })
+        .schedule;
+    }
+
+    async function tickUntil(expected: boolean): Promise<void> {
+      const deadline = Date.now() + 2_000;
+      for (;;) {
+        ticker.tick();
+        if ((await happyHour()) === expected) {
+          return;
+        }
+        if (Date.now() > deadline) {
+          throw new Error(`Happy Hour jamais passé à ${String(expected)}`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+
+    async function readScheduleFile(): Promise<unknown> {
+      return JSON.parse(await readFile(join(dataDirectory, 'happy-hour-schedule.json'), 'utf8'));
+    }
+
+    it('allume le Happy Hour au début, crédite son barème, puis l’éteint à la fin', async () => {
+      const window = windowFromNow();
+      expect((await schedule('PUT', window)).status).toBe(200);
+
+      ticker.tick();
+      expect(await happyHour()).toBe(false);
+
+      clockOffsetMs = 11 * MINUTE;
+      await tickUntil(true);
+
+      await notify('channel.subscribe', channelSubscribe);
+      const history = (await (await api('/api/history')).json()) as {
+        entries: { rewardSeconds: number }[];
+      };
+      expect(history.entries[0]?.rewardSeconds).toBe(360);
+
+      clockOffsetMs = 71 * MINUTE;
+      await tickUntil(false);
+      expect(await currentSchedule()).toBeNull();
+    });
+
+    it('annonce la plage aux panneaux ouverts, à la connexion puis à chaque changement', async () => {
+      const window = windowFromNow();
+      await schedule('PUT', window);
+
+      const panel = collect(connectOverlay());
+      await panel.waitFor(() => panel.ofType('hello').length > 0, 'accueil');
+      expect(panel.ofType('hello')[0]?.['happyHourSchedule']).toStrictEqual(window);
+
+      await schedule('DELETE');
+      await panel.waitFor(
+        () => panel.ofType('config').some((message) => message['happyHourSchedule'] === null),
+        'annulation diffusée',
+      );
+    });
+
+    it('refuse une plage invalide sans rien enregistrer', async () => {
+      const now = Date.now();
+      const response = await schedule('PUT', { startAt: now + 2 * MINUTE, endAt: now + MINUTE });
+
+      expect(response.status).toBe(400);
+      expect(await currentSchedule()).toBeNull();
+    });
+
+    it('respecte une extinction à la main pendant la plage', async () => {
+      await schedule('PUT', windowFromNow());
+      clockOffsetMs = 11 * MINUTE;
+      await tickUntil(true);
+
+      await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { rewards: { happyHour: false } } }),
+      });
+      ticker.tick();
+      ticker.tick();
+      expect(await happyHour()).toBe(false);
+
+      clockOffsetMs = 71 * MINUTE;
+      const deadline = Date.now() + 2_000;
+      while ((await currentSchedule()) !== null) {
+        ticker.tick();
+        if (Date.now() > deadline) {
+          throw new Error('plage jamais effacée');
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(await happyHour()).toBe(false);
+    });
+
+    it('active le Happy Hour quand l’application est relancée entre le début et la fin', async () => {
+      const window = windowFromNow();
+      await schedule('PUT', window);
+      await application.stop();
+
+      clockOffsetMs = 30 * MINUTE;
+      application = build();
+      port = await application.start();
+
+      expect(await happyHour()).toBe(true);
+      expect(await currentSchedule()).toStrictEqual(window);
+      expect(await readScheduleFile()).toStrictEqual({ window, started: true });
+    });
+
+    it('efface la plage sans rien activer quand l’application est relancée après la fin', async () => {
+      await schedule('PUT', windowFromNow());
+      await application.stop();
+
+      clockOffsetMs = 120 * MINUTE;
+      application = build();
+      port = await application.start();
+
+      expect(await happyHour()).toBe(false);
+      expect(await currentSchedule()).toBeNull();
+      expect(await readScheduleFile()).toBeNull();
+    });
+
+    it('journalise la bascule programmée comme une bascule manuelle, avec son origine', async () => {
+      await schedule('PUT', windowFromNow());
+      clockOffsetMs = 11 * MINUTE;
+      await tickUntil(true);
+
+      await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { rewards: { happyHour: false } } }),
+      });
+
+      const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+        records: { message: string; context?: { active?: boolean; origin?: string } }[];
+      };
+      const toggles = records
+        .filter((record) => record.message === 'Happy Hour basculé')
+        .map((record) => record.context);
+
+      expect(toggles).toContainEqual({ active: true, origin: 'plage programmée' });
+      expect(toggles).toContainEqual({ active: false, origin: 'manuel' });
+    });
+
+    it('refuse de poser ou d’annuler une plage sans jeton CSRF', async () => {
+      const put = await api('/api/happy-hour/schedule', {
+        method: 'PUT',
+        body: JSON.stringify(windowFromNow()),
+      });
+      const cancel = await api('/api/happy-hour/schedule', { method: 'DELETE' });
+
+      expect(put.status).toBe(403);
+      expect(cancel.status).toBe(403);
+      expect(await currentSchedule()).toBeNull();
+    });
+  });
+
+  describe('mise à jour depuis une version où la barre comptait en abonnements', () => {
+    const OLD_CONFIG = {
+      schemaVersion: 5,
+      goals: {
+        bitsPerSub: 500,
+        tiers: [
+          { target: 50, label: 'Je me rase la tête' },
+          { target: 100, label: 'Karaoké' },
+        ],
+        overlay: { fontSize: 40, bar: { height: 60 } },
+      },
+    };
+
+    const OLD_GOALS = {
+      subs: 37,
+      reached: [{ target: 5, reachedAt: 1_754_000_000_000 }],
+      updatedAt: 1_754_000_000_000,
+      schemaVersion: 1,
+    };
+
+    async function restart(): Promise<void> {
+      await application.stop();
+      application = build();
+      port = await application.start();
+    }
+
+    async function notice(): Promise<unknown> {
+      return ((await (await api('/api/update-notice')).json()) as { notice: unknown }).notice;
+    }
+
+    async function goals(): Promise<{ goal: { subs: number; reached: unknown[] }; tiers: unknown[] }> {
+      return (await (await api('/api/goals')).json()) as {
+        goal: { subs: number; reached: unknown[] };
+        tiers: unknown[];
+      };
+    }
+
+    async function goalsConfig(): Promise<Record<string, unknown> & { overlay: { fontSize: number; bar: { height: number } } }> {
+      const { config } = (await (await api('/api/config')).json()) as {
+        config: { goals: Record<string, unknown> & { overlay: { fontSize: number; bar: { height: number } } } };
+      };
+      return config.goals;
+    }
+
+    beforeEach(async () => {
+      await application.stop();
+      await writeFile(join(dataDirectory, 'config.json'), JSON.stringify(OLD_CONFIG), 'utf8');
+      await writeFile(join(dataDirectory, 'goals.json'), JSON.stringify(OLD_GOALS), 'utf8');
+      application = build();
+      port = await application.start();
+    });
+
+    it('remet le comptage aux valeurs de départ et garde l’apparence de la barre', async () => {
+      const config = await goalsConfig();
+
+      expect(config['bitsPerSub']).toBe(1);
+      expect(config['unitLabel']).toBe('points');
+      expect(config['points']).toMatchObject({ sub: { tier1: 500, tier2: 1_000, tier3: 2_500 } });
+      expect(config['tiers']).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+      expect(config.overlay.fontSize).toBe(40);
+      expect(config.overlay.bar.height).toBe(60);
+    });
+
+    it('remet le compte et les paliers atteints à zéro', async () => {
+      const { goal } = await goals();
+
+      expect(goal.subs).toBe(0);
+      expect(goal.reached).toStrictEqual([]);
+    });
+
+    it('annonce la remise à zéro en rappelant l’ancien compte', async () => {
+      expect(await notice()).toStrictEqual({ goalsReset: { previousCount: 37 } });
+    });
+
+    it('trace la remise à zéro dans le journal', async () => {
+      const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+        records: { message: string }[];
+      };
+
+      expect(records.map((record) => record.message)).toContain(
+        'comptage de la barre d’objectif remis aux valeurs de départ',
+      );
+    });
+
+    it('compte en points dès le premier soutien', async () => {
+      await notify('channel.subscribe', channelSubscribe);
+      await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 120 });
+
+      expect((await goals()).goal.subs).toBe(620);
+    });
+
+    it('garde l’annonce d’un lancement à l’autre tant qu’elle n’est pas acquittée, sans rejouer la remise à zéro', async () => {
+      await notify('channel.subscribe', channelSubscribe);
+      await restart();
+
+      expect(await notice()).toStrictEqual({ goalsReset: { previousCount: 37 } });
+      expect((await goals()).goal.subs).toBe(500);
+    });
+
+    it('ne revient plus une fois acquittée, même après relance', async () => {
+      const response = await mutate('/api/update-notice/acknowledge');
+      expect(response.status).toBe(200);
+
+      await restart();
+
+      expect(await notice()).toBeNull();
+    });
+
+    it('ne remet plus rien à zéro une fois la barre réglée de nouveau', async () => {
+      await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { goals: { bitsPerSub: 250, tiers: [{ target: 7, label: 'Mien' }] } } }),
+      });
+      await mutate('/api/goals/subs', JSON.stringify({ subs: 4 }));
+
+      await restart();
+
+      expect((await goalsConfig())['bitsPerSub']).toBe(250);
+      expect((await goals()).goal.subs).toBe(4);
+    });
+
+    it('refuse d’acquitter l’annonce sans jeton CSRF', async () => {
+      const response = await api('/api/update-notice/acknowledge', { method: 'POST' });
+
+      expect(response.status).toBe(403);
+      expect(await notice()).not.toBeNull();
+    });
+  });
+
+  describe('installation neuve', () => {
+    it('n’annonce aucune mise à jour', async () => {
+      const { notice } = (await (await api('/api/update-notice')).json()) as { notice: unknown };
+
+      expect(notice).toBeNull();
+    });
+
+    it('affiche d’office une barre sur un palier à 1 000 points', async () => {
+      const payload = (await (await api('/api/goals')).json()) as {
+        goal: { subs: number; position: { to: number; label: string } };
+      };
+
+      expect(payload.goal.subs).toBe(0);
+      expect(payload.goal.position).toMatchObject({ to: 1_000, label: 'Objectif' });
     });
   });
 

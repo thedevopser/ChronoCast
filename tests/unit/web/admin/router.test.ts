@@ -105,3 +105,15 @@ describe('FIELD_VIEWS', () => {
     }
   });
 });
+
+describe('vue Happy Hour', () => {
+  it('a son entrée de navigation, juste après le barème', () => {
+    expect(ADMIN_VIEWS.indexOf('happy-hour')).toBe(ADMIN_VIEWS.indexOf('rewards') + 1);
+    expect(VIEW_LABELS['happy-hour']).toBe('Happy Hour');
+    expect(viewFromHash('#happy-hour')).toBe('happy-hour');
+  });
+
+  it('porte son propre formulaire', () => {
+    expect(FIELD_VIEWS).toContain('happy-hour');
+  });
+});

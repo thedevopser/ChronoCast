@@ -60,7 +60,7 @@ Le panneau d'administration et l'assistant de configuration proposent des liens 
 Quand vous autorisez l'application, Twitch lui transmet, pour votre chaîne :
 
 - les **abonnements**, réabonnements et abonnements offerts ;
-- les **dons de bits** ;
+- les **dons de bits**, et les bits dépensés en Power-ups ;
 - les **messages de chat**, nécessaires à la commande `!addtime`.
 
 De ces données, ChronoCast retient dans son historique le **pseudonyme** de la personne à l'origine de l'événement, le type d'événement et le temps crédité. Le contenu des messages de chat n'est **pas** conservé : seule la commande reconnue l'est, sous forme d'un nombre de secondes.

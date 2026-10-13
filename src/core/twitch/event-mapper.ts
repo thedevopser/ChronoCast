@@ -1,4 +1,5 @@
 import type {
+  BitsUsage,
   DomainEvent,
   GiftTier,
   SubscriptionTier,
@@ -13,7 +14,14 @@ export interface MapContext {
 }
 
 export type MapResult =
-  | { readonly kind: 'event'; readonly event: DomainEvent; readonly reason: string }
+  | {
+      readonly kind: 'event';
+      readonly event: DomainEvent;
+      readonly reason: string;
+
+      /** Ce que la charge avait d'inattendu sans empêcher de la compter, à journaliser. */
+      readonly warning?: string;
+    }
   | { readonly kind: 'ignored'; readonly reason: string }
   | { readonly kind: 'invalid'; readonly reason: string };
 
@@ -35,8 +43,10 @@ function invalid(reason: string): MapResult {
   return { kind: 'invalid', reason };
 }
 
-function produced(event: DomainEvent, reason: string): MapResult {
-  return { kind: 'event', event, reason };
+function produced(event: DomainEvent, reason: string, warning?: string): MapResult {
+  return warning === undefined
+    ? { kind: 'event', event, reason }
+    : { kind: 'event', event, reason, warning };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -146,11 +156,25 @@ function mapSubscriptionGift(context: MapContext, payload: Record<string, unknow
   );
 }
 
-function mapCheer(context: MapContext, payload: Record<string, unknown>): MapResult {
+const BITS_USAGES: Readonly<Record<string, BitsUsage>> = {
+  cheer: 'cheer',
+  power_up: 'power_up',
+  custom_power_up: 'custom_power_up',
+};
+
+// `channel.bits.use` couvre les cheers et les Power-ups. Twitch en fait un événement fourre-tout
+// appelé à s'élargir : une dépense d'un type encore inconnu est comptée pour ses bits.
+function mapBitsUse(context: MapContext, payload: Record<string, unknown>): MapResult {
   const bits = readNumber(payload, 'bits');
   if (bits === undefined) {
     return invalid('nombre de bits absent');
   }
+
+  const declared = readString(payload, 'type');
+  const usage: BitsUsage =
+    declared !== undefined && Object.hasOwn(BITS_USAGES, declared)
+      ? (BITS_USAGES[declared] ?? 'unknown')
+      : 'unknown';
 
   const actor = readActor(payload, 'user_id', 'user_name');
   return produced(
@@ -158,11 +182,13 @@ function mapCheer(context: MapContext, payload: Record<string, unknown>): MapRes
       id: context.messageId,
       type: 'bits',
       bits,
+      usage,
       occurredAt: context.receivedAt,
       source: 'eventsub',
       ...actor,
     },
-    'don de bits',
+    'dépense de bits',
+    usage === 'unknown' ? `type de dépense inconnu : ${declared ?? 'absent'}` : undefined,
   );
 }
 
@@ -277,8 +303,8 @@ export function mapNotification(context: MapContext, payload: unknown): MapResul
       return mapSubscriptionMessage(context, payload);
     case 'channel.subscription.gift':
       return mapSubscriptionGift(context, payload);
-    case 'channel.cheer':
-      return mapCheer(context, payload);
+    case 'channel.bits.use':
+      return mapBitsUse(context, payload);
     case 'channel.chat.notification':
       return mapChatNotification(context, payload);
     default:
@@ -294,8 +320,10 @@ export function semanticKey(event: DomainEvent): string {
       return `resub:${event.userId}:${event.tier === 'prime' ? 'tier1' : event.tier}`;
     case 'gift':
       return `gift:${event.userId}:${event.tier}:${String(event.total)}`;
+    // Les bits n'arrivent que par une source : il n'y a rien à corréler, et deux dépenses
+    // identiques du même spectateur — deux Power-ups coup sur coup — sont bien deux dépenses.
     case 'bits':
-      return `bits:${event.userId}:${String(event.bits)}`;
+      return `bits:${event.id}`;
     case 'command':
       return `command:${event.id}`;
   }

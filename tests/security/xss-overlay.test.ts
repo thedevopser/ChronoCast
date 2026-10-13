@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { mapNotification } from '../../src/core/twitch/event-mapper.js';
 import { sanitizeText, setText } from '../../src/web/shared/safe-dom.js';
+import { channelBitsUsePowerUp } from '../fixtures/eventsub-payloads.js';
 
 const OVERLAY_HTML = readFileSync(
   resolve(process.cwd(), 'src/web/overlay/index.html'),
@@ -67,6 +69,27 @@ describe('pseudonyme hostile écrit dans l’overlay', () => {
 
     expect(sanitizeText(target.textContent ?? '', 64)).toBe(target.textContent);
     expect((target.textContent ?? '').length).toBeLessThanOrEqual(65);
+  });
+});
+
+// Un Power-up arrive par channel.bits.use avec un pseudo choisi par le spectateur, comme un cheer.
+describe('pseudonyme hostile porté par un Power-up', () => {
+  it.each(HOSTILE_PAYLOADS)('ne crée aucun élément à partir de %j', (payload) => {
+    const mapped = mapNotification(
+      { messageId: 'msg-1', receivedAt: 1_754_000_000_000, subscriptionType: 'channel.bits.use' },
+      { ...(channelBitsUsePowerUp as object), user_name: payload, message: { text: payload } },
+    );
+    if (mapped.kind !== 'event') {
+      throw new Error('événement attendu');
+    }
+
+    const target = document.createElement('div');
+    setText(target, mapped.event.userName);
+
+    expect(target.children).toHaveLength(0);
+    expect(target.childNodes).toHaveLength(1);
+    // Le message du Power-up ne voyage pas : rien de ce qu'il contient n'atteint l'événement.
+    expect(JSON.stringify({ ...mapped.event, userName: '' })).not.toContain('alert');
   });
 });
 

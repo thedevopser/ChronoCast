@@ -264,7 +264,7 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
 
       const next = await commit(
         applyAdd(requireState(), {
-          deltaMs: reward.seconds * 1_000,
+          deltaMs: Math.round(reward.seconds * 1_000),
           bounds: currentBounds(),
           now: clock.now(),
         }),

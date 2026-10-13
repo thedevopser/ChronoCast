@@ -43,6 +43,20 @@
             </p>
           </header>
 
+          <div class="card" id="update-notice" hidden>
+            <p class="card__label">Ce qui a changé avec cette version</p>
+            <p class="card__hint" id="update-notice-goals"></p>
+            <p class="card__hint">
+              Les bits du barème de temps se règlent par un taux unique, où chaque bit compte : le
+              mode par paliers et le seuil minimum n'existent plus. Vérifiez vos réglages dans
+              <a href="#rewards">Barème</a>, <a href="#happy-hour">Happy Hour</a> et
+              <a href="#goals">Objectifs</a>.
+            </p>
+            <div class="actions">
+              <button class="button" type="button" id="update-notice-ack">J'ai compris</button>
+            </div>
+          </div>
+
           <div class="board">
             <div class="card card--counter">
               <p class="card__label">Temps restant</p>
@@ -79,13 +93,13 @@
               <p class="card__value">
                 <span class="pill" id="happy-hour-status">—</span>
               </p>
-              <p class="card__hint">
-                Abonnements, réabonnements, sub offerts et bits créditent le double. La commande de
-                chat et les seuils d'entrée ne bougent pas.
-              </p>
+              <p class="card__hint" id="happy-hour-schedule-summary" hidden></p>
               <div class="actions">
                 <button class="button" type="button" id="happy-hour-toggle">Activer</button>
               </div>
+              <p class="card__hint">
+                <a href="#happy-hour">Programmer une plage ou régler le barème Happy Hour</a>
+              </p>
             </div>
 
             <div class="card">
@@ -187,21 +201,62 @@
 
           <div class="fields" id="fields-rewards"></div>
 
-          <div class="card" id="bits-tiers-card">
-            <p class="card__label">Paliers de bits</p>
-            <p class="card__hint">
-              Utilisés seulement lorsque le mode de calcul est « par paliers ». Le palier atteint le
-              plus généreux s'applique.
-            </p>
-            <ul class="tiers" id="bits-tiers"></ul>
-            <div class="actions">
-              <button class="button" type="button" id="add-tier">Ajouter un palier</button>
-            </div>
-          </div>
-
           <div class="actions">
             <button class="button button--primary" type="button" id="save-rewards">
               Enregistrer le barème
+            </button>
+          </div>
+        </section>
+
+        <section class="view" id="view-happy-hour" hidden>
+          <header class="view__head">
+            <h1 class="view__title">Happy Hour</h1>
+            <p class="view__subtitle">
+              Tant qu'il est actif, abonnements, réabonnements, sub offerts et bits créditent le
+              barème ci-dessous à la place du barème normal. La commande de chat n'est pas concernée.
+            </p>
+          </header>
+
+          <div class="card" id="happy-hour-state-card">
+            <p class="card__label">État</p>
+            <p class="card__value">
+              <span class="pill" id="hh-view-status">—</span>
+            </p>
+            <p class="card__hint" id="hh-view-summary" hidden></p>
+            <div class="actions">
+              <button class="button" type="button" id="hh-view-toggle">Activer</button>
+            </div>
+          </div>
+
+          <div class="card" id="happy-hour-schedule-card">
+            <p class="card__label">Programmer une plage</p>
+            <p class="card__hint">
+              Le Happy Hour s'allume seul à l'heure de début et s'éteint seul à l'heure de fin, une
+              fois. Une heure désigne sa prochaine occurrence ; une fin antérieure au début tombe le
+              lendemain. Le bouton ci-dessus garde la main à tout moment.
+            </p>
+            <div class="actions actions--wrap actions--end" id="happy-hour-schedule-form">
+              <label class="field field--compact">
+                <span class="field__label">Début</span>
+                <input class="field__input" type="time" id="happy-hour-start" />
+              </label>
+              <label class="field field--compact">
+                <span class="field__label">Fin</span>
+                <input class="field__input" type="time" id="happy-hour-end" />
+              </label>
+              <button class="button" type="button" id="happy-hour-schedule">Programmer</button>
+            </div>
+            <p class="field__error" id="happy-hour-schedule-error"></p>
+            <div class="actions" id="happy-hour-cancel-row" hidden>
+              <button class="button" type="button" id="happy-hour-cancel">Annuler la plage</button>
+            </div>
+          </div>
+
+          <div class="fields" id="fields-happy-hour"></div>
+
+          <div class="actions">
+            <button class="button button--primary" type="button" id="save-happy-hour">
+              Enregistrer le barème Happy Hour
             </button>
           </div>
         </section>
@@ -210,8 +265,9 @@
           <header class="view__head">
             <h1 class="view__title">Objectifs</h1>
             <p class="view__subtitle">
-              L'échelle des promesses, comptée en abonnements. Un sub, un réabonnement et chaque sub
-              offert valent un, quel que soit le tier ; les bits comptent par tranches.
+              L'échelle des promesses, et ce que pèse chaque soutien dans la barre. Elle compte en
+              points : au départ un point par bit, et 500, 1 000 ou 2 500 points par abonnement
+              selon son tier. Tout se règle ci-dessous.
             </p>
           </header>
 
@@ -236,21 +292,21 @@
             <hr class="rule" />
 
             <label class="field field--compact">
-              <span class="field__label">Abonnements déjà acquis</span>
+              <span class="field__label">Compte déjà acquis</span>
               <input
                 class="field__input"
                 id="goal-subs-input"
                 type="number"
                 min="0"
                 step="1"
-                placeholder="80"
+                placeholder="25000"
                 autocomplete="off"
               />
             </label>
             <p class="note">
-              Pour caler la barre sur un subathon déjà commencé. La valeur saisie remplace le
-              compte : elle n'annonce aucun palier aux spectateurs et ne crédite aucune seconde au
-              compteur.
+              Pour caler la barre sur un subathon déjà commencé, dans l'unité de votre barème de
+              points. La valeur saisie remplace le compte : elle n'annonce aucun palier aux
+              spectateurs et ne crédite aucune seconde au compteur.
             </p>
             <div class="actions">
               <button class="button" type="button" id="save-goal-subs">Enregistrer</button>
@@ -272,6 +328,10 @@
           </div>
 
           <div class="fields" id="fields-goals"></div>
+          <p class="note">
+            Le barème de points ne vaut que pour les soutiens à venir : le modifier ne recalcule pas
+            le compte en cours.
+          </p>
 
           <div class="actions">
             <button class="button button--primary" type="button" id="save-goals">

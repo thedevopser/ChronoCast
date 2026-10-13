@@ -56,6 +56,15 @@ describe('readGoalPreviewMessage', () => {
     ).toBeNull();
   });
 
+  it('refuse un brouillon sans largeur de barre', () => {
+    const { width: _width, ...bar } = APPEARANCE.bar;
+    const amputé = { ...APPEARANCE, bar };
+
+    expect(
+      readGoalPreviewMessage({ origin: ORIGIN, data: envelope({ goalOverlay: amputé }) }, ORIGIN),
+    ).toBeNull();
+  });
+
   it('refuse un brouillon dont une branche a le mauvais type', () => {
     const faussé = { ...APPEARANCE, announce: { ...APPEARANCE.announce, durationMs: 'longtemps' } };
 

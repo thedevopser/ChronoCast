@@ -50,6 +50,30 @@ describe('page /goal', () => {
       expect(await goalCss()).toContain('calc(var(--cc-goal-progress) * 100%)');
     });
 
+    it('borne la barre à la largeur réglée et la centre dans la source', async () => {
+      const bar = /\.bar\s*\{[^}]*\}/.exec(await goalCss())?.[0] ?? '';
+
+      expect(bar).toContain('max-width: var(--cc-goal-bar-width)');
+      expect(bar).toContain('margin-inline: auto');
+    });
+
+    it('ne laisse pas l’annonce dépasser la largeur de la barre', async () => {
+      const label = /\.announce__label\s*\{[^}]*\}/.exec(await goalCss())?.[0] ?? '';
+
+      expect(label).toContain('max-width: min(100vw, var(--cc-goal-bar-width))');
+    });
+
+    // Un compte en points tient sur six ou sept chiffres : c'est le libellé qui doit céder la place.
+    it('garde le compte entier et rogne le libellé quand la barre manque de place', async () => {
+      const css = await goalCss();
+      const label = /\.bar__label\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+      const count = /\.bar__count\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+
+      expect(label).toContain('min-width: 0');
+      expect(label).toContain('text-overflow: ellipsis');
+      expect(count).toContain('flex-shrink: 0');
+    });
+
     it('ne préfixe que --cc-goal-, pour ne jamais heurter les variables de l’overlay', async () => {
       const declared = [...(await goalCss()).matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map(
         (match) => match[1] ?? '',

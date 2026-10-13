@@ -2,6 +2,8 @@ import { mkdir } from 'node:fs/promises';
 
 import { evaluateChatMessage } from '../chat/command-service.js';
 import { createConfigService, type ConfigService } from '../config/config-service.js';
+import { prepareRawConfig } from '../config/config-migration.js';
+import { withDerivedHappyHourRewards } from '../config/happy-hour-rewards.js';
 import { configSchema, type ChronoCastConfig } from '../config/schema.js';
 import {
   createCounterService,
@@ -12,6 +14,11 @@ import {
 import type { CounterState } from '../counter/counter-state.js';
 import { createDedupCache, type DedupCache } from '../dedup/dedup-cache.js';
 import type { DomainEvent } from '../events/domain-event.js';
+import {
+  createHappyHourSchedule,
+  parseScheduleState,
+  type HappyHourSchedule,
+} from '../happy-hour/happy-hour-schedule.js';
 import { createGoalService, type GoalService, type GoalState } from '../goals/goal-service.js';
 import {
   createEventHistoryService,
@@ -37,6 +44,13 @@ import { createCsrfToken, verifyCsrfToken } from '../server/security/csrf.js';
 import { createStaticHandler } from '../server/static-handler.js';
 import { createWsAdapter, type WsAdapter } from '../server/ws-adapter.js';
 import { createWsHub, type HubTimers, type WsHub } from '../server/ws-hub.js';
+import type { WindowState } from '../schedule/one-shot-window.js';
+import {
+  createUpdateNotice,
+  parseUpdateNotice,
+  type UpdateNotice,
+  type UpdateNoticeState,
+} from '../update/update-notice.js';
 import { createAtomicJsonStore } from '../storage/atomic-json-store.js';
 import { createJsonlStore } from '../storage/jsonl-store.js';
 import { mapNotification, semanticKey } from '../twitch/event-mapper.js';
@@ -78,6 +92,10 @@ const CONFIG_FILE = 'config.json';
 const COUNTER_FILE = 'counter.json';
 
 const GOALS_FILE = 'goals.json';
+
+const HAPPY_HOUR_SCHEDULE_FILE = 'happy-hour-schedule.json';
+
+const UPDATE_NOTICE_FILE = 'update-notice.json';
 
 const WS_PATH = '/ws';
 
@@ -184,10 +202,40 @@ export function createApplication(options: ApplicationOptions): Application {
     },
   });
 
+  // Levé par la lecture d'une configuration dont le comptage de la barre vient d'être écarté : le
+  // compte en cours, tenu par le service des objectifs, reste à remettre à zéro au démarrage.
+  let goalsResetPending = false;
+
+  const updateNotice: UpdateNotice = createUpdateNotice({
+    store: createAtomicJsonStore<UpdateNoticeState | null>({
+      filePath: paths.resolveDataFile(UPDATE_NOTICE_FILE),
+      parse: parseUpdateNotice,
+      createDefault: () => null,
+      logger: logger.child('update-notice-store'),
+    }),
+    logger: logger.child('update-notice'),
+  });
+
   const configService: ConfigService = createConfigService({
     store: createAtomicJsonStore<ChronoCastConfig>({
       filePath: paths.resolveDataFile(CONFIG_FILE),
-      parse: (raw) => configSchema.parse(raw),
+      // Converti et dérivé ici, sur le fichier tel qu'il est écrit : une fois passé par le schéma,
+      // les clés d'une version antérieure ont disparu, et rien ne distingue plus un barème Happy
+      // Hour absent d'un barème laissé à ses valeurs par défaut.
+      parse: (raw) => {
+        const prepared = prepareRawConfig(raw);
+        const config = withDerivedHappyHourRewards(prepared.raw, configSchema.parse(prepared.raw));
+
+        for (const note of prepared.notes) {
+          logger.child('config').info(note.message, note.context);
+        }
+
+        if (prepared.goalsReset) {
+          goalsResetPending = true;
+        }
+
+        return config;
+      },
       createDefault: () => configSchema.parse({}),
       logger: logger.child('config-store'),
     }),
@@ -203,9 +251,46 @@ export function createApplication(options: ApplicationOptions): Application {
     }),
     getConfig: () => configService.get(),
     clock,
-    ticker,
+    ticker: {
+      start: (intervalMs, onTick) => {
+        ticker.start(intervalMs, () => {
+          onTick();
+          happyHourSchedule.tick();
+        });
+      },
+      stop: () => {
+        ticker.stop();
+      },
+    },
     bus,
     logger: logger.child('counter'),
+  });
+
+  // Lue par l'abonné à la configuration, qui journalise la bascule : le service de configuration
+  // ne sait pas qui l'a demandée.
+  let happyHourOrigin: 'manuel' | 'plage programmée' = 'manuel';
+
+  const happyHourSchedule: HappyHourSchedule = createHappyHourSchedule({
+    store: createAtomicJsonStore<WindowState | null>({
+      filePath: paths.resolveDataFile(HAPPY_HOUR_SCHEDULE_FILE),
+      parse: parseScheduleState,
+      createDefault: () => null,
+      logger: logger.child('happy-hour-store'),
+    }),
+    clock,
+    isActive: () => configService.get().rewards.happyHour,
+    setActive: async (active) => {
+      happyHourOrigin = 'plage programmée';
+      try {
+        await configService.update({ rewards: { happyHour: active } });
+      } finally {
+        happyHourOrigin = 'manuel';
+      }
+    },
+    onChange: () => {
+      hub.publishConfig();
+    },
+    logger: logger.child('happy-hour'),
   });
 
   const goalService: GoalService = createGoalService({
@@ -288,11 +373,9 @@ export function createApplication(options: ApplicationOptions): Application {
     const outcome = await counterService.applyEvent(event);
     await history.record(event, outcome.reward, outcome.state);
 
-    // Après le barème et sur le même événement déjà dédupliqué : ce qu'il a refusé ne doit pas
-    // davantage faire avancer une promesse affichée aux spectateurs.
-    if (outcome.reward.applied) {
-      await goalService.applyEvent(event);
-    }
+    // Sur le même événement déjà dédupliqué, mais sans regarder ce que le barème de temps en a
+    // fait : la barre a son barème de points, et peut servir seule, hors subathon.
+    await goalService.applyEvent(event);
 
     return outcome;
   }
@@ -368,6 +451,12 @@ export function createApplication(options: ApplicationOptions): Application {
       return;
     }
 
+    if (mapped.warning !== undefined) {
+      pipeline.warning('dépense de bits de type inconnu, comptée pour ses bits', {
+        detail: mapped.warning,
+      });
+    }
+
     if (!semanticDedup.admit(semanticKey(mapped.event), now)) {
       pipeline.debug('événement déjà crédité par une autre source', { eventId: mapped.event.id });
       return;
@@ -384,6 +473,7 @@ export function createApplication(options: ApplicationOptions): Application {
   const hub: WsHub = createWsHub({
     bus,
     getConfig: () => configService.get(),
+    getHappyHourSchedule: () => happyHourSchedule.get(),
     getSnapshot: () => ({
       counter: counterService.getState(),
       twitch: composeTwitchStatus(),
@@ -586,6 +676,8 @@ export function createApplication(options: ApplicationOptions): Application {
       config: configService,
       counter: counterService,
       goals: goalService,
+      happyHourSchedule,
+      updateNotice,
       history,
       logs: ringBuffer,
       twitch: twitchApi,
@@ -711,10 +803,17 @@ export function createApplication(options: ApplicationOptions): Application {
       // onChange ne reçoit que la configuration nouvelle : l'ancienne se conserve ici pour
       // pouvoir comparer.
       let previousTwitch = configService.get().twitch;
+      let previousHappyHour = configService.get().rewards.happyHour;
 
       configService.onChange(() => {
         logger.setLevel(configService.get().logging.level);
         hub.publishConfig();
+
+        const nextHappyHour = configService.get().rewards.happyHour;
+        if (nextHappyHour !== previousHappyHour) {
+          previousHappyHour = nextHappyHour;
+          scoped.info('Happy Hour basculé', { active: nextHappyHour, origin: happyHourOrigin });
+        }
 
         const nextTwitch = configService.get().twitch;
         const restartNeeded = requiresRestart(previousTwitch, nextTwitch);
@@ -727,6 +826,18 @@ export function createApplication(options: ApplicationOptions): Application {
 
       await counterService.start();
       await goalService.start();
+      await happyHourSchedule.start();
+      await updateNotice.start();
+
+      if (goalsResetPending) {
+        goalsResetPending = false;
+
+        // L'ancien compte était en abonnements : il ne veut plus rien dire face à un barème en
+        // points. Il est rappelé dans l'annonce pour que le streamer puisse recaler sa barre.
+        const previousCount = goalService.getState().subs;
+        await goalService.reset();
+        await updateNotice.announceGoalsReset(previousCount);
+      }
       hub.start();
 
       httpServer = createHttpServer({

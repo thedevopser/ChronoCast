@@ -96,18 +96,59 @@ describe('mapNotification', () => {
     });
   });
 
-  describe('channel.cheer', () => {
-    it('convertit un don de bits', () => {
-      const event = expectEvent(mapNotification(context('channel.cheer'), fixtures.channelCheer));
+  describe('channel.bits.use', () => {
+    it('convertit un cheer en don de bits', () => {
+      const event = expectEvent(
+        mapNotification(context('channel.bits.use'), fixtures.channelBitsUseCheer),
+      );
 
-      expect(event).toMatchObject({ type: 'bits', bits: 1000, userName: 'Cool_User' });
+      expect(event).toMatchObject({ type: 'bits', bits: 1000, userName: 'Cool_User', usage: 'cheer' });
     });
 
     it('accepte un don de bits anonyme', () => {
-      const event = expectEvent(mapNotification(context('channel.cheer'), fixtures.channelCheerAnonymous));
+      const event = expectEvent(
+        mapNotification(context('channel.bits.use'), fixtures.channelBitsUseAnonymous),
+      );
 
       expect(event).toMatchObject({ type: 'bits', bits: 500 });
       expect(event.userName).not.toBe('');
+    });
+
+    it.each([
+      ['un Power-up', fixtures.channelBitsUsePowerUp, 30, 'power_up'],
+      ['un Power-up sans message', fixtures.channelBitsUseCelebration, 50, 'power_up'],
+      ['un Power-up personnalisé', fixtures.channelBitsUseCustomPowerUp, 200, 'custom_power_up'],
+    ] as const)('convertit %s en don de bits du même montant', (_case, payload, bits, usage) => {
+      const result = mapNotification(context('channel.bits.use'), payload);
+
+      expect(expectEvent(result)).toMatchObject({ type: 'bits', bits, usage, userName: 'Cool_User' });
+      expect(result.kind === 'event' ? result.warning : 'absent').toBeUndefined();
+    });
+
+    it('compte pour ses bits une dépense de type inconnu, et le signale', () => {
+      const result = mapNotification(context('channel.bits.use'), {
+        ...(fixtures.channelBitsUseCheer as object),
+        bits: 75,
+        type: 'combo',
+      });
+
+      expect(expectEvent(result)).toMatchObject({ type: 'bits', bits: 75, usage: 'unknown' });
+      expect(result.kind === 'event' ? result.warning : '').toContain('combo');
+    });
+
+    it('compte de même une dépense sans type', () => {
+      const { type: _type, ...untyped } = fixtures.channelBitsUseCheer as Record<string, unknown>;
+
+      expect(expectEvent(mapNotification(context('channel.bits.use'), untyped))).toMatchObject({
+        bits: 1000,
+        usage: 'unknown',
+      });
+    });
+
+    it('ne gère plus channel.cheer, que channel.bits.use remplace : le garder compterait chaque cheer deux fois', () => {
+      expect(mapNotification(context('channel.cheer'), fixtures.channelBitsUseCheer).kind).toBe(
+        'ignored',
+      );
     });
   });
 
@@ -200,7 +241,7 @@ describe('mapNotification', () => {
     });
 
     it('signale un champ obligatoire manquant', () => {
-      const result = mapNotification(context('channel.cheer'), {
+      const result = mapNotification(context('channel.bits.use'), {
         user_id: '1234',
         user_name: 'Cool_User',
       });
@@ -256,16 +297,28 @@ describe('semanticKey', () => {
     expect(semanticKey(tier1)).not.toBe(semanticKey(tier2));
   });
 
-  it('distingue deux dons de bits de montants différents', () => {
-    const petit = expectEvent(mapNotification(context('channel.cheer'), fixtures.channelCheerAnonymous));
-    const grand = expectEvent(mapNotification(context('channel.cheer'), fixtures.channelCheer));
+  // Les bits n'arrivent que par une source : rien à corréler, et deux Power-ups identiques envoyés
+  // coup sur coup par le même spectateur sont deux dépenses.
+  it('distingue deux dépenses de bits identiques du même spectateur, portées par deux messages', () => {
+    const first = expectEvent(
+      mapNotification(
+        { messageId: 'msg-1', receivedAt: RECEIVED_AT, subscriptionType: 'channel.bits.use' },
+        fixtures.channelBitsUsePowerUp,
+      ),
+    );
+    const second = expectEvent(
+      mapNotification(
+        { messageId: 'msg-2', receivedAt: RECEIVED_AT, subscriptionType: 'channel.bits.use' },
+        fixtures.channelBitsUsePowerUp,
+      ),
+    );
 
-    expect(semanticKey(petit)).not.toBe(semanticKey(grand));
+    expect(semanticKey(first)).not.toBe(semanticKey(second));
   });
 
   it('distingue deux types d\'événements du même spectateur', () => {
     const sub = expectEvent(mapNotification(context('channel.subscribe'), fixtures.channelSubscribe));
-    const cheer = expectEvent(mapNotification(context('channel.cheer'), fixtures.channelCheer));
+    const cheer = expectEvent(mapNotification(context('channel.bits.use'), fixtures.channelBitsUseCheer));
 
     expect(semanticKey(sub)).not.toBe(semanticKey(cheer));
   });

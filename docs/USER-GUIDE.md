@@ -43,7 +43,7 @@ Le secret est chiffré sur votre machine par Windows, lié à votre compte, et n
 | Autorisation | Sert à |
 | --- | --- |
 | `channel:read:subscriptions` | Les subs, resubs et sub offerts |
-| `bits:read` | Les dons de bits |
+| `bits:read` | Les dons de bits, et les bits dépensés en Power-ups |
 | `user:read:chat`, `user:bot` | Distinguer un sub Prime d'un Tier 1, et lire la commande `!addtime` |
 
 ## 4. Ajouter l'overlay dans OBS
@@ -73,7 +73,7 @@ Si vous avez défini des paliers — voir la section 5 —, ajoutez une **second
 | Largeur | 800 |
 | Hauteur | 80 |
 
-Elle affiche une barre unique portant le libellé de la promesse en cours et le compte d'abonnements, et rien d'autre. Placez-la où vous voulez : elle ne dépend pas de l'overlay du compteur, et l'une peut exister sans l'autre.
+Elle affiche une barre unique portant le libellé de la promesse en cours et le compte, et rien d'autre. Placez-la où vous voulez : elle ne dépend pas de l'overlay du compteur, et l'une peut exister sans l'autre.
 
 **Tant qu'aucun palier n'est défini, la page reste vide** — c'est l'état éteint des objectifs, et non une erreur.
 
@@ -84,7 +84,8 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | Vue | Contenu |
 | --- | --- |
 | **Tableau de bord** | Le compteur, l'état de la connexion Twitch, les derniers événements, et les commandes : pause, reprise, ajout ou retrait de temps |
-| **Barème** | Combien de secondes ajoute chaque événement, et la bascule du Happy Hour |
+| **Barème** | Combien de secondes ajoute chaque événement |
+| **Happy Hour** | Sa bascule, la programmation d'une plage, et le barème qui s'applique tant qu'il est actif |
 | **Objectifs** | L'échelle de vos promesses, la progression en cours, et l'adresse de la barre à coller dans OBS |
 | **Apparence** | Les deux pages que vous collez dans OBS, chacune sous son onglet — *Compteur* et *Barre d'objectif* — avec un aperçu qui est la page réelle et qui suit votre saisie sans enregistrement |
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
@@ -96,31 +97,86 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 
 Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre réseau local, ni depuis Internet.
 
+### Les bits
+
+Les bits se règlent par **un taux**, dans la vue *Barème* : *pour ce nombre de bits…* *…créditer ce nombre de secondes*. Par défaut, 100 bits pour 60 secondes.
+
+**Chaque bit compte.** Le taux s'applique au bit près, et non par tranches entières : à 100 bits pour 60 secondes, un seul bit ajoute 0,6 seconde au compteur, 50 bits en ajoutent 30 et 150 bits en ajoutent 90. Il n'y a ni seuil minimum, ni palier : pour que les bits pèsent plus ou moins, changez le taux. Pour qu'ils ne créditent rien, mettez les secondes à 0.
+
+Le décompte à l'écran avance en secondes entières : un don d'un seul bit ne fait pas toujours bouger le chiffre à l'instant où il arrive, mais son temps est bien acquis, et la bulle de l'overlay l'annonce (« +0,6 s »).
+
+Les bits dépensés en Power-ups suivent le même taux — voir la section 6.
+
 ### Le Happy Hour
 
-Une bascule qui **double les secondes créditées**, le temps que vous décidez. Elle se trouve sur le **tableau de bord**, dans la carte *Happy Hour*, et aussi dans la vue *Barème* — c'est le même réglage, et les deux restent d'accord même si vous gardez plusieurs onglets ouverts.
+Une bascule qui **fait passer les crédits sur un barème à part**, le temps que vous décidez. **Tout se règle dans la vue *Happy Hour*** du menu : l'état et la bascule, la programmation d'une plage, le barème. Le **tableau de bord** garde une carte *Happy Hour* qui montre l'état et la plage programmée, avec le même bouton *Activer* / *Désactiver* pour basculer d'un clic en plein direct — les deux restent d'accord, même si vous gardez plusieurs onglets ouverts.
 
-Sont doublés les **abonnements, réabonnements, sub offerts et bits**. Un sub Tier 1 qui vaut trois minutes en vaut six.
+**Le Happy Hour a son propre barème**, que vous réglez dans la vue *Happy Hour* et enregistrez par son bouton *Enregistrer le barème Happy Hour* : les cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, puis *Happy Hour · Bits*, qui porte son propre taux. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
 
-Ne sont **pas** doublés : la commande `!addtime`, parce qu'un modérateur qui tape 300 veut créditer 300 ; et les seuils d'entrée, parce que doubler le nombre de bits minimum rendrait le barème moins généreux au lieu de plus. Un don qui ne créditait rien ne crédite toujours rien.
+Ce barème vaut au départ **le double de votre barème normal** : si vous aviez réglé un sub Tier 1 à cinq minutes, il en vaut dix en Happy Hour, comme avant. Il est ensuite indépendant — modifier le barème normal ne le change plus, et inversement. Le bouton *Copier vers…* au pied de chaque carte d'abonnement recopie ses valeurs dans les deux autres.
 
-**Le Happy Hour ne s'éteint pas tout seul** : il reste actif tant que vous ne le désactivez pas, et il survit à la fermeture de l'application. C'est pour cela que son état est affiché en permanence sur le tableau de bord — pensez à le couper quand la promesse est passée.
+**Le taux des bits du Happy Hour se règle à part** : au départ il reprend le nombre de bits de votre taux normal, avec des secondes doublées — 100 bits pour 120 secondes si vous êtes à 100 bits pour 60. Libre à vous ensuite de le rendre plus ou moins généreux.
+
+La commande `!addtime` n'est **jamais** concernée, parce qu'un modérateur qui tape 300 veut créditer 300.
+
+**Sans plage programmée, le Happy Hour ne s'éteint pas tout seul** : il reste actif tant que vous ne le désactivez pas, et il survit à la fermeture de l'application. C'est pour cela que son état est affiché en permanence sur le tableau de bord — pensez à le couper quand la promesse est passée.
+
+#### Programmer une plage
+
+Pour ne pas avoir à y penser en plein direct, la carte *Programmer une plage* de la vue *Happy Hour* propose deux heures, *Début* et *Fin*, et un bouton *Programmer*. Le Happy Hour s'allume seul à l'heure de début, s'éteint seul à l'heure de fin, puis la plage s'efface.
+
+- **Une heure désigne sa prochaine occurrence.** « 21:00 » saisi à 18 h vaut ce soir ; saisi à 22 h, il vaut demain.
+- **Une fin antérieure ou égale au début tombe le lendemain du début** : de 23:00 à 01:00, la plage dure deux heures.
+- **La vue et le tableau de bord affichent ce qui est programmé**, jour compris quand ce n'est pas aujourd'hui, et pendant la plage jusqu'à quelle heure le Happy Hour est actif. Le bouton *Annuler la plage* l'efface à tout moment, sans changer l'état courant du Happy Hour.
+- **La plage ne se répète pas.** Elle joue une fois : pour le lendemain, programmez-en une nouvelle. Une seule plage existe à la fois.
+- **Votre geste garde la main.** Le bouton *Activer* / *Désactiver* reste disponible à tout moment. Éteindre le Happy Hour à la main pendant la plage est respecté : il reste éteint, et la plage s'efface à son heure sans rien rallumer. L'allumer à la main avant le début ne décale rien : il sera éteint à la fin de la plage.
+- **La plage survit à un redémarrage.** Relancée entre le début et la fin, l'application allume le Happy Hour ; relancée après la fin, elle efface la plage sans rien allumer.
+
+Les nuits de changement d'heure, une heure qui n'existe pas — 02:30 au passage à l'heure d'été — est décalée d'une heure, et une heure qui existe deux fois — 02:30 au passage à l'heure d'hiver — désigne la première.
 
 ### Les objectifs
 
 Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesses. « À 50 subs je me rase la tête. » Les objectifs comptent ces promesses et les montrent à vos spectateurs, pour qu'ils voient ce que leur abonnement vient de faire avancer.
 
-**Ce qui fait avancer le compte.** Un abonnement vaut 1, un réabonnement vaut 1, et un lot de sub offerts vaut ce qu'il porte — dix sub offerts font avancer de dix. **Le palier Twitch ne pèse pas** : un Tier 3 vaut 1 comme un Tier 1, sans quoi la barre bondirait de six sur un seul abonnement et cesserait d'être lisible. Les **bits** se convertissent par tranches entières, réglées par *Bits pour un abonnement* — à 500, un don de 1 200 bits fait avancer de deux, et le reste n'est pas conservé.
+**Ce qui fait avancer le compte.** La barre compte en **points**, selon un barème que vous réglez dans la vue *Objectifs* : *Bits par point* pour les bits, et trois cartes — *Points · Abonnements*, *Points · Réabonnements*, *Points · Sub offerts* — pour le poids de chaque tier, Prime compris. Un lot de sub offerts ajoute les points de son tier multipliés par le nombre de sub. Le bouton *Copier vers…* au pied de chaque carte recopie ses valeurs dans les deux autres.
+
+**Les valeurs de départ sont calées sur les prix**, pour qu'un euro de soutien pèse à peu près pareil quelle que soit sa forme :
+
+| Soutien | Points |
+| --- | --- |
+| 1 bit | 1 |
+| Abonnement ou réabonnement, Prime ou Tier 1 | 500 |
+| Abonnement ou réabonnement, Tier 2 | 1 000 |
+| Abonnement ou réabonnement, Tier 3 | 2 500 |
+| Sub offert | 500, 1 000 ou 2 500 selon le tier, par sub offert |
+
+Ce ne sont que des valeurs de départ : réglez-les à votre main. Un poids à 0 retire ce type de soutien de la barre. Pour une barre qui compte **en abonnements** — « à 50 subs je me rase la tête » —, mettez 1 partout, relevez *Bits par point* (à 500, cinq cents bits valent un abonnement) et nommez l'unité « abo. ». Au-delà de 1, les bits comptent par tranches entières et le reste n'est pas conservé.
+
+**Une barre vous attend dès l'installation**, sur un premier palier à 1 000 points nommé « Objectif ». Renommez-le, changez son seuil, ajoutez-en d'autres ou supprimez-le : sans aucun palier, la page reste vide.
+
+**Modifier le barème de points ne recalcule pas le compte en cours** : il ne vaut que pour les soutiens à venir.
+
+**Le barème de points est indépendant du barème de temps.** Ce qu'un soutien ajoute au compteur et ce qu'il ajoute à la barre se règlent séparément : mettre les secondes des bits à 0 dans le barème n'empêche pas les bits de faire avancer la barre, et inversement.
+
+**Le nom de l'unité.** Le champ *Nom de l'unité* dit ce que le panneau écrit après le compte — « points » par défaut. Il n'apparaît que dans le panneau : vos spectateurs lisent le nom du palier et « 620 / 1000 », sans unité.
 
 **Ce qui ne compte pas** : la commande `!addtime`. C'est un crédit accordé à la main par un modérateur, et le faire gonfler une promesse affichée aux spectateurs la rendrait mensongère.
 
-**L'échelle.** Dans la vue *Objectifs*, ajoutez un palier par promesse : un seuil en abonnements, et le libellé qui dit la promesse, en quarante caractères au plus. Vous ne saisissez que la borne haute — la borne basse est celle du palier précédent, si bien qu'il ne peut y avoir ni trou ni chevauchement. L'ordre de saisie n'a pas d'importance : l'échelle est triée pour vous.
+**L'échelle.** Dans la vue *Objectifs*, ajoutez un palier par promesse : un seuil, dans l'unité de votre barème de points, et le libellé qui dit la promesse, en quarante caractères au plus. Vous ne saisissez que la borne haute — la borne basse est celle du palier précédent, si bien qu'il ne peut y avoir ni trou ni chevauchement. L'ordre de saisie n'a pas d'importance : l'échelle est triée pour vous.
 
 **Au-delà du dernier palier**, la barre reste pleine sur sa dernière promesse et le compte continue de monter. Rien ne repart à zéro tout seul.
 
 **La remise à zéro** se trouve sur le tableau de bord, et demande deux clics : le premier arme, le second exécute. Elle n'efface **que** la progression des objectifs — votre compteur n'y touche pas, et l'inverse est vrai aussi : réinitialiser le chrono ne remet pas les objectifs à zéro. La progression est enregistrée dans son propre fichier et survit à la fermeture de l'application.
 
-**Si votre subathon a commencé avant ChronoCast**, le champ *Abonnements déjà acquis*, sous l'échelle dans la vue *Objectifs*, cale la barre sur votre compte réel. La valeur saisie **remplace** le compte : elle ne s'y ajoute pas, elle n'annonce aucun palier à vos spectateurs même si elle en dépasse plusieurs, et elle ne crédite aucune seconde au compteur. Servez-vous-en pour rattraper un retard ou corriger une saisie, et non pour gonfler une promesse : c'est le seul endroit où le compte affiché peut s'écarter de ce que ChronoCast a réellement vu passer.
+**À la mise à jour vers la 1.4.0**, la barre est passée en points chez tout le monde : son barème, ses paliers et son compte ont été remis aux valeurs de départ, et son apparence conservée. Un encart sur le tableau de bord le signale au premier lancement et rappelle le compte qu'elle avait ; il reste affiché jusqu'à ce que vous le fermiez.
+
+**Si votre subathon a commencé avant ChronoCast**, le champ *Compte déjà acquis*, sous l'échelle dans la vue *Objectifs*, cale la barre sur votre compte réel. La valeur saisie **remplace** le compte : elle ne s'y ajoute pas, elle n'annonce aucun palier à vos spectateurs même si elle en dépasse plusieurs, et elle ne crédite aucune seconde au compteur. Servez-vous-en pour rattraper un retard ou corriger une saisie, et non pour gonfler une promesse : c'est le seul endroit où le compte affiché peut s'écarter de ce que ChronoCast a réellement vu passer.
+
+#### Employer la barre seule, hors subathon
+
+La barre ne dépend pas du compteur : elle sert à elle seule d'objectif mensuel, où abonnements, réabonnements, sub offerts, bits et Power-ups s'additionnent en points. Rien n'est à régler de plus que pour un subathon : écrivez vos paliers — 50 000, 100 000… — et **remettez la barre à zéro à la main en début de période**, depuis le tableau de bord. Rien ne repart à zéro tout seul le 1er du mois.
+
+**Seuls les soutiens reçus pendant que ChronoCast est ouvert sont comptés.** L'application ne rattrape pas ce qui s'est passé pendant qu'elle était fermée : pour un objectif mensuel, laissez-la tourner pendant vos directs, et corrigez un écart avec le champ *Compte déjà acquis*.
 
 **Un palier franchi ne crédite aucune seconde.** Le barème reste le seul juge du temps ajouté ; les objectifs disent *pourquoi* le compteur monte, ils ne le font pas monter.
 
@@ -131,6 +187,8 @@ Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesse
 ## 6. Les dons hors Twitch
 
 ChronoCast crédite ce que **Twitch** lui rapporte : subs, resubs, sub offerts, sub Prime, bits. C'est tout.
+
+**Les Power-ups comptent comme des bits.** Un spectateur qui dépense des bits dans un Power-up — message animé, emote géante, célébration, ou Power-up personnalisé de votre chaîne — crédite le même temps qu'un cheer du même montant, selon le barème des bits, et fait avancer la barre d'objectif de la même façon. L'historique indique « en Power-up » à côté du montant. Un Power-up que vous déclenchez gratuitement sur votre propre chaîne ne compte pas : Twitch ne le signale pas. Aucune autorisation supplémentaire n'est demandée, vous n'avez pas à reconnecter votre chaîne.
 
 Rien n'est plafonné. Mille abonnements offerts d'un coup valent mille fois le tarif du palier, et le compteur peut monter aussi haut que votre communauté le décide.
 

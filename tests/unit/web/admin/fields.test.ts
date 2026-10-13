@@ -184,6 +184,49 @@ describe('fieldsOf', () => {
 });
 
 describe('regroupement', () => {
+  it('libelle le réglage des bits « par point », la barre ne comptant plus forcément en abonnements', () => {
+    const field = ADMIN_FIELDS.find((entry) => entry.path === 'goals.bitsPerSub');
+
+    expect(field?.label).toBe('Bits par point');
+  });
+
+  it('sépare la bascule du Happy Hour de son barème', () => {
+    expect(groupOf('rewards.happyHourRewards.sub.tier1')).toBe('Happy Hour · Abonnements');
+    expect(groupOf('rewards.happyHourRewards.resub.prime')).toBe('Happy Hour · Réabonnements');
+    expect(groupOf('rewards.happyHourRewards.gift.tier3')).toBe('Happy Hour · Sub offerts');
+    expect(groupOf('rewards.happyHourRewards.bits.linear.unit')).toBe('Happy Hour · Bits');
+  });
+
+  it('ne laisse dans la vue Barème que le barème normal et la commande de chat', () => {
+    expect(groupsOf('rewards')).toStrictEqual([
+      'Abonnements',
+      'Réabonnements',
+      'Sub offerts',
+      'Bits',
+      'Commande de chat',
+    ]);
+  });
+
+  it('réunit tout le barème Happy Hour dans sa propre vue', () => {
+    expect(groupsOf('happy-hour')).toStrictEqual([
+      'Happy Hour · Abonnements',
+      'Happy Hour · Réabonnements',
+      'Happy Hour · Sub offerts',
+      'Happy Hour · Bits',
+    ]);
+
+    for (const field of ADMIN_FIELDS.filter((entry) => entry.path.startsWith('rewards.happyHour'))) {
+      expect(field.view, field.path).toBe('happy-hour');
+    }
+  });
+
+  // La bascule agit tout de suite, depuis le tableau de bord ou la vue : en faire aussi une case à
+  // enregistrer donnerait deux gestes pour un même état.
+  it('ne fait pas de la bascule du Happy Hour un champ à enregistrer', () => {
+    expect(ADMIN_FIELDS.some((field) => field.path === 'rewards.happyHour')).toBe(false);
+    expect(UNBOUND_PATHS['rewards.happyHour']).toBeDefined();
+  });
+
   it('range chaque champ dans un groupe nommé', () => {
     for (const field of ADMIN_FIELDS) {
       expect(groupOf(field.path), field.path).not.toBe('Divers');
@@ -223,7 +266,14 @@ describe('regroupement', () => {
   // L'apparence de la page /goal est un sous-arbre de `goals.` : sans préfixe plus spécifique
   // déclaré avant lui, ses trente-trois feuilles atterriraient toutes dans « Objectifs ».
   it('sépare l’apparence de la barre du comptage lui-même', () => {
-    expect(groupsOf('goals')).toStrictEqual(['Objectifs']);
+    expect(groupsOf('goals')).toStrictEqual([
+      'Points · Abonnements',
+      'Points · Réabonnements',
+      'Points · Sub offerts',
+      'Points · Bits et unité',
+    ]);
+    expect(groupOf('goals.bitsPerSub')).toBe('Points · Bits et unité');
+    expect(groupOf('goals.unitLabel')).toBe('Points · Bits et unité');
 
     expect(groupsOf('goal-appearance')).toStrictEqual([
       'Barre',
@@ -244,3 +294,33 @@ describe('regroupement', () => {
     }
   });
 });
+
+describe('taux des bits', () => {
+  const bitsFields = (prefix: string): { path: string; label: string; min?: number | undefined }[] =>
+    ADMIN_FIELDS.filter((field) => field.path.startsWith(prefix)).map((field) => ({
+      path: field.path,
+      label: field.label,
+      min: field.min,
+    }));
+
+  it.each(['rewards.bits.', 'rewards.happyHourRewards.bits.'])(
+    'se règle par deux champs qui se lisent comme une phrase : %s',
+    (prefix) => {
+      expect(bitsFields(prefix)).toStrictEqual([
+        { path: `${prefix}unit`, label: 'Pour ce nombre de bits…', min: 1 },
+        { path: `${prefix}seconds`, label: '…créditer ce nombre de secondes', min: 0 },
+      ]);
+    },
+  );
+
+  it('dit dans son aide que chaque bit compte', () => {
+    const unit = ADMIN_FIELDS.find((field) => field.path === 'rewards.bits.unit');
+
+    expect(unit?.hint).toContain('0,6');
+  });
+
+  it('n’a plus d’éditeur de paliers à écarter du schéma', () => {
+    expect(Object.keys(UNBOUND_PATHS).filter((path) => path.includes('bits'))).toStrictEqual([]);
+  });
+});
+

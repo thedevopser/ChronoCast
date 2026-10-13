@@ -18,10 +18,11 @@ import {
 } from '../shared/protocol.js';
 import { createWsClient, type WsClientStatus, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
-import { normalizeTiers, type TierInput } from './bits-tiers.js';
+
 import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
+  goalThresholdLabel,
   parseGoalSubs,
   type GoalTierInput,
 } from './goal-tiers.js';
@@ -30,7 +31,11 @@ import {
   counterControls,
   createDashboardModel,
   EVENT_LABELS,
+  formatGoalCount,
+  goalsResetNotice,
+  type UpdateNoticeView,
   happyHourLabels,
+  happyHourScheduleView,
   isResetArmed,
   resetLabel,
   RESET_ARM_WINDOW_MS,
@@ -39,9 +44,16 @@ import {
   type DashboardModel,
 } from './dashboard-model.js';
 import { inactiveGroups, mutedSelectors } from './field-dependencies.js';
-import { fieldsOf, groupsOf } from './fields.js';
-import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
+import { fieldsOf, groupOf, groupsOf } from './fields.js';
+import {
+  patchFrom,
+  readAtPath,
+  valuesFrom,
+  type FieldError,
+} from './form-binding.js';
+import { resolveWindow } from './next-occurrence.js';
 import { draftSubtree } from './overlay-draft.js';
+import { copyLabel, copyReward } from './reward-copy.js';
 import {
   APPEARANCE_TABS,
   APPEARANCE_TAB_LABELS,
@@ -66,6 +78,7 @@ import {
   type LogRecord,
 } from './log-view.js';
 import {
+  appendGroupAction,
   clearFieldErrors,
   readFieldValues,
   renderFieldGroups,
@@ -83,6 +96,32 @@ import {
   type AdminViewId,
   type FieldViewId,
 } from './router.js';
+
+// Chaque jeu réunit les barèmes d'une vue qui se recopient l'un dans l'autre, désignés par leur
+// préfixe.
+const REWARD_COPY_SETS: readonly { view: FieldViewId; cards: readonly string[] }[] = [
+  { view: 'rewards', cards: ['rewards.sub.', 'rewards.resub.', 'rewards.gift.'] },
+  {
+    view: 'happy-hour',
+    cards: [
+      'rewards.happyHourRewards.sub.',
+      'rewards.happyHourRewards.resub.',
+      'rewards.happyHourRewards.gift.',
+    ],
+  },
+  { view: 'goals', cards: ['goals.points.sub.', 'goals.points.resub.', 'goals.points.gift.'] },
+];
+
+// L'état du Happy Hour s'affiche et se bascule à deux endroits : la carte du tableau de bord et la
+// vue dédiée.
+const HAPPY_HOUR_SURFACES = [
+  {
+    status: '#happy-hour-status',
+    toggle: '#happy-hour-toggle',
+    summary: '#happy-hour-schedule-summary',
+  },
+  { status: '#hh-view-status', toggle: '#hh-view-toggle', summary: '#hh-view-summary' },
+] as const;
 
 const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {
   connecting: 'dot dot--warning',
@@ -267,10 +306,22 @@ function start(): void {
     setText(requireElement(document, '#app-version'), model.appVersion, 32);
 
     const happyHour = happyHourLabels(model.happyHour);
-    const happyHourPill = requireElement(document, '#happy-hour-status');
-    setText(happyHourPill, happyHour.state);
-    happyHourPill.className = model.happyHour ? 'pill pill--ok' : 'pill';
-    setText(button('#happy-hour-toggle'), happyHour.action);
+    const schedule = happyHourScheduleView(model.happyHourSchedule, model.happyHour, Date.now());
+
+    // Le même état se lit sur le tableau de bord et dans la vue Happy Hour.
+    for (const prefix of HAPPY_HOUR_SURFACES) {
+      const pill = requireElement(document, prefix.status);
+      setText(pill, happyHour.state);
+      pill.className = model.happyHour ? 'pill pill--ok' : 'pill';
+      setText(button(prefix.toggle), happyHour.action);
+
+      const summary = requireElement(document, prefix.summary);
+      setText(summary, schedule.summary, 200);
+      summary.hidden = schedule.summary === '';
+    }
+
+    requireElement(document, '#happy-hour-schedule-form').hidden = !schedule.canSchedule;
+    requireElement(document, '#happy-hour-cancel-row').hidden = !schedule.canCancel;
 
     const reconnect = requireElement(document, '#twitch-reconnect-needed');
     reconnect.hidden = model.missingScopes.length === 0;
@@ -287,6 +338,13 @@ function start(): void {
     painted = model;
   }
 
+  // Le libellé d'unité est un réglage et non un état diffusé : il se lit dans la configuration
+  // chargée par le panneau, que chaque enregistrement recharge.
+  function unitLabel(): string {
+    const label = readAtPath(config, 'goals.unitLabel');
+    return typeof label === 'string' ? label : '';
+  }
+
   function paintGoal(): void {
     const goal = model.goal;
     const bar = requireElement(document, '#goal-bar');
@@ -297,7 +355,7 @@ function start(): void {
       return;
     }
 
-    setText(requireElement(document, '#goal-subs'), `${String(goal.subs)} abo.`);
+    setText(requireElement(document, '#goal-subs'), formatGoalCount(goal.subs, unitLabel()), 80);
 
     // Sans palier, il n'y a pas de promesse à afficher : la barre n'aurait aucune borne.
     if (goal.total === 0) {
@@ -331,7 +389,8 @@ function start(): void {
 
     setText(
       requireElement(document, '#goal-progress-count'),
-      goal === null ? '—' : `${String(goal.subs)} abo.`,
+      goal === null ? '—' : formatGoalCount(goal.subs, unitLabel()),
+      80,
     );
 
     const tiers = readGoalTiersFromConfig();
@@ -388,14 +447,9 @@ function start(): void {
         }
         break;
 
-      // Un autre onglet vient d'enregistrer : la case du barème doit suivre sans qu'on recharge
-      // toute la configuration, ce qui effacerait une saisie en cours.
+      // Le tableau de bord suit le Happy Hour et la progression par le modèle seul : recharger la
+      // configuration effacerait une saisie en cours dans un éditeur resté ouvert.
       case 'config':
-        syncHappyHourField(message.happyHour);
-        break;
-
-      // Le tableau de bord suit la progression par le modèle seul : recharger la configuration
-      // effacerait une saisie en cours dans l'éditeur d'échelle resté ouvert.
       case 'goal':
       case 'hello':
       case 'twitch:status':
@@ -493,11 +547,51 @@ function start(): void {
   }
 
   // Le message « config » diffusé en retour repeint la carte : aucune mise à jour optimiste.
-  const happyHourToggle = button('#happy-hour-toggle');
-  happyHourToggle.addEventListener('click', () => {
-    void guarded(happyHourToggle, async () => {
-      await api.patch('/api/config', { config: { rewards: { happyHour: !model.happyHour } } });
+  for (const surface of HAPPY_HOUR_SURFACES) {
+    const happyHourToggle = button(surface.toggle);
+    happyHourToggle.addEventListener('click', () => {
+      void guarded(happyHourToggle, async () => {
+        await api.patch('/api/config', { config: { rewards: { happyHour: !model.happyHour } } });
+      });
     });
+  }
+
+  // L'affichage de la plage vient du WebSocket et non de la réponse : deux panneaux ouverts
+  // montrent ainsi la même chose. Un refus s'écrit à côté des champs, saisie intacte.
+  const scheduleError = requireElement(document, '#happy-hour-schedule-error');
+
+  async function submitSchedule(action: () => Promise<unknown>): Promise<void> {
+    setText(scheduleError, '');
+    try {
+      await action();
+    } catch (error: unknown) {
+      setText(
+        scheduleError,
+        error instanceof ApiError ? error.message : 'Une erreur inattendue est survenue.',
+        200,
+      );
+    }
+  }
+
+  const scheduleButton = button('#happy-hour-schedule');
+  scheduleButton.addEventListener('click', () => {
+    const start = (requireElement(document, '#happy-hour-start') as HTMLInputElement).value;
+    const end = (requireElement(document, '#happy-hour-end') as HTMLInputElement).value;
+    const window_ = resolveWindow(start, end, Date.now());
+
+    if (window_ === null) {
+      setText(scheduleError, 'Saisissez une heure de début et une heure de fin.');
+      return;
+    }
+
+    void guarded(scheduleButton, () =>
+      submitSchedule(() => api.put('/api/happy-hour/schedule', window_)),
+    );
+  });
+
+  const cancelButton = button('#happy-hour-cancel');
+  cancelButton.addEventListener('click', () => {
+    void guarded(cancelButton, () => submitSchedule(() => api.delete('/api/happy-hour/schedule')));
   });
 
   for (const [selector, path, fallback] of [
@@ -560,76 +654,6 @@ function start(): void {
   const containerOf = (view: FieldViewId): HTMLElement =>
     requireElement(document, `#fields-${view}`);
 
-  const HAPPY_HOUR_PATH = 'rewards.happyHour';
-  const HAPPY_HOUR_FIELDS = fieldsOf('rewards').filter((field) => field.path === HAPPY_HOUR_PATH);
-
-  function syncHappyHourField(active: boolean): void {
-    const rewards = (config as { rewards?: Record<string, unknown> }).rewards;
-    if (rewards !== undefined) {
-      rewards['happyHour'] = active;
-    }
-
-    for (const field of HAPPY_HOUR_FIELDS) {
-      writeFieldValues(containerOf(field.view), [field], { [field.selector]: active });
-    }
-  }
-
-  const tiersList = requireElement(document, '#bits-tiers');
-
-  function appendTierRow(minBits: string, seconds: string): void {
-    const row = document.createElement('li');
-    row.className = 'tier';
-
-    const makeField = (label: string, value: string, role: string): HTMLElement => {
-      const wrapper = document.createElement('label');
-      wrapper.className = 'field field--compact';
-
-      const caption = document.createElement('span');
-      caption.className = 'field__label';
-      setText(caption, label);
-
-      const input = document.createElement('input');
-      input.className = 'field__input';
-      input.type = 'number';
-      input.min = '0';
-      input.step = '1';
-      input.value = value;
-      input.dataset['tier'] = role;
-
-      wrapper.append(caption, input);
-      return wrapper;
-    };
-
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'button button--danger';
-    setText(remove, 'Retirer');
-    remove.addEventListener('click', () => {
-      row.remove();
-    });
-
-    row.append(makeField('Seuil, en bits', minBits, 'min'), makeField('Secondes', seconds, 'seconds'), remove);
-    tiersList.append(row);
-  }
-
-  function readTierRows(): TierInput[] {
-    return [...tiersList.querySelectorAll('.tier')].map((row) => ({
-      minBits: row.querySelector<HTMLInputElement>('[data-tier="min"]')?.value ?? '',
-      seconds: row.querySelector<HTMLInputElement>('[data-tier="seconds"]')?.value ?? '',
-    }));
-  }
-
-  function renderTiers(tiers: readonly { minBits: number; seconds: number }[]): void {
-    clearChildren(tiersList);
-    for (const tier of tiers) {
-      appendTierRow(String(tier.minBits), String(tier.seconds));
-    }
-  }
-
-  requireElement(document, '#add-tier').addEventListener('click', () => {
-    appendTierRow('', '');
-  });
-
   const goalTiersList = requireElement(document, '#goal-tiers');
 
   function appendGoalRow(target: string, label: string): void {
@@ -674,7 +698,7 @@ function start(): void {
     });
 
     row.append(
-      makeField('Seuil, en abonnements', target, 'target', 'number'),
+      makeField(goalThresholdLabel(unitLabel()), target, 'target', 'number'),
       makeField('Promesse', label, 'label', 'text'),
       remove,
     );
@@ -852,6 +876,48 @@ function start(): void {
     showAppearanceTab(activeTab);
   }
 
+  function copyRewardCard(
+    view: FieldViewId,
+    sourcePrefix: string,
+    targetPrefixes: readonly string[],
+  ): void {
+    const fields = fieldsOf(view);
+    const container = containerOf(view);
+    const sourceFields = fields.filter((field) => field.path.startsWith(sourcePrefix));
+
+    clearFieldErrors(container, sourceFields);
+    const outcome = copyReward(fields, readFieldValues(container, fields), sourcePrefix, targetPrefixes);
+
+    if (!outcome.ok) {
+      showFieldErrors(container, outcome.errors);
+      return;
+    }
+
+    const targetFields = fields.filter((field) => Object.hasOwn(outcome.values, field.selector));
+    clearFieldErrors(container, targetFields);
+    writeFieldValues(container, targetFields, outcome.values);
+  }
+
+  function buildRewardCopyActions(): void {
+    for (const { view, cards } of REWARD_COPY_SETS) {
+      const fields = fieldsOf(view);
+
+      for (const sourcePrefix of cards) {
+        const anchor = fields.find((field) => field.path.startsWith(sourcePrefix));
+        if (anchor === undefined) {
+          continue;
+        }
+
+        const targetPrefixes = cards.filter((prefix) => prefix !== sourcePrefix);
+        const label = copyLabel(targetPrefixes.map((prefix) => groupOf(prefix)));
+
+        appendGroupAction(document, containerOf(view), anchor.selector, label, () => {
+          copyRewardCard(view, sourcePrefix, targetPrefixes);
+        });
+      }
+    }
+  }
+
   function paintFields(): void {
     for (const view of FIELD_VIEWS) {
       const fields = fieldsOf(view);
@@ -868,11 +934,8 @@ function start(): void {
       refreshAppearanceState(tab);
     }
 
-    const tiers = (config as { rewards?: { bits?: { tiers?: { minBits: number; seconds: number }[] } } })
-      .rewards?.bits?.tiers;
-    renderTiers(tiers ?? []);
-
     renderGoalTiers(readGoalTiersFromConfig());
+    paintGoal();
     paintGoalView();
   }
 
@@ -891,24 +954,6 @@ function start(): void {
 
     const allErrors: FieldError[] = [...errors];
     const tierMessages: string[] = [];
-
-    if (view === 'rewards') {
-      const rows = readTierRows();
-      const filled = rows.filter((row) => row.minBits.trim() !== '' || row.seconds.trim() !== '');
-      const modeField = container.querySelector<HTMLSelectElement>('#reward-bits-mode');
-
-      if (modeField?.value === 'tiers' || filled.length > 0) {
-        const { tiers, errors: tierErrors } = normalizeTiers(rows);
-        if (tierErrors.length > 0) {
-          tierMessages.push(...tierErrors);
-        } else if (JSON.stringify(tiers) !== JSON.stringify(readTiersFromConfig())) {
-          patch['rewards'] = { ...(patch['rewards'] as object | undefined), bits: {
-            ...((patch['rewards'] as { bits?: object } | undefined)?.bits ?? {}),
-            tiers,
-          } };
-        }
-      }
-    }
 
     if (view === 'goals') {
       const { tiers, errors: goalErrors } = normalizeGoalTiers(readGoalRows());
@@ -942,13 +987,7 @@ function start(): void {
     );
   }
 
-  function readTiersFromConfig(): unknown {
-    return (
-      (config as { rewards?: { bits?: { tiers?: unknown } } }).rewards?.bits?.tiers ?? []
-    );
-  }
-
-  for (const view of ['rewards', 'goals', 'appearance', 'settings'] as const) {
+  for (const view of ['rewards', 'happy-hour', 'goals', 'appearance', 'settings'] as const) {
     const control = button(`#save-${view}`);
     control.addEventListener('click', () => {
       void guarded(control, () => saveView(view));
@@ -1292,6 +1331,8 @@ function start(): void {
     });
   }
 
+  buildRewardCopyActions();
+
   buildNav();
   buildAppearanceTabs();
   showView(viewFromHash(window.location.hash));
@@ -1333,6 +1374,30 @@ function start(): void {
       reportFailure(error);
     },
   );
+
+  const updateNoticeCard = requireElement(document, '#update-notice');
+
+  function paintUpdateNotice(notice: UpdateNoticeView | null): void {
+    setText(requireElement(document, '#update-notice-goals'), goalsResetNotice(notice), 600);
+    updateNoticeCard.hidden = notice === null;
+  }
+
+  const updateNoticeAck = button('#update-notice-ack');
+  updateNoticeAck.addEventListener('click', () => {
+    void guarded(updateNoticeAck, async () => {
+      await api.post('/api/update-notice/acknowledge');
+      paintUpdateNotice(null);
+    });
+  });
+
+  void api
+    .get<{ notice: UpdateNoticeView | null }>('/api/update-notice')
+    .then(({ notice }) => {
+      paintUpdateNotice(notice);
+    })
+    .catch((error: unknown) => {
+      reportFailure(error);
+    });
 
   void refreshHistory().catch((error: unknown) => {
     reportFailure(error);

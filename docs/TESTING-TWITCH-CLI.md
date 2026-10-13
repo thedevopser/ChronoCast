@@ -54,14 +54,15 @@ Et remettez `eventsubUrl` à sa valeur d'origine — sans quoi ChronoCast tenter
 | `trigger subscribe` | Un nouvel abonnement | Le palier crédite le bon nombre de secondes |
 | `trigger subscription-message` | Un réabonnement | Barème `resub`, distinct de `sub` |
 | `trigger subscription-gift` | Un don d'abonnements | Le tarif du palier, multiplié par le nombre d'abonnements |
-| `trigger cheer` | Un don de bits | Le mode linéaire ou par paliers |
+
+**Les bits ne se simulent pas avec la CLI.** ChronoCast les reçoit par `channel.bits.use`, qui porte les cheers et les Power-ups, et la CLI ne sait pas encore émettre cet événement : un `trigger cheer` part en `channel.cheer`, que l'application n'écoute plus. Pour vérifier le barème des bits, servez-vous du bouton *Bits* de la carte *Tester l'overlay* du tableau de bord.
 
 `--transport=websocket` est ajouté par le script, et il est **indispensable** : sans lui la CLI vise les webhooks, que ChronoCast n'implémente pas et n'implémentera pas.
 
 Les options de la CLI se passent après la commande :
 
 ```bash
-./scripts/twitch-mock.sh trigger cheer --bits 1000
+./scripts/twitch-mock.sh trigger subscription-gift --cost 5
 ./scripts/twitch-mock.sh trigger subscribe --tier 3000
 ```
 

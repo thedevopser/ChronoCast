@@ -36,9 +36,16 @@ export interface GiftEvent extends BaseDomainEvent {
   readonly isAnonymous: boolean;
 }
 
+// Ce à quoi les bits ont été dépensés. Les bits comptent pareil dans tous les cas : le champ ne
+// sert qu'à le dire dans l'historique.
+export type BitsUsage = 'cheer' | 'power_up' | 'custom_power_up' | 'unknown';
+
 export interface BitsEvent extends BaseDomainEvent {
   readonly type: 'bits';
   readonly bits: number;
+
+  /** Absent, c'est un cheer : les entrées d'avant les Power-ups n'en portent pas. */
+  readonly usage?: BitsUsage;
 }
 
 export interface CommandEvent extends BaseDomainEvent {
