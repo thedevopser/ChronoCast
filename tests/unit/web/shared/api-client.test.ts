@@ -90,6 +90,26 @@ describe('createApiClient', () => {
   });
 
   describe('mutation', () => {
+    it('remplace une ressource par PUT, jeton et corps compris', () => {
+      const harness = createHarness();
+
+      void harness.client.put('/api/happy-hour/schedule', { startAt: 1, endAt: 2 });
+
+      expect(harness.calls[0]?.method).toBe('PUT');
+      expect(harness.calls[0]?.headers['x-chronocast-token']).toBe(TOKEN);
+      expect(harness.calls[0]?.body).toBe('{"startAt":1,"endAt":2}');
+    });
+
+    it('supprime une ressource par DELETE, sous jeton et sans corps', () => {
+      const harness = createHarness();
+
+      void harness.client.delete('/api/happy-hour/schedule');
+
+      expect(harness.calls[0]?.method).toBe('DELETE');
+      expect(harness.calls[0]?.headers['x-chronocast-token']).toBe(TOKEN);
+      expect(harness.calls[0]?.body).toBeNull();
+    });
+
     it('porte le jeton CSRF', () => {
       const harness = createHarness();
 

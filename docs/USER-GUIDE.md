@@ -108,7 +108,20 @@ Ce barème vaut au départ **le double de votre barème normal** : si vous aviez
 
 La commande `!addtime` n'est **jamais** concernée, parce qu'un modérateur qui tape 300 veut créditer 300.
 
-**Le Happy Hour ne s'éteint pas tout seul** : il reste actif tant que vous ne le désactivez pas, et il survit à la fermeture de l'application. C'est pour cela que son état est affiché en permanence sur le tableau de bord — pensez à le couper quand la promesse est passée.
+**Sans plage programmée, le Happy Hour ne s'éteint pas tout seul** : il reste actif tant que vous ne le désactivez pas, et il survit à la fermeture de l'application. C'est pour cela que son état est affiché en permanence sur le tableau de bord — pensez à le couper quand la promesse est passée.
+
+#### Programmer une plage
+
+Pour ne pas avoir à y penser en plein direct, la carte *Happy Hour* du tableau de bord propose deux heures, *Début* et *Fin*, et un bouton *Programmer*. Le Happy Hour s'allume seul à l'heure de début, s'éteint seul à l'heure de fin, puis la plage s'efface.
+
+- **Une heure désigne sa prochaine occurrence.** « 21:00 » saisi à 18 h vaut ce soir ; saisi à 22 h, il vaut demain.
+- **Une fin antérieure ou égale au début tombe le lendemain du début** : de 23:00 à 01:00, la plage dure deux heures.
+- **La carte affiche ce qui est programmé**, jour compris quand ce n'est pas aujourd'hui, et pendant la plage jusqu'à quelle heure le Happy Hour est actif. Le bouton *Annuler la plage* l'efface à tout moment, sans changer l'état courant du Happy Hour.
+- **La plage ne se répète pas.** Elle joue une fois : pour le lendemain, programmez-en une nouvelle. Une seule plage existe à la fois.
+- **Votre geste garde la main.** Le bouton *Activer* / *Désactiver* reste disponible à tout moment. Éteindre le Happy Hour à la main pendant la plage est respecté : il reste éteint, et la plage s'efface à son heure sans rien rallumer. L'allumer à la main avant le début ne décale rien : il sera éteint à la fin de la plage.
+- **La plage survit à un redémarrage.** Relancée entre le début et la fin, l'application allume le Happy Hour ; relancée après la fin, elle efface la plage sans rien allumer.
+
+Les nuits de changement d'heure, une heure qui n'existe pas — 02:30 au passage à l'heure d'été — est décalée d'une heure, et une heure qui existe deux fois — 02:30 au passage à l'heure d'hiver — désigne la première.
 
 ### Les objectifs
 

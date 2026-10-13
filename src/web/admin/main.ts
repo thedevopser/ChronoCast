@@ -31,6 +31,7 @@ import {
   createDashboardModel,
   EVENT_LABELS,
   happyHourLabels,
+  happyHourScheduleView,
   isResetArmed,
   resetLabel,
   RESET_ARM_WINDOW_MS,
@@ -47,6 +48,7 @@ import {
   writeAtPath,
   type FieldError,
 } from './form-binding.js';
+import { resolveWindow } from './next-occurrence.js';
 import { draftSubtree } from './overlay-draft.js';
 import { copyReward } from './reward-copy.js';
 import {
@@ -308,6 +310,13 @@ function start(): void {
     happyHourPill.className = model.happyHour ? 'pill pill--ok' : 'pill';
     setText(button('#happy-hour-toggle'), happyHour.action);
 
+    const schedule = happyHourScheduleView(model.happyHourSchedule, model.happyHour, Date.now());
+    const scheduleSummary = requireElement(document, '#happy-hour-schedule-summary');
+    setText(scheduleSummary, schedule.summary, 200);
+    scheduleSummary.hidden = schedule.summary === '';
+    requireElement(document, '#happy-hour-schedule-form').hidden = !schedule.canSchedule;
+    button('#happy-hour-cancel').hidden = !schedule.canCancel;
+
     const reconnect = requireElement(document, '#twitch-reconnect-needed');
     reconnect.hidden = model.missingScopes.length === 0;
     setText(
@@ -534,6 +543,44 @@ function start(): void {
     void guarded(happyHourToggle, async () => {
       await api.patch('/api/config', { config: { rewards: { happyHour: !model.happyHour } } });
     });
+
+  // L'affichage de la plage vient du WebSocket et non de la réponse : deux panneaux ouverts
+  // montrent ainsi la même chose. Un refus s'écrit à côté des champs, saisie intacte.
+  const scheduleError = requireElement(document, '#happy-hour-schedule-error');
+
+  async function submitSchedule(action: () => Promise<unknown>): Promise<void> {
+    setText(scheduleError, '');
+    try {
+      await action();
+    } catch (error: unknown) {
+      setText(
+        scheduleError,
+        error instanceof ApiError ? error.message : 'Une erreur inattendue est survenue.',
+        200,
+      );
+    }
+  }
+
+  const scheduleButton = button('#happy-hour-schedule');
+  scheduleButton.addEventListener('click', () => {
+    const start = (requireElement(document, '#happy-hour-start') as HTMLInputElement).value;
+    const end = (requireElement(document, '#happy-hour-end') as HTMLInputElement).value;
+    const window_ = resolveWindow(start, end, Date.now());
+
+    if (window_ === null) {
+      setText(scheduleError, 'Saisissez une heure de début et une heure de fin.');
+      return;
+    }
+
+    void guarded(scheduleButton, () =>
+      submitSchedule(() => api.put('/api/happy-hour/schedule', window_)),
+    );
+  });
+
+  const cancelButton = button('#happy-hour-cancel');
+  cancelButton.addEventListener('click', () => {
+    void guarded(cancelButton, () => submitSchedule(() => api.delete('/api/happy-hour/schedule')));
+  });
   });
 
   for (const [selector, path, fallback] of [

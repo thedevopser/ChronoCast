@@ -5,6 +5,7 @@ import {
   counterControls,
   createDashboardModel,
   happyHourLabels,
+  happyHourScheduleView,
   isResetArmed,
   MAX_RECENT_EVENTS,
   RESET_ARM_WINDOW_MS,
@@ -67,6 +68,97 @@ describe('happyHourLabels', () => {
   it('nomme l’état éteint plutôt que de le laisser vide', () => {
     expect(happyHourLabels(false).state.trim()).not.toBe('');
     expect(happyHourLabels(false).state).not.toContain('×2');
+  });
+});
+
+describe('plage du Happy Hour', () => {
+  const NOW = new Date(2026, 9, 13, 18, 0).getTime();
+  const SCHEDULE = {
+    startAt: new Date(2026, 9, 13, 21, 0).getTime(),
+    endAt: new Date(2026, 9, 14, 1, 0).getTime(),
+  };
+
+  function config(happyHourSchedule: typeof SCHEDULE | null, happyHour = false) {
+    return {
+      type: 'config' as const,
+      overlay: {} as never,
+      goalOverlay: {} as never,
+      happyHour,
+      happyHourSchedule,
+    };
+  }
+
+  it('n’a aucune plage tant que le serveur n’en annonce pas', () => {
+    expect(createDashboardModel().happyHourSchedule).toBeNull();
+  });
+
+  it('retient la plage annoncée à la connexion', () => {
+    const model = applyMessage(createDashboardModel(), {
+      type: 'hello',
+      protocolVersion: 3,
+      appVersion: '0.1.0',
+      port: 3_777,
+      wsPort: 3_777,
+      overlay: {} as never,
+      goalOverlay: {} as never,
+      happyHour: false,
+      happyHourSchedule: SCHEDULE,
+    });
+
+    expect(model.happyHourSchedule).toStrictEqual(SCHEDULE);
+  });
+
+  it('suit la pose puis l’annulation diffusées, pour que deux panneaux restent d’accord', () => {
+    const posed = applyMessage(createDashboardModel(), config(SCHEDULE));
+    expect(posed.happyHourSchedule).toStrictEqual(SCHEDULE);
+
+    expect(applyMessage(posed, config(null)).happyHourSchedule).toBeNull();
+  });
+
+  it('ne repeint rien quand ni la bascule ni la plage n’ont changé', () => {
+    const posed = applyMessage(createDashboardModel(), config(SCHEDULE));
+
+    expect(applyMessage(posed, config({ ...SCHEDULE }))).toBe(posed);
+  });
+
+  describe('happyHourScheduleView', () => {
+    it('propose de programmer quand il n’y a pas de plage', () => {
+      expect(happyHourScheduleView(null, false, NOW)).toStrictEqual({
+        summary: '',
+        canSchedule: true,
+        canCancel: false,
+      });
+    });
+
+    it('affiche les deux bornes en clair, jour compris quand ce n’est pas aujourd’hui', () => {
+      expect(happyHourScheduleView(SCHEDULE, false, NOW)).toStrictEqual({
+        summary: 'Programmé de 21:00 à demain 01:00.',
+        canSchedule: false,
+        canCancel: true,
+      });
+    });
+
+    it('dit pendant la plage que le Happy Hour est actif jusqu’à l’heure de fin', () => {
+      const during = new Date(2026, 9, 13, 22, 0).getTime();
+
+      expect(happyHourScheduleView(SCHEDULE, true, during).summary).toBe(
+        'Actif jusqu’à demain 01:00.',
+      );
+    });
+
+    it('dit pendant la plage qu’il a été éteint à la main, et quand la plage s’efface', () => {
+      const during = new Date(2026, 9, 13, 22, 0).getTime();
+
+      expect(happyHourScheduleView(SCHEDULE, false, during).summary).toBe(
+        'Éteint à la main. La plage programmée s’efface à demain 01:00.',
+      );
+    });
+
+    it('dit qu’un Happy Hour allumé avant le début sera éteint à la fin', () => {
+      expect(happyHourScheduleView(SCHEDULE, true, NOW).summary).toBe(
+        'Programmé de 21:00 à demain 01:00. Déjà actif : il s’éteindra à la fin de la plage.',
+      );
+    });
   });
 });
 

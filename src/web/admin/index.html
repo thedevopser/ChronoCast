@@ -86,6 +86,27 @@
               <div class="actions">
                 <button class="button" type="button" id="happy-hour-toggle">Activer</button>
               </div>
+
+              <p class="card__hint" id="happy-hour-schedule-summary" hidden></p>
+
+              <div class="actions actions--wrap" id="happy-hour-schedule-form">
+                <label class="field field--compact">
+                  <span class="field__label">Début</span>
+                  <input class="field__input" type="time" id="happy-hour-start" />
+                </label>
+                <label class="field field--compact">
+                  <span class="field__label">Fin</span>
+                  <input class="field__input" type="time" id="happy-hour-end" />
+                </label>
+                <button class="button" type="button" id="happy-hour-schedule">Programmer</button>
+              </div>
+              <p class="field__error" id="happy-hour-schedule-error"></p>
+
+              <div class="actions">
+                <button class="button" type="button" id="happy-hour-cancel" hidden>
+                  Annuler la plage
+                </button>
+              </div>
             </div>
 
             <div class="card">

@@ -35,6 +35,8 @@ export interface ApiClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T | null>;
   patch<T>(path: string, body?: unknown): Promise<T | null>;
+  put<T>(path: string, body?: unknown): Promise<T | null>;
+  delete<T>(path: string): Promise<T | null>;
 }
 
 export function createApiClient(options: ApiClientOptions): ApiClient {
@@ -91,6 +93,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     },
     patch<T>(path: string, body?: unknown): Promise<T | null> {
       return request<T>('PATCH', path, body);
+    },
+    put<T>(path: string, body?: unknown): Promise<T | null> {
+      return request<T>('PUT', path, body);
+    },
+    delete<T>(path: string): Promise<T | null> {
+      return request<T>('DELETE', path);
     },
   };
 }

@@ -2,9 +2,11 @@ import type {
   CounterState,
   CounterStatus,
   DomainEventType,
+  HappyHourSchedule,
   ServerMessage,
   TwitchConnectionStatus,
 } from '../shared/protocol.js';
+import { formatLocalBound } from './next-occurrence.js';
 
 export const MAX_RECENT_EVENTS = 5;
 
@@ -43,6 +45,8 @@ export interface DashboardModel {
 
   readonly happyHour: boolean;
 
+  readonly happyHourSchedule: HappyHourSchedule | null;
+
   // Nulle tant que le serveur n'a rien annoncé : le tableau de bord n'affiche pas une progression
   // qu'il ne connaît pas.
   readonly goal: GoalView | null;
@@ -56,6 +60,7 @@ const EMPTY: DashboardModel = {
   port: 0,
   missingScopes: [],
   happyHour: false,
+  happyHourSchedule: null,
   goal: null,
 };
 
@@ -100,6 +105,10 @@ function sameGoal(left: GoalView | null, right: GoalView): boolean {
   );
 }
 
+function sameSchedule(left: HappyHourSchedule | null, right: HappyHourSchedule | null): boolean {
+  return left?.startAt === right?.startAt && left?.endAt === right?.endAt;
+}
+
 export function applyMessage(model: DashboardModel, message: ServerMessage): DashboardModel {
   switch (message.type) {
     case 'hello':
@@ -108,6 +117,7 @@ export function applyMessage(model: DashboardModel, message: ServerMessage): Das
         appVersion: message.appVersion,
         port: message.port,
         happyHour: message.happyHour,
+        happyHourSchedule: message.happyHourSchedule,
       };
 
     case 'state': {
@@ -158,9 +168,14 @@ export function applyMessage(model: DashboardModel, message: ServerMessage): Das
     }
 
     case 'config':
-      return model.happyHour === message.happyHour
+      return model.happyHour === message.happyHour &&
+        sameSchedule(model.happyHourSchedule, message.happyHourSchedule)
         ? model
-        : { ...model, happyHour: message.happyHour };
+        : {
+            ...model,
+            happyHour: message.happyHour,
+            happyHourSchedule: message.happyHourSchedule,
+          };
 
     case 'goal': {
       const goal: GoalView = {
@@ -210,6 +225,48 @@ export function happyHourLabels(active: boolean): HappyHourLabels {
   return active
     ? { state: 'Actif', action: 'Désactiver' }
     : { state: 'Éteint', action: 'Activer' };
+}
+
+export interface HappyHourScheduleView {
+  /** Ce que la carte dit de la plage, vide quand il n'y en a pas. */
+  readonly summary: string;
+  readonly canSchedule: boolean;
+  readonly canCancel: boolean;
+}
+
+/**
+ * L'instant est passé en argument, comme pour la remise à zéro : la vue dépend de ce qu'il est
+ * avant, pendant ou après le début de la plage.
+ */
+export function happyHourScheduleView(
+  schedule: HappyHourSchedule | null,
+  active: boolean,
+  now: number,
+): HappyHourScheduleView {
+  if (schedule === null) {
+    return { summary: '', canSchedule: true, canCancel: false };
+  }
+
+  const end = formatLocalBound(schedule.endAt, now);
+
+  if (now < schedule.startAt) {
+    const planned = `Programmé de ${formatLocalBound(schedule.startAt, now)} à ${end}.`;
+    return {
+      summary: active
+        ? `${planned} Déjà actif : il s’éteindra à la fin de la plage.`
+        : planned,
+      canSchedule: false,
+      canCancel: true,
+    };
+  }
+
+  return {
+    summary: active
+      ? `Actif jusqu’à ${end}.`
+      : `Éteint à la main. La plage programmée s’efface à ${end}.`,
+    canSchedule: false,
+    canCancel: true,
+  };
 }
 
 /**
