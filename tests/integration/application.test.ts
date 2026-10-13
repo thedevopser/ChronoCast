@@ -122,6 +122,11 @@ describe('application complète', () => {
   let socketFactory: EventSubSocketFactory | null = null;
   let openedSocketUrls: string[] = [];
 
+  // Décale l'horloge murale de l'application sans toucher à l'horloge monotone du décompte.
+  let clockOffsetMs = 0;
+
+  const systemClock = createSystemClock();
+
   function build(): Application {
     ticker = createManualTicker();
 
@@ -134,7 +139,10 @@ describe('application complète', () => {
         resolveDataFile: (...segments) => join(dataDirectory, ...segments),
       },
       secrets: createMemorySecretStore(seededSecrets),
-      clock: createSystemClock(),
+      clock: {
+        now: () => systemClock.now() + clockOffsetMs,
+        monotonicMs: () => systemClock.monotonicMs(),
+      },
       browser: { open: () => Promise.resolve() },
       ticker,
       appVersion: '0.1.0',
@@ -204,6 +212,7 @@ describe('application complète', () => {
     oauthEvents = [];
     appFetch = () => Promise.reject(new Error('aucun accès réseau dans ces tests'));
     oauthRouter = null;
+    clockOffsetMs = 0;
     application = build();
     port = await application.start();
   });
@@ -905,6 +914,184 @@ describe('application complète', () => {
 
       expect((await readPersistedCounter()).status).toBe('paused');
       expect((await api('/api/state')).status).toBe(200);
+    });
+  });
+
+  describe('plage ponctuelle du Happy Hour', () => {
+    const MINUTE = 60_000;
+
+    function schedule(method: 'PUT' | 'DELETE', body?: unknown): Promise<Response> {
+      return api('/api/happy-hour/schedule', {
+        method,
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    }
+
+    function windowFromNow(): { startAt: number; endAt: number } {
+      const now = Date.now();
+      return { startAt: now + 10 * MINUTE, endAt: now + 70 * MINUTE };
+    }
+
+    async function happyHour(): Promise<boolean> {
+      const { config } = (await (await api('/api/config')).json()) as {
+        config: { rewards: { happyHour: boolean } };
+      };
+      return config.rewards.happyHour;
+    }
+
+    async function currentSchedule(): Promise<unknown> {
+      return ((await (await api('/api/happy-hour/schedule')).json()) as { schedule: unknown })
+        .schedule;
+    }
+
+    async function tickUntil(expected: boolean): Promise<void> {
+      const deadline = Date.now() + 2_000;
+      for (;;) {
+        ticker.tick();
+        if ((await happyHour()) === expected) {
+          return;
+        }
+        if (Date.now() > deadline) {
+          throw new Error(`Happy Hour jamais passé à ${String(expected)}`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+
+    async function readScheduleFile(): Promise<unknown> {
+      return JSON.parse(await readFile(join(dataDirectory, 'happy-hour-schedule.json'), 'utf8'));
+    }
+
+    it('allume le Happy Hour au début, crédite son barème, puis l’éteint à la fin', async () => {
+      const window = windowFromNow();
+      expect((await schedule('PUT', window)).status).toBe(200);
+
+      ticker.tick();
+      expect(await happyHour()).toBe(false);
+
+      clockOffsetMs = 11 * MINUTE;
+      await tickUntil(true);
+
+      await notify('channel.subscribe', channelSubscribe);
+      const history = (await (await api('/api/history')).json()) as {
+        entries: { rewardSeconds: number }[];
+      };
+      expect(history.entries[0]?.rewardSeconds).toBe(360);
+
+      clockOffsetMs = 71 * MINUTE;
+      await tickUntil(false);
+      expect(await currentSchedule()).toBeNull();
+    });
+
+    it('annonce la plage aux panneaux ouverts, à la connexion puis à chaque changement', async () => {
+      const window = windowFromNow();
+      await schedule('PUT', window);
+
+      const panel = collect(connectOverlay());
+      await panel.waitFor(() => panel.ofType('hello').length > 0, 'accueil');
+      expect(panel.ofType('hello')[0]?.['happyHourSchedule']).toStrictEqual(window);
+
+      await schedule('DELETE');
+      await panel.waitFor(
+        () => panel.ofType('config').some((message) => message['happyHourSchedule'] === null),
+        'annulation diffusée',
+      );
+    });
+
+    it('refuse une plage invalide sans rien enregistrer', async () => {
+      const now = Date.now();
+      const response = await schedule('PUT', { startAt: now + 2 * MINUTE, endAt: now + MINUTE });
+
+      expect(response.status).toBe(400);
+      expect(await currentSchedule()).toBeNull();
+    });
+
+    it('respecte une extinction à la main pendant la plage', async () => {
+      await schedule('PUT', windowFromNow());
+      clockOffsetMs = 11 * MINUTE;
+      await tickUntil(true);
+
+      await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { rewards: { happyHour: false } } }),
+      });
+      ticker.tick();
+      ticker.tick();
+      expect(await happyHour()).toBe(false);
+
+      clockOffsetMs = 71 * MINUTE;
+      const deadline = Date.now() + 2_000;
+      while ((await currentSchedule()) !== null) {
+        ticker.tick();
+        if (Date.now() > deadline) {
+          throw new Error('plage jamais effacée');
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(await happyHour()).toBe(false);
+    });
+
+    it('active le Happy Hour quand l’application est relancée entre le début et la fin', async () => {
+      const window = windowFromNow();
+      await schedule('PUT', window);
+      await application.stop();
+
+      clockOffsetMs = 30 * MINUTE;
+      application = build();
+      port = await application.start();
+
+      expect(await happyHour()).toBe(true);
+      expect(await currentSchedule()).toStrictEqual(window);
+      expect(await readScheduleFile()).toStrictEqual({ window, started: true });
+    });
+
+    it('efface la plage sans rien activer quand l’application est relancée après la fin', async () => {
+      await schedule('PUT', windowFromNow());
+      await application.stop();
+
+      clockOffsetMs = 120 * MINUTE;
+      application = build();
+      port = await application.start();
+
+      expect(await happyHour()).toBe(false);
+      expect(await currentSchedule()).toBeNull();
+      expect(await readScheduleFile()).toBeNull();
+    });
+
+    it('journalise la bascule programmée comme une bascule manuelle, avec son origine', async () => {
+      await schedule('PUT', windowFromNow());
+      clockOffsetMs = 11 * MINUTE;
+      await tickUntil(true);
+
+      await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { rewards: { happyHour: false } } }),
+      });
+
+      const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+        records: { message: string; context?: { active?: boolean; origin?: string } }[];
+      };
+      const toggles = records
+        .filter((record) => record.message === 'Happy Hour basculé')
+        .map((record) => record.context);
+
+      expect(toggles).toContainEqual({ active: true, origin: 'plage programmée' });
+      expect(toggles).toContainEqual({ active: false, origin: 'manuel' });
+    });
+
+    it('refuse de poser ou d’annuler une plage sans jeton CSRF', async () => {
+      const put = await api('/api/happy-hour/schedule', {
+        method: 'PUT',
+        body: JSON.stringify(windowFromNow()),
+      });
+      const cancel = await api('/api/happy-hour/schedule', { method: 'DELETE' });
+
+      expect(put.status).toBe(403);
+      expect(cancel.status).toBe(403);
+      expect(await currentSchedule()).toBeNull();
     });
   });
 

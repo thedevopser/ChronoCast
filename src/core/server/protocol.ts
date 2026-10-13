@@ -5,8 +5,9 @@ import type { GoalOverlayConfig, OverlayConfig } from '../config/schema.js';
 import type { CounterState } from '../counter/counter-state.js';
 import type { DomainEvent } from '../events/domain-event.js';
 import type { LogRecord } from '../logging/logger.js';
+import type { OneShotWindow } from '../schedule/one-shot-window.js';
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'goal'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -26,6 +27,10 @@ export interface HelloMessage {
   readonly goalOverlay: GoalOverlayConfig;
 
   readonly happyHour: boolean;
+
+  // La plage programmée, ou `null`. Elle voyage avec la configuration bien qu'elle n'en fasse pas
+  // partie : c'est le même geste du panneau qui a besoin des deux.
+  readonly happyHourSchedule: OneShotWindow | null;
 }
 
 export interface StateMessage {
@@ -71,6 +76,7 @@ export interface ConfigMessage {
   readonly overlay: OverlayConfig;
   readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
+  readonly happyHourSchedule: OneShotWindow | null;
 }
 
 export interface GoalMessage {

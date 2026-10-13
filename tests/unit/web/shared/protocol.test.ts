@@ -50,6 +50,10 @@ describe('alignement des constantes avec le noyau', () => {
     expect(PROTOCOL_VERSION).toBe(CORE_PROTOCOL_VERSION);
   });
 
+  it('est en version 3 depuis que la plage du Happy Hour voyage avec la configuration', () => {
+    expect(CORE_PROTOCOL_VERSION).toBe(3);
+  });
+
   it('déclare les mêmes canaux, dans le même ordre', () => {
     expect(CHANNELS).toStrictEqual(CORE_CHANNELS);
   });

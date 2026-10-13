@@ -185,12 +185,18 @@ export interface GoalOverlayConfig {
   };
 }
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const CHANNELS = ['counter', 'event', 'log', 'config', 'twitch', 'goal'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export const DEFAULT_CHANNELS: readonly Channel[] = CHANNELS;
+
+/** La plage programmée du Happy Hour : deux horodatages absolus, en millisecondes. */
+export interface HappyHourSchedule {
+  readonly startAt: number;
+  readonly endAt: number;
+}
 
 export interface HelloMessage {
   readonly type: 'hello';
@@ -201,6 +207,7 @@ export interface HelloMessage {
   readonly overlay: OverlayConfig;
   readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
+  readonly happyHourSchedule: HappyHourSchedule | null;
 }
 
 export interface StateMessage {
@@ -246,6 +253,7 @@ export interface ConfigMessage {
   readonly overlay: OverlayConfig;
   readonly goalOverlay: GoalOverlayConfig;
   readonly happyHour: boolean;
+  readonly happyHourSchedule: HappyHourSchedule | null;
 }
 
 export interface GoalMessage {

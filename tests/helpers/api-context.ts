@@ -16,9 +16,14 @@ import {
   type RingBufferSink,
 } from '../../src/core/logging/sinks/ring-buffer-sink.js';
 import { createLogger, type LogSink } from '../../src/core/logging/logger.js';
+import { createHappyHourSchedule } from '../../src/core/happy-hour/happy-hour-schedule.js';
+import type { WindowState } from '../../src/core/schedule/one-shot-window.js';
 import type { ApiContext, TwitchApiPort } from '../../src/core/server/routes/api.js';
 
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
+
+/** L'instant figé de l'horloge des doublures : les plages se posent par rapport à lui. */
+export const API_NOW = 1_700_000_000_000;
 
 export interface ApiDoubles {
   context: ApiContext;
@@ -196,10 +201,39 @@ export function createApiDoubles(): ApiDoubles {
     },
   };
 
+  let scheduleState: WindowState | null = null;
+  const logger = createLogger({ level: 'error', sinks: [SILENT_SINK] });
+
+  const happyHourSchedule = createHappyHourSchedule({
+    store: {
+      filePath: '/mémoire/happy-hour-schedule.json',
+      read: () => Promise.resolve(scheduleState),
+      write: (value) => {
+        scheduleState = value;
+        return Promise.resolve();
+      },
+    },
+    clock: { now: () => API_NOW, monotonicMs: () => 0 },
+    isActive: () => doubles.config.rewards.happyHour,
+    setActive: (active) => {
+      calls.push(`happyHour.setActive:${String(active)}`);
+      doubles.config = configSchema.parse({
+        ...doubles.config,
+        rewards: { ...doubles.config.rewards, happyHour: active },
+      });
+      return Promise.resolve();
+    },
+    onChange: () => {
+      calls.push('happyHour.scheduleChanged');
+    },
+    logger,
+  });
+
   const context: ApiContext = {
     config: configService,
     counter: counterService,
     goals,
+    happyHourSchedule,
     history,
     logs: ringBuffer,
     twitch,
@@ -222,7 +256,7 @@ export function createApiDoubles(): ApiDoubles {
         state: doubles.counterState,
       });
     },
-    logger: createLogger({ level: 'error', sinks: [SILENT_SINK] }),
+    logger,
   };
 
   return Object.assign(doubles, { context, calls, ringBuffer });

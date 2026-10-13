@@ -91,6 +91,7 @@ describe('createWsAdapter', () => {
     hub = createWsHub({
       bus,
       getConfig: () => DEFAULT_CONFIG,
+      getHappyHourSchedule: () => null,
       getSnapshot: () => ({
         counter: createInitialState({ initialMs: 43_200_000, now: 1_000 }),
         twitch: { status: 'ready' },

@@ -5,6 +5,7 @@ import type { ChronoCastConfig, GoalTier } from '../config/schema.js';
 import type { CounterState } from '../counter/counter-state.js';
 import type { GoalSnapshot } from '../goals/goal-service.js';
 import type { Logger, LogRecord } from '../logging/logger.js';
+import type { OneShotWindow } from '../schedule/one-shot-window.js';
 import {
   CHANNELS,
   DEFAULT_CHANNELS,
@@ -70,6 +71,7 @@ export interface WsHub {
 export interface WsHubOptions {
   readonly bus: EventBus<AppEvents>;
   readonly getConfig: () => ChronoCastConfig;
+  readonly getHappyHourSchedule: () => OneShotWindow | null;
   readonly getSnapshot: () => HubSnapshot;
   readonly clock: Clock;
   readonly timers: HubTimers;
@@ -90,7 +92,18 @@ interface Client {
 }
 
 export function createWsHub(options: WsHubOptions): WsHub {
-  const { bus, getConfig, getSnapshot, clock, timers, getPort, getWsPort, appVersion, logger } =
+  const {
+    bus,
+    getConfig,
+    getHappyHourSchedule,
+    getSnapshot,
+    clock,
+    timers,
+    getPort,
+    getWsPort,
+    appVersion,
+    logger,
+  } =
     options;
   const scoped = logger.child('ws');
 
@@ -327,6 +340,7 @@ export function createWsHub(options: WsHubOptions): WsHub {
         overlay: getConfig().overlay,
         goalOverlay: getConfig().goals.overlay,
         happyHour: getConfig().rewards.happyHour,
+        happyHourSchedule: getHappyHourSchedule(),
       });
 
       sendTo(client, snapshotMessage());
@@ -354,6 +368,7 @@ export function createWsHub(options: WsHubOptions): WsHub {
         overlay: getConfig().overlay,
         goalOverlay: getConfig().goals.overlay,
         happyHour: getConfig().rewards.happyHour,
+        happyHourSchedule: getHappyHourSchedule(),
       });
     },
   };

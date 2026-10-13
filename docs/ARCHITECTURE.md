@@ -151,6 +151,7 @@ Producteurs et consommateurs ne se connaissent pas. Le catalogue est un type uni
 | `config.json` | À chaque modification, atomique |
 | `counter.json` | Mutations immédiates, érosion toutes les 5 s |
 | `goals.json` | À chaque abonnement compté, atomique |
+| `happy-hour-schedule.json` | À la pose, à l'annulation et à chaque transition de la plage programmée du Happy Hour, atomique. Un état et non un réglage : il n'est ni exporté ni importé avec la configuration |
 | `secrets.json` | Chiffré par DPAPI, jamais en clair |
 | `history/*.jsonl` | Une ligne par événement |
 | `logs/*.log` | Journalisation |

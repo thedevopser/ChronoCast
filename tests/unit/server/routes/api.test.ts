@@ -4,7 +4,7 @@ import { CONFIG_SCHEMA_VERSION, configSchema } from '../../../../src/core/config
 import type { HttpResponse } from '../../../../src/core/server/http-types.js';
 import { createApiRoutes } from '../../../../src/core/server/routes/api.js';
 import type { Route } from '../../../../src/core/server/router.js';
-import { createApiDoubles, type ApiDoubles } from '../../../helpers/api-context.js';
+import { API_NOW, createApiDoubles, type ApiDoubles } from '../../../helpers/api-context.js';
 import { makeRequest, type RequestOverrides } from '../../../helpers/http-request.js';
 
 describe('createApiRoutes', () => {
@@ -471,6 +471,88 @@ describe('createApiRoutes', () => {
       );
 
       expect(response?.status).toBe(501);
+    });
+  });
+
+  describe('plage du Happy Hour', () => {
+    const WINDOW = { startAt: API_NOW + 600_000, endAt: API_NOW + 4_200_000 };
+
+    function put(payload: unknown): Promise<HttpResponse> {
+      return call('PUT', '/api/happy-hour/schedule', { body: JSON.stringify(payload) });
+    }
+
+    it('n’annonce aucune plage tant qu’on n’en a pas posé', async () => {
+      const response = await call('GET', '/api/happy-hour/schedule');
+
+      expect(response.status).toBe(200);
+      expect(body(response)).toStrictEqual({ schedule: null });
+    });
+
+    it('pose la plage et la rend', async () => {
+      const response = await put(WINDOW);
+
+      expect(response.status).toBe(200);
+      expect(body(response)).toStrictEqual({ schedule: WINDOW });
+      expect(body(await call('GET', '/api/happy-hour/schedule'))).toStrictEqual({ schedule: WINDOW });
+      expect(doubles.calls).toContain('happyHour.scheduleChanged');
+    });
+
+    it('remplace la plage précédente', async () => {
+      await put(WINDOW);
+      const later = { startAt: API_NOW + 7_200_000, endAt: API_NOW + 9_000_000 };
+
+      expect(body(await put(later))).toStrictEqual({ schedule: later });
+    });
+
+    it.each([
+      ['dont la fin précède le début', { startAt: API_NOW + 2_000, endAt: API_NOW + 1_000 }],
+      ['dont la fin égale le début', { startAt: API_NOW + 1_000, endAt: API_NOW + 1_000 }],
+      ['dont la fin est passée', { startAt: API_NOW - 2_000, endAt: API_NOW - 1_000 }],
+    ])('refuse une plage %s, en disant pourquoi', async (_case, payload) => {
+      const response = await put(payload);
+
+      expect(response.status).toBe(400);
+      expect(body(response)).toMatchObject({ code: 'invalid_schedule' });
+      expect(String(body(response)['error'])).not.toBe('');
+      expect(body(await call('GET', '/api/happy-hour/schedule'))).toStrictEqual({ schedule: null });
+    });
+
+    it.each([
+      {},
+      { startAt: API_NOW + 1_000 },
+      { startAt: 'demain', endAt: API_NOW + 1_000 },
+      { startAt: 1.5, endAt: API_NOW + 1_000 },
+      { startAt: -1, endAt: API_NOW + 1_000 },
+      { startAt: null, endAt: null },
+    ])('refuse %j', async (payload) => {
+      expect((await put(payload)).status).toBe(400);
+      expect(doubles.calls).not.toContain('happyHour.scheduleChanged');
+    });
+
+    it('refuse un corps illisible', async () => {
+      const response = await call('PUT', '/api/happy-hour/schedule', { body: 'pas du json' });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('annule la plage', async () => {
+      await put(WINDOW);
+
+      const response = await call('DELETE', '/api/happy-hour/schedule');
+
+      expect(response.status).toBe(200);
+      expect(body(response)).toStrictEqual({ schedule: null });
+      expect(body(await call('GET', '/api/happy-hour/schedule'))).toStrictEqual({ schedule: null });
+    });
+
+    it('annule sans se plaindre quand il n’y a pas de plage', async () => {
+      expect((await call('DELETE', '/api/happy-hour/schedule')).status).toBe(200);
+    });
+
+    it('active aussitôt le Happy Hour quand la plage posée a déjà commencé', async () => {
+      await put({ startAt: API_NOW - 1_000, endAt: API_NOW + 60_000 });
+
+      expect(doubles.calls).toContain('happyHour.setActive:true');
     });
   });
 });

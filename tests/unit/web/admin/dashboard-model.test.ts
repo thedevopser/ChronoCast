@@ -81,6 +81,7 @@ describe('applyMessage', () => {
       overlay: {} as never,
       goalOverlay: {} as never,
       happyHour: false,
+      happyHourSchedule: null,
     });
 
     expect(model.appVersion).toBe('0.1.0');
@@ -97,6 +98,7 @@ describe('applyMessage', () => {
       overlay: {} as never,
       goalOverlay: {} as never,
       happyHour: true,
+      happyHourSchedule: null,
     });
 
     expect(model.happyHour).toBe(true);
@@ -108,11 +110,12 @@ describe('applyMessage', () => {
       overlay: {} as never,
       goalOverlay: {} as never,
       happyHour: true,
+      happyHourSchedule: null,
     });
 
     expect(active.happyHour).toBe(true);
 
-    const éteint = applyMessage(active, { type: 'config', overlay: {} as never, goalOverlay: {} as never, happyHour: false });
+    const éteint = applyMessage(active, { type: 'config', overlay: {} as never, goalOverlay: {} as never, happyHour: false, happyHourSchedule: null });
 
     expect(éteint.happyHour).toBe(false);
   });
