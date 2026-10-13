@@ -79,3 +79,11 @@ describe('mise en page du panneau', () => {
     }
   });
 });
+
+// `.actions` pose `display: flex`, qui l'emporte sur l'attribut `hidden` : sans règle dédiée, un
+// groupe de boutons masqué par le code reste affiché.
+describe('rangées d’actions masquées', () => {
+  it('disparaissent réellement quand le code les masque', async () => {
+    expect(await adminCss()).toMatch(/\.actions\[hidden\]\s*\{\s*display:\s*none;/);
+  });
+});

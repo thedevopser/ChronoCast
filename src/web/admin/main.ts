@@ -558,6 +558,7 @@ function start(): void {
     void guarded(happyHourToggle, async () => {
       await api.patch('/api/config', { config: { rewards: { happyHour: !model.happyHour } } });
     });
+  });
 
   // L'affichage de la plage vient du WebSocket et non de la réponse : deux panneaux ouverts
   // montrent ainsi la même chose. Un refus s'écrit à côté des champs, saisie intacte.
@@ -595,7 +596,6 @@ function start(): void {
   const cancelButton = button('#happy-hour-cancel');
   cancelButton.addEventListener('click', () => {
     void guarded(cancelButton, () => submitSchedule(() => api.delete('/api/happy-hour/schedule')));
-  });
   });
 
   for (const [selector, path, fallback] of [
