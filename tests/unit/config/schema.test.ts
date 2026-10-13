@@ -529,3 +529,17 @@ describe('barème de points de la barre d’objectif', () => {
     expect(configSchema.parse({ goals: { bitsPerSub: 1 } }).goals.bitsPerSub).toBe(1);
   });
 });
+
+describe('libellé d’unité de la barre d’objectif', () => {
+  it('vaut « abo. » par défaut', () => {
+    expect(configSchema.parse({}).goals.unitLabel).toBe('abo.');
+  });
+
+  it('accepte un libellé vide : le compte s’affiche alors sans unité', () => {
+    expect(configSchema.parse({ goals: { unitLabel: '' } }).goals.unitLabel).toBe('');
+  });
+
+  it('refuse un libellé plus long qu’un libellé de palier', () => {
+    expect(() => configSchema.parse({ goals: { unitLabel: 'x'.repeat(41) } })).toThrow();
+  });
+});

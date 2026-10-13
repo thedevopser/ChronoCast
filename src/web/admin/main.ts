@@ -22,6 +22,7 @@ import { tiersChange, type TierInput } from './bits-tiers.js';
 import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
+  goalThresholdLabel,
   parseGoalSubs,
   type GoalTierInput,
 } from './goal-tiers.js';
@@ -30,6 +31,7 @@ import {
   counterControls,
   createDashboardModel,
   EVENT_LABELS,
+  formatGoalCount,
   happyHourLabels,
   happyHourScheduleView,
   isResetArmed,
@@ -94,14 +96,19 @@ import {
   type FieldViewId,
 } from './router.js';
 
-// Chaque jeu réunit les barèmes qui se recopient l'un dans l'autre, désignés par leur préfixe.
-const REWARD_COPY_SETS: readonly (readonly string[])[] = [
-  ['rewards.sub.', 'rewards.resub.', 'rewards.gift.'],
-  [
-    'rewards.happyHourRewards.sub.',
-    'rewards.happyHourRewards.resub.',
-    'rewards.happyHourRewards.gift.',
-  ],
+// Chaque jeu réunit les barèmes d'une vue qui se recopient l'un dans l'autre, désignés par leur
+// préfixe.
+const REWARD_COPY_SETS: readonly { view: FieldViewId; cards: readonly string[] }[] = [
+  { view: 'rewards', cards: ['rewards.sub.', 'rewards.resub.', 'rewards.gift.'] },
+  {
+    view: 'rewards',
+    cards: [
+      'rewards.happyHourRewards.sub.',
+      'rewards.happyHourRewards.resub.',
+      'rewards.happyHourRewards.gift.',
+    ],
+  },
+  { view: 'goals', cards: ['goals.points.sub.', 'goals.points.resub.', 'goals.points.gift.'] },
 ];
 
 // Le même éditeur de paliers sert le barème normal et celui du Happy Hour.
@@ -332,6 +339,13 @@ function start(): void {
     painted = model;
   }
 
+  // Le libellé d'unité est un réglage et non un état diffusé : il se lit dans la configuration
+  // chargée par le panneau, que chaque enregistrement recharge.
+  function unitLabel(): string {
+    const label = readAtPath(config, 'goals.unitLabel');
+    return typeof label === 'string' ? label : '';
+  }
+
   function paintGoal(): void {
     const goal = model.goal;
     const bar = requireElement(document, '#goal-bar');
@@ -342,7 +356,7 @@ function start(): void {
       return;
     }
 
-    setText(requireElement(document, '#goal-subs'), `${String(goal.subs)} abo.`);
+    setText(requireElement(document, '#goal-subs'), formatGoalCount(goal.subs, unitLabel()), 80);
 
     // Sans palier, il n'y a pas de promesse à afficher : la barre n'aurait aucune borne.
     if (goal.total === 0) {
@@ -376,7 +390,8 @@ function start(): void {
 
     setText(
       requireElement(document, '#goal-progress-count'),
-      goal === null ? '—' : `${String(goal.subs)} abo.`,
+      goal === null ? '—' : formatGoalCount(goal.subs, unitLabel()),
+      80,
     );
 
     const tiers = readGoalTiersFromConfig();
@@ -771,7 +786,7 @@ function start(): void {
     });
 
     row.append(
-      makeField('Seuil, en abonnements', target, 'target', 'number'),
+      makeField(goalThresholdLabel(unitLabel()), target, 'target', 'number'),
       makeField('Promesse', label, 'label', 'text'),
       remove,
     );
@@ -949,9 +964,13 @@ function start(): void {
     showAppearanceTab(activeTab);
   }
 
-  function copyRewardCard(sourcePrefix: string, targetPrefixes: readonly string[]): void {
-    const fields = fieldsOf('rewards');
-    const container = containerOf('rewards');
+  function copyRewardCard(
+    view: FieldViewId,
+    sourcePrefix: string,
+    targetPrefixes: readonly string[],
+  ): void {
+    const fields = fieldsOf(view);
+    const container = containerOf(view);
     const sourceFields = fields.filter((field) => field.path.startsWith(sourcePrefix));
 
     clearFieldErrors(container, sourceFields);
@@ -968,9 +987,9 @@ function start(): void {
   }
 
   function buildRewardCopyActions(): void {
-    const fields = fieldsOf('rewards');
+    for (const { view, cards } of REWARD_COPY_SETS) {
+      const fields = fieldsOf(view);
 
-    for (const cards of REWARD_COPY_SETS) {
       for (const sourcePrefix of cards) {
         const anchor = fields.find((field) => field.path.startsWith(sourcePrefix));
         if (anchor === undefined) {
@@ -980,8 +999,8 @@ function start(): void {
         const targetPrefixes = cards.filter((prefix) => prefix !== sourcePrefix);
         const label = `Copier vers ${targetPrefixes.map((prefix) => groupOf(prefix)).join(' et ')}`;
 
-        appendGroupAction(document, containerOf('rewards'), anchor.selector, label, () => {
-          copyRewardCard(sourcePrefix, targetPrefixes);
+        appendGroupAction(document, containerOf(view), anchor.selector, label, () => {
+          copyRewardCard(view, sourcePrefix, targetPrefixes);
         });
       }
     }
@@ -1009,6 +1028,7 @@ function start(): void {
     }
 
     renderGoalTiers(readGoalTiersFromConfig());
+    paintGoal();
     paintGoalView();
   }
 

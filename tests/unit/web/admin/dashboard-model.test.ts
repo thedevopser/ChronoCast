@@ -4,6 +4,7 @@ import {
   applyMessage,
   counterControls,
   createDashboardModel,
+  formatGoalCount,
   happyHourLabels,
   happyHourScheduleView,
   isResetArmed,
@@ -457,5 +458,17 @@ describe('immuabilité', () => {
     applyMessage(model, { type: 'twitch:status', status: 'ready' });
 
     expect(JSON.stringify(model)).toBe(snapshot);
+  });
+});
+
+describe('formatGoalCount', () => {
+  it('suit le compte du libellé d’unité choisi', () => {
+    expect(formatGoalCount(12, 'abo.')).toBe('12 abo.');
+    expect(formatGoalCount(125_000, 'points')).toBe('125000 points');
+  });
+
+  it('affiche le compte seul quand le libellé est vide ou fait d’espaces', () => {
+    expect(formatGoalCount(12, '')).toBe('12');
+    expect(formatGoalCount(12, '   ')).toBe('12');
   });
 });

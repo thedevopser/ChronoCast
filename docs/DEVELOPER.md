@@ -83,7 +83,7 @@ src/
     config/    schéma Zod
     logging/   journalisation, rédaction des secrets
     events/    vocabulaire du domaine
-    goals/     objectifs, progression comptée en abonnements
+    goals/     objectifs, progression comptée en points
   main/        coquille Electron
   headless/    point d'entrée Node nu, outil de développement
   web/         overlay, barre d'objectif, panneau, assistant — servis au navigateur

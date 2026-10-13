@@ -278,6 +278,10 @@ const goalsSchema = z
 
     points: goalPointsSchema.default({}),
 
+    // Ce que le panneau écrit après le compte. Jamais diffusé aux spectateurs : la page /goal
+    // affiche « 12 / 50 » sans unité.
+    unitLabel: z.string().max(GOAL_LABEL_MAX_LENGTH).default('abo.'),
+
     // Ni tri ni unicité ici : un refine qui rejette ferait tomber toute la configuration au
     // chargement. L'échelle se normalise à la lecture, et la saisie se valide dans le panneau.
     tiers: z.array(goalTierSchema).default([]),

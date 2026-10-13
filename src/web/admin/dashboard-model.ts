@@ -227,6 +227,11 @@ export function happyHourLabels(active: boolean): HappyHourLabels {
     : { state: 'Éteint', action: 'Activer' };
 }
 
+/** Le compte de la barre suivi de son unité, ou seul quand le streamer n'en a pas nommé. */
+export function formatGoalCount(count: number, unitLabel: string): string {
+  return `${String(count)} ${unitLabel.trim()}`.trim();
+}
+
 export interface HappyHourScheduleView {
   /** Ce que la carte dit de la plage, vide quand il n'y en a pas. */
   readonly summary: string;

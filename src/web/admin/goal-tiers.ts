@@ -21,8 +21,14 @@ const INTEGER = /^\d+$/;
 
 export type GoalSubsResult = { readonly subs: number } | { readonly error: string };
 
+/** L'intitulé du seuil d'un palier, dans l'unité que le streamer a nommée. */
+export function goalThresholdLabel(unitLabel: string): string {
+  const unit = unitLabel.trim();
+  return unit === '' ? 'Seuil' : `Seuil, en ${unit}`;
+}
+
 /**
- * Lit le compte d'abonnements saisi. Un champ vide est refusé plutôt qu'entendu comme zéro :
+ * Lit le compte saisi. Un champ vide est refusé plutôt qu'entendu comme zéro :
  * `Number('')` vaut 0, et une saisie oubliée effacerait la progression au lieu de ne rien faire.
  */
 export function parseGoalSubs(raw: string): GoalSubsResult {
@@ -30,7 +36,7 @@ export function parseGoalSubs(raw: string): GoalSubsResult {
 
   if (!INTEGER.test(value)) {
     return {
-      error: 'Nombre d’abonnements attendu : un entier positif ou zéro.',
+      error: 'Compte attendu : un entier positif ou zéro.',
     };
   }
 
@@ -56,7 +62,7 @@ export function normalizeGoalTiers(rows: readonly GoalTierInput[]): GoalTiersRes
     const label = row.label.trim();
 
     if (!INTEGER.test(target) || Number(target) < 1) {
-      errors.push(`Palier ${position} : seuil en abonnements attendu, entier et supérieur à zéro.`);
+      errors.push(`Palier ${position} : seuil attendu, entier et supérieur à zéro.`);
       return;
     }
 

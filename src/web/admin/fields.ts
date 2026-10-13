@@ -231,11 +231,21 @@ const GOAL_FIELDS: readonly AdminField[] = [
   {
     selector: '#goal-bits-per-sub',
     path: 'goals.bitsPerSub',
-    label: 'Bits pour un abonnement',
-    hint: 'Les bits comptent en abonnements entiers ; le reste n’est pas conservé. À 500, un don de 1 200 bits fait avancer de deux.',
+    label: 'Bits par point',
+    hint: 'Les bits comptent par tranches entières ; le reste n’est pas conservé. À 500, un don de 1 200 bits ajoute deux points. À 1, un bit vaut un point.',
     view: 'goals',
     kind: 'integer',
     min: 1,
+  },
+  {
+    selector: '#goal-unit-label',
+    path: 'goals.unitLabel',
+    label: 'Nom de l’unité',
+    hint: 'Écrit après le compte dans ce panneau : « abo. », « points »… Vos spectateurs ne le voient pas, la barre affiche « 12 / 50 » sans unité.',
+    view: 'goals',
+    kind: 'text',
+    allowEmpty: true,
+    max: 40,
   },
 
   {
@@ -841,7 +851,8 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['goals.points.sub.', 'Points · Abonnements'],
   ['goals.points.resub.', 'Points · Réabonnements'],
   ['goals.points.gift.', 'Points · Sub offerts'],
-  ['goals.bitsPerSub', 'Objectifs'],
+  ['goals.bitsPerSub', 'Points · Bits et unité'],
+  ['goals.unitLabel', 'Points · Bits et unité'],
   ['goals.overlay.bar.', 'Barre'],
   ['goals.overlay.shadow.', 'Ombre du texte'],
   ['goals.overlay.outline.', 'Contour du texte'],

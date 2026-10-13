@@ -4,6 +4,7 @@ import { GOAL_LABEL_MAX_LENGTH as CORE_LABEL_MAX_LENGTH } from '../../../../src/
 import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
+  goalThresholdLabel,
   parseGoalSubs,
   type GoalSubsResult,
   type GoalTierInput,
@@ -149,5 +150,32 @@ describe('parseGoalSubs', () => {
 
     expect(result).not.toHaveProperty('subs');
     expect(refusal(result)).not.toBe('');
+  });
+});
+
+describe('goalThresholdLabel', () => {
+  it('nomme le seuil dans l’unité choisie', () => {
+    expect(goalThresholdLabel('abo.')).toBe('Seuil, en abo.');
+    expect(goalThresholdLabel('points')).toBe('Seuil, en points');
+  });
+
+  it('reste neutre sans unité', () => {
+    expect(goalThresholdLabel('')).toBe('Seuil');
+    expect(goalThresholdLabel('  ')).toBe('Seuil');
+  });
+});
+
+describe('vocabulaire neutre', () => {
+  it('ne parle plus d’abonnements dans le refus du compte, qui peut être en points', () => {
+    const result = parseGoalSubs('abc');
+
+    expect('error' in result ? result.error : '').not.toMatch(/abonnement/iu);
+  });
+
+  it('ne parle plus d’abonnements dans le refus d’un seuil', () => {
+    const { errors } = normalizeGoalTiers([{ target: 'abc', label: 'Karaoké' }]);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).not.toMatch(/abonnement/iu);
   });
 });

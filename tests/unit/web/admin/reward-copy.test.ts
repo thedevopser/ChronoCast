@@ -112,4 +112,31 @@ describe('copyReward', () => {
       '#reward-hh-resub-tier3': '33',
     });
   });
+
+  it('sert aussi les cartes du barème de points de la barre', () => {
+    const outcome = copyReward(
+      fieldsOf('goals'),
+      {
+        '#goal-points-sub-prime': '200',
+        '#goal-points-sub-tier1': '250',
+        '#goal-points-sub-tier2': '500',
+        '#goal-points-sub-tier3': '1250',
+      },
+      'goals.points.sub.',
+      ['goals.points.resub.', 'goals.points.gift.'],
+    );
+
+    expect(outcome).toStrictEqual({
+      ok: true,
+      values: {
+        '#goal-points-resub-prime': '200',
+        '#goal-points-resub-tier1': '250',
+        '#goal-points-resub-tier2': '500',
+        '#goal-points-resub-tier3': '1250',
+        '#goal-points-gift-tier1': '250',
+        '#goal-points-gift-tier2': '500',
+        '#goal-points-gift-tier3': '1250',
+      },
+    });
+  });
 });

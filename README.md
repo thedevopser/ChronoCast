@@ -11,8 +11,8 @@ abonnement : la seule communication sortante est celle qui va vers Twitch.
 
 - **Un overlay** à ajouter dans OBS comme simple Browser Source, fond transparent.
 - **Une barre d'objectif**, seconde Browser Source indépendante : l'échelle de vos
-  promesses — « à 50 subs je me rase la tête » — comptée en abonnements, avec un
-  bandeau qui annonce chaque palier franchi.
+  promesses — « à 50 subs je me rase la tête » — comptée en abonnements ou selon
+  votre propre barème de points, avec un bandeau qui annonce chaque palier franchi.
 - **Un Happy Hour** : une bascule qui fait passer les crédits sur un barème à part,
   le temps que vous décidez.
 - **Un panneau d'administration** local pour tout piloter : barème, objectifs,

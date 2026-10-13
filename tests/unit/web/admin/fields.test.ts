@@ -184,6 +184,12 @@ describe('fieldsOf', () => {
 });
 
 describe('regroupement', () => {
+  it('libelle le réglage des bits « par point », la barre ne comptant plus forcément en abonnements', () => {
+    const field = ADMIN_FIELDS.find((entry) => entry.path === 'goals.bitsPerSub');
+
+    expect(field?.label).toBe('Bits par point');
+  });
+
   it('sépare la bascule du Happy Hour de son barème', () => {
     expect(groupOf('rewards.happyHour')).toBe('Happy Hour');
     expect(groupOf('rewards.happyHourRewards.sub.tier1')).toBe('Happy Hour · Abonnements');
@@ -250,8 +256,10 @@ describe('regroupement', () => {
       'Points · Abonnements',
       'Points · Réabonnements',
       'Points · Sub offerts',
-      'Objectifs',
+      'Points · Bits et unité',
     ]);
+    expect(groupOf('goals.bitsPerSub')).toBe('Points · Bits et unité');
+    expect(groupOf('goals.unitLabel')).toBe('Points · Bits et unité');
 
     expect(groupsOf('goal-appearance')).toStrictEqual([
       'Barre',

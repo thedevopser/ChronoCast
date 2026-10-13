@@ -243,8 +243,9 @@
           <header class="view__head">
             <h1 class="view__title">Objectifs</h1>
             <p class="view__subtitle">
-              L'échelle des promesses, comptée en abonnements. Un sub, un réabonnement et chaque sub
-              offert valent un, quel que soit le tier ; les bits comptent par tranches.
+              L'échelle des promesses, et ce que pèse chaque soutien dans la barre. Par défaut un
+              sub, un réabonnement et chaque sub offert valent un point ; les bits comptent par
+              tranches.
             </p>
           </header>
 
@@ -269,7 +270,7 @@
             <hr class="rule" />
 
             <label class="field field--compact">
-              <span class="field__label">Abonnements déjà acquis</span>
+              <span class="field__label">Compte déjà acquis</span>
               <input
                 class="field__input"
                 id="goal-subs-input"
@@ -281,9 +282,9 @@
               />
             </label>
             <p class="note">
-              Pour caler la barre sur un subathon déjà commencé. La valeur saisie remplace le
-              compte : elle n'annonce aucun palier aux spectateurs et ne crédite aucune seconde au
-              compteur.
+              Pour caler la barre sur un subathon déjà commencé, dans l'unité de votre barème de
+              points. La valeur saisie remplace le compte : elle n'annonce aucun palier aux
+              spectateurs et ne crédite aucune seconde au compteur.
             </p>
             <div class="actions">
               <button class="button" type="button" id="save-goal-subs">Enregistrer</button>
@@ -305,6 +306,10 @@
           </div>
 
           <div class="fields" id="fields-goals"></div>
+          <p class="note">
+            Le barème de points ne vaut que pour les soutiens à venir : le modifier ne recalcule pas
+            le compte en cours.
+          </p>
 
           <div class="actions">
             <button class="button button--primary" type="button" id="save-goals">
