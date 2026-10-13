@@ -7,24 +7,23 @@ import type { DomainEvent } from '../events/domain-event.js';
  * qui traduit ensuite un compte en position sur l'échelle.
  */
 export function pointsGained(event: DomainEvent, goals: GoalsConfig): number {
+  const countsSubsOnly = goals.mode === 'subs';
+  const weights = countsSubsOnly ? goals.subWeights : goals.points;
+
   switch (event.type) {
     case 'sub':
-      return goals.points.sub[event.tier];
+      return weights.sub[event.tier];
 
     case 'resub':
-      return goals.points.resub[event.tier];
+      return weights.resub[event.tier];
 
     case 'gift':
-      return event.total > 0 ? event.total * goals.points.gift[event.tier] : 0;
+      return event.total > 0 ? event.total * weights.gift[event.tier] : 0;
 
-    case 'bits': {
-      if (event.bits <= 0) {
-        return 0;
-      }
-      // Sans reste conservé : le garder demanderait un état de plus à persister, pour une barre
-      // qui avancerait sans qu'aucun événement ne l'explique.
-      return Math.floor(event.bits / goals.bitsPerSub);
-    }
+    // En mode points, un bit vaut un point, sans réglage : c'est le poids des abonnements qui se
+    // règle. En mode subs, la barre ne compte que des abonnements.
+    case 'bits':
+      return countsSubsOnly || event.bits <= 0 ? 0 : event.bits;
 
     // Un crédit accordé à la main par un modérateur ne gonfle pas une promesse faite aux
     // spectateurs : elle en deviendrait mensongère.

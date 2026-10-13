@@ -100,6 +100,11 @@ const goalSubsSchema = z
   .object({ subs: z.number().int().min(0).max(MAX_GOAL_COUNT) })
   .strip();
 
+const goalModeSchema = z.object({ mode: z.enum(['points', 'subs']) }).strip();
+
+// Le libellé écrit après le compte suit le mode : un compte d'abonnements ne se lit pas en points.
+const GOAL_MODE_UNIT_LABELS = { points: 'points', subs: 'abo.' } as const;
+
 const scheduleSchema = z
   .object({
     startAt: z.number().int().nonnegative(),
@@ -468,6 +473,29 @@ export function createApiRoutes(context: ApiContext): Route[] {
 
         await goals.setSubs(parsed.data.subs);
         return jsonResponse(200, { goal: goals.getSnapshot() });
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/api/goals/mode',
+      handler: async (request) => {
+        const parsed = goalModeSchema.safeParse(parseJsonBody(request));
+        if (!parsed.success) {
+          return badRequest('Mode de la barre inconnu.');
+        }
+
+        const { mode } = parsed.data;
+
+        // Le compte change d'unité avec le mode et ne veut plus rien dire : il repart de zéro. Les
+        // paliers restent, au streamer de les relire. Redemander le mode courant n'efface rien.
+        if (config.get().goals.mode !== mode) {
+          await config.update({ goals: { mode, unitLabel: GOAL_MODE_UNIT_LABELS[mode] } });
+          await goals.reset();
+          scoped.info('mode de la barre d’objectif changé', { mode });
+        }
+
+        return jsonResponse(200, { mode, goal: goals.getSnapshot() });
       },
     },
 

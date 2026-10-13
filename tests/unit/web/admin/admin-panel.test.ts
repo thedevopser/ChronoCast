@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_CONFIG } from '../../../../src/core/config/defaults.js';
+import { fieldsOf } from '../../../../src/web/admin/fields.js';
+import { FIELD_VIEWS } from '../../../../src/web/admin/router.js';
 
 const HTML = readFileSync(resolve(process.cwd(), 'src/web/admin/index.html'), 'utf8')
   .replace('__CHRONOCAST_CSRF__', 'a'.repeat(64))
@@ -18,6 +20,9 @@ const sockets: FakeSocket[] = [];
 const requests: { method: string; url: string; body: string | null }[] = [];
 let scheduleResponse: () => Response = () => new Response('{"schedule":null}', { status: 200 });
 let pendingNotice: unknown = { goalsReset: { previousCount: 37 } };
+
+// La configuration que sert le faux serveur : le changement de mode la fait évoluer.
+let servedConfig: typeof DEFAULT_CONFIG = structuredClone(DEFAULT_CONFIG);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -115,8 +120,15 @@ beforeAll(async () => {
       pendingNotice = null;
       return Promise.resolve(json({ notice: null }));
     }
+    if (input === '/api/goals/mode') {
+      const { mode } = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        mode: 'points' | 'subs';
+      };
+      servedConfig = { ...servedConfig, goals: { ...servedConfig.goals, mode } };
+      return Promise.resolve(json({ mode, goal: null }));
+    }
     if (input === '/api/config') {
-      return Promise.resolve(json({ config: DEFAULT_CONFIG, hasClientSecret: false }));
+      return Promise.resolve(json({ config: servedConfig, hasClientSecret: false }));
     }
     return Promise.resolve(json({ entries: [], records: [], subscriptions: [], goal: null, tiers: [] }));
   }) as typeof window.fetch;
@@ -341,3 +353,128 @@ describe('gestes de copie du panneau', () => {
     }
   });
 });
+
+describe('vue Objectifs', () => {
+  it('ne propose plus de régler les bits : un bit vaut un point', () => {
+    expect(document.querySelector('#goal-bits-per-sub')).toBeNull();
+    expect(element('#view-goals').textContent).toContain('Un bit vaut toujours un point');
+  });
+});
+
+describe('mode de la barre dans la vue Objectifs', () => {
+  function shownGroups(): string[] {
+    return [...document.querySelectorAll<HTMLElement>('#fields-goals .group')]
+      .filter((group) => !group.hidden)
+      .map((group) => group.dataset['group'] ?? '');
+  }
+
+  const modeRequests = (): typeof requests =>
+    requests.filter((request) => request.url === '/api/goals/mode');
+
+  it('dit que la barre compte en points et ne montre que les cartes de points', () => {
+    expect(element('#goal-mode-title').textContent).toBe('Points');
+    expect(element('#view-goals').contains(element('#goal-mode-card'))).toBe(true);
+    expect(shownGroups()).toStrictEqual([
+      'Points · Abonnements',
+      'Points · Réabonnements',
+      'Points · Sub offerts',
+      'Unité',
+    ]);
+  });
+
+  it('demande confirmation avant de changer de mode : le premier clic n’envoie rien', () => {
+    element('#goal-mode-switch').click();
+
+    expect(modeRequests()).toHaveLength(0);
+    expect(element('#goal-mode-switch').textContent).toBe('Confirmer : le compte repart de zéro');
+  });
+
+  it('change de mode au second clic, puis montre les cartes du mode subs', async () => {
+    element('#goal-mode-switch').click();
+    await settle();
+
+    expect(modeRequests().map((request) => request.body)).toStrictEqual(['{"mode":"subs"}']);
+    expect(element('#goal-mode-title').textContent).toBe('Abonnements seuls');
+    expect(element('#goal-mode-switch').textContent).toBe('Compter en points');
+    expect(shownGroups()).toStrictEqual([
+      'Subs · Abonnements',
+      'Subs · Réabonnements',
+      'Subs · Sub offerts',
+      'Unité',
+    ]);
+  });
+
+  it('pose un bouton de copie sur les cartes du mode subs', () => {
+    for (const selector of ['#goal-subs-sub-tier1', '#goal-subs-resub-tier1', '#goal-subs-gift-tier1']) {
+      expect(element(selector).closest('.group')?.querySelector('button'), selector).not.toBeNull();
+    }
+  });
+
+  it('revient en points de la même façon', async () => {
+    element('#goal-mode-switch').click();
+    element('#goal-mode-switch').click();
+    await settle();
+
+    expect(modeRequests().at(-1)?.body).toBe('{"mode":"points"}');
+    expect(element('#goal-mode-title').textContent).toBe('Points');
+  });
+});
+
+describe('enregistrement des vues', () => {
+  function patchesSince(index: number): unknown[] {
+    return requests
+      .filter((request) => request.method === 'PATCH')
+      .slice(index)
+      .map((request) => JSON.parse(request.body ?? '{}') as unknown);
+  }
+
+  const patchCount = (): number => requests.filter((request) => request.method === 'PATCH').length;
+
+  // L'aperçu montre le brouillon : sans enregistrement réel, le réglage semble pris en compte,
+  // n'arrive jamais dans OBS et disparaît à la relance.
+  it('enregistre l’apparence de la barre d’objectif par le bouton de son onglet', async () => {
+    field('#goal-outline-width').value = '7';
+    const before = patchCount();
+
+    element('#save-goal-appearance').click();
+    await settle();
+
+    // Le navigateur rend les couleurs en minuscules : elles partent aussi, sans rien changer.
+    const patches = patchesSince(before);
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toMatchObject({ config: { goals: { overlay: { outline: { width: 7 } } } } });
+  });
+
+  // Dérivé des vues à formulaire : une vue ajoutée sans câblage de son bouton rougit ici.
+  it.each([...FIELD_VIEWS])('enregistre la vue %s quand on clique sur son bouton', async (view) => {
+    const target = fieldsOf(view).find(
+      (candidate) =>
+        candidate.readOnly !== true && ['integer', 'number', 'boolean'].includes(candidate.kind),
+    );
+    if (target === undefined) {
+      throw new Error(`aucun champ modifiable à exercer dans la vue ${view}`);
+    }
+
+    // Une configuration neuve laisse vides des champs de texte obligatoires — l'identifiant client
+    // Twitch — et une vue invalide ne s'enregistre pas : ce n'est pas ce qu'on vérifie ici.
+    for (const required of fieldsOf(view)) {
+      if (required.kind === 'text' && required.allowEmpty !== true && field(required.selector).value === '') {
+        field(required.selector).value = 'valeur';
+      }
+    }
+
+    const control = field(target.selector);
+    if (target.kind === 'boolean') {
+      control.checked = !control.checked;
+    } else {
+      control.value = String(Number(control.value) + 1);
+    }
+    const before = patchCount();
+
+    element(`#save-${view}`).click();
+    await settle();
+
+    expect(patchesSince(before), target.path).toHaveLength(1);
+  });
+});
+

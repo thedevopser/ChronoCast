@@ -5,6 +5,7 @@ import {
   counterControls,
   createDashboardModel,
   formatGoalCount,
+  goalModeView,
   goalsResetNotice,
   happyHourLabels,
   happyHourScheduleView,
@@ -492,8 +493,38 @@ describe('goalsResetNotice', () => {
     expect(goalsResetNotice({ goalsReset: { previousCount: 0 } })).not.toMatch(/était de/u);
   });
 
+  // Ceux que la 1.4.0 a remis à zéro en points peuvent maintenant retrouver une barre en subs.
+  it('dit qu’on peut revenir à une barre qui ne compte que les abonnements', () => {
+    expect(goalsResetNotice({ goalsReset: { previousCount: 0 } })).toContain('Abonnements seuls');
+  });
+
   it('ne dit rien sans annonce', () => {
     expect(goalsResetNotice(null)).toBe('');
   });
+});
+
+describe('goalModeView', () => {
+  it('dit ce que compte la barre en mode points, et propose de ne compter que les abonnements', () => {
+    const view = goalModeView('points', false);
+
+    expect(view.title).toBe('Points');
+    expect(view.description).toContain('Un bit vaut un point');
+    expect(view.action).toBe('Compter seulement les abonnements');
+  });
+
+  it('dit en mode subs que les bits ne comptent pas, et propose de revenir aux points', () => {
+    const view = goalModeView('subs', false);
+
+    expect(view.title).toBe('Abonnements seuls');
+    expect(view.description).toContain('Les bits ne comptent pas');
+    expect(view.action).toBe('Compter en points');
+  });
+
+  it.each(['points', 'subs'] as const)(
+    'prévient, une fois armé, que le compte repart de zéro (%s)',
+    (mode) => {
+      expect(goalModeView(mode, true).action).toBe('Confirmer : le compte repart de zéro');
+    },
+  );
 });
 

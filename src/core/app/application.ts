@@ -202,10 +202,6 @@ export function createApplication(options: ApplicationOptions): Application {
     },
   });
 
-  // Levé par la lecture d'une configuration dont le comptage de la barre vient d'être écarté : le
-  // compte en cours, tenu par le service des objectifs, reste à remettre à zéro au démarrage.
-  let goalsResetPending = false;
-
   const updateNotice: UpdateNotice = createUpdateNotice({
     store: createAtomicJsonStore<UpdateNoticeState | null>({
       filePath: paths.resolveDataFile(UPDATE_NOTICE_FILE),
@@ -228,10 +224,6 @@ export function createApplication(options: ApplicationOptions): Application {
 
         for (const note of prepared.notes) {
           logger.child('config').info(note.message, note.context);
-        }
-
-        if (prepared.goalsReset) {
-          goalsResetPending = true;
         }
 
         return config;
@@ -828,16 +820,6 @@ export function createApplication(options: ApplicationOptions): Application {
       await goalService.start();
       await happyHourSchedule.start();
       await updateNotice.start();
-
-      if (goalsResetPending) {
-        goalsResetPending = false;
-
-        // L'ancien compte était en abonnements : il ne veut plus rien dire face à un barème en
-        // points. Il est rappelé dans l'annonce pour que le streamer puisse recaler sa barre.
-        const previousCount = goalService.getState().subs;
-        await goalService.reset();
-        await updateNotice.announceGoalsReset(previousCount);
-      }
       hub.start();
 
       httpServer = createHttpServer({

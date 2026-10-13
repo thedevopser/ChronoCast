@@ -32,6 +32,8 @@ import {
   createDashboardModel,
   EVENT_LABELS,
   formatGoalCount,
+  goalModeView,
+  type GoalBarMode,
   goalsResetNotice,
   type UpdateNoticeView,
   happyHourLabels,
@@ -44,7 +46,7 @@ import {
   type DashboardModel,
 } from './dashboard-model.js';
 import { inactiveGroups, mutedSelectors } from './field-dependencies.js';
-import { fieldsOf, groupOf, groupsOf } from './fields.js';
+import { fieldsOf, goalGroupsFor, groupOf, groupsOf } from './fields.js';
 import {
   patchFrom,
   readAtPath,
@@ -110,6 +112,10 @@ const REWARD_COPY_SETS: readonly { view: FieldViewId; cards: readonly string[] }
     ],
   },
   { view: 'goals', cards: ['goals.points.sub.', 'goals.points.resub.', 'goals.points.gift.'] },
+  {
+    view: 'goals',
+    cards: ['goals.subWeights.sub.', 'goals.subWeights.resub.', 'goals.subWeights.gift.'],
+  },
 ];
 
 // L'état du Happy Hour s'affiche et se bascule à deux endroits : la carte du tableau de bord et la
@@ -515,6 +521,48 @@ function start(): void {
   });
 
   paintGoalReset();
+
+  // Le mode se lit dans la configuration chargée par le panneau, comme le libellé d'unité.
+  function goalMode(): GoalBarMode {
+    return readAtPath(config, 'goals.mode') === 'subs' ? 'subs' : 'points';
+  }
+
+  let goalModeArmedAt: number | null = null;
+  const goalModeSwitch = button('#goal-mode-switch');
+
+  function paintGoalMode(): void {
+    const mode = goalMode();
+    const armed = isResetArmed(goalModeArmedAt, Date.now());
+    const view = goalModeView(mode, armed);
+
+    setText(requireElement(document, '#goal-mode-title'), view.title);
+    setText(requireElement(document, '#goal-mode-description'), view.description, 240);
+    setText(goalModeSwitch, view.action);
+    goalModeSwitch.className = armed ? 'button button--danger button--armed' : 'button';
+
+    const shown = new Set(goalGroupsFor(mode));
+    for (const group of containerOf('goals').querySelectorAll<HTMLElement>('.group')) {
+      group.hidden = !shown.has(group.dataset['group'] ?? '');
+    }
+  }
+
+  goalModeSwitch.addEventListener('click', () => {
+    // Deux temps, comme la remise à zéro : changer de mode efface le compte en cours.
+    if (!isResetArmed(goalModeArmedAt, Date.now())) {
+      goalModeArmedAt = Date.now();
+      paintGoalMode();
+      window.setTimeout(paintGoalMode, RESET_ARM_WINDOW_MS + 100);
+      return;
+    }
+
+    const target: GoalBarMode = goalMode() === 'points' ? 'subs' : 'points';
+    goalModeArmedAt = null;
+    void guarded(goalModeSwitch, async () => {
+      await api.post('/api/goals/mode', { mode: target });
+      await refreshConfig();
+      showBanner('La barre a changé de mode : son compte est reparti de zéro.', 'banner--success');
+    });
+  });
 
   const saveGoalSubs = button('#save-goal-subs');
   saveGoalSubs.addEventListener('click', () => {
@@ -937,6 +985,7 @@ function start(): void {
     renderGoalTiers(readGoalTiersFromConfig());
     paintGoal();
     paintGoalView();
+    paintGoalMode();
   }
 
   async function refreshConfig(): Promise<void> {
@@ -987,7 +1036,10 @@ function start(): void {
     );
   }
 
-  for (const view of ['rewards', 'happy-hour', 'goals', 'appearance', 'settings'] as const) {
+  // Dérivé des vues à formulaire, et non d'une liste tenue à la main : c'est une telle liste qui a
+  // laissé le bouton de l'onglet « Barre d'objectif » sans effet. Twitch a son propre gestionnaire,
+  // qui joint le secret client.
+  for (const view of FIELD_VIEWS.filter((candidate) => candidate !== 'twitch')) {
     const control = button(`#save-${view}`);
     control.addEventListener('click', () => {
       void guarded(control, () => saveView(view));

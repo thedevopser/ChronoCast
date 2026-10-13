@@ -113,11 +113,9 @@ describe('une configuration 1.3.0 par paliers, de bout en bout', () => {
   });
 });
 
-describe('prepareRawConfig — remise à zéro du comptage de la barre', () => {
+describe('prepareRawConfig — barre d’une configuration antérieure aux points', () => {
   const OLD_GOALS = {
     bitsPerSub: 500,
-    points: { sub: { tier1: 1 } },
-    unitLabel: 'abo.',
     tiers: [{ target: 50, label: 'Je me rase la tête' }],
     overlay: { fontSize: 40, bar: { width: 600 } },
   };
@@ -126,67 +124,97 @@ describe('prepareRawConfig — remise à zéro du comptage de la barre', () => {
     return (prepareRawConfig(raw).raw as { goals?: unknown }).goals;
   }
 
-  it.each([5, 6, 7, 8])('écarte le comptage d’une configuration en version %d et garde l’apparence', (schemaVersion) => {
+  it.each([5, 6, 7, 8])('garde la barre d’une version %d, en mode subs et sous l’unité « abo. »', (schemaVersion) => {
     expect(goalsOf({ schemaVersion, goals: OLD_GOALS })).toStrictEqual({
-      overlay: { fontSize: 40, bar: { width: 600 } },
+      ...OLD_GOALS,
+      mode: 'subs',
+      unitLabel: 'abo.',
     });
   });
 
-  it('le signale, pour que l’appelant remette le compte à zéro et prévienne le streamer', () => {
-    const prepared = prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS });
+  it('donne, une fois passée par le schéma, une barre qui compte un par abonnement sur ses paliers', () => {
+    const goals = configSchema.parse(prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS }).raw).goals;
 
-    expect(prepared.goalsReset).toBe(true);
-    expect(prepared.notes.map((note) => note.message)).toContain(
-      'comptage de la barre d’objectif remis aux valeurs de départ',
-    );
-  });
-
-  it('remet aux valeurs de départ une fois passé par le schéma', () => {
-    const prepared = prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS });
-    const goals = configSchema.parse(prepared.raw).goals;
-
-    expect(goals.bitsPerSub).toBe(1);
-    expect(goals.points.sub.tier1).toBe(500);
-    expect(goals.unitLabel).toBe('points');
-    expect(goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+    expect(goals.mode).toBe('subs');
+    expect(goals.unitLabel).toBe('abo.');
+    expect(goals.subWeights.sub.tier3).toBe(1);
+    expect(goals.tiers).toStrictEqual([{ target: 50, label: 'Je me rase la tête' }]);
     expect(goals.overlay.fontSize).toBe(40);
-    expect(goals.overlay.bar.width).toBe(600);
   });
 
-  it('ne touche plus à une configuration déjà passée par la remise à zéro', () => {
-    const settled = { schemaVersion: 9, goals: { ...OLD_GOALS, tiers: [] } };
-    const prepared = prepareRawConfig(settled);
+  it('garde une échelle vide vide : la barre d’une 1.3.0 sans palier ne s’allume pas toute seule', () => {
+    const raw = prepareRawConfig({ schemaVersion: 5, goals: { tiers: [] } }).raw;
 
-    expect(prepared.goalsReset).toBe(false);
+    expect(configSchema.parse(raw).goals.tiers).toStrictEqual([]);
+  });
+
+  it('n’allume pas non plus la barre d’une configuration ancienne qui ne dit rien de ses paliers', () => {
+    const raw = prepareRawConfig({ schemaVersion: 5, rewards: {} }).raw;
+    const goals = configSchema.parse(raw).goals;
+
+    expect(goals.mode).toBe('subs');
+    expect(goals.tiers).toStrictEqual([]);
+  });
+
+  it('signale que les bits ne font plus avancer cette barre', () => {
+    const notes = prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS }).notes;
+
+    expect(notes.map((note) => note.message)).toStrictEqual([
+      'barre d’objectif conservée en mode subs : les bits ne la font plus avancer',
+    ]);
+  });
+
+  it('laisse en mode points une configuration qui y est déjà', () => {
+    const settled = { schemaVersion: 9, goals: { tiers: [], unitLabel: 'points' } };
+
     expect(goalsOf(settled)).toStrictEqual(settled.goals);
-  });
-
-  it('remet à zéro une configuration ancienne même sans sous-arbre d’objectifs', () => {
-    const prepared = prepareRawConfig({ schemaVersion: 5, rewards: {} });
-
-    expect(prepared.goalsReset).toBe(true);
-    expect(goalsOf({ schemaVersion: 5, rewards: {} })).toBeUndefined();
+    expect(configSchema.parse(prepareRawConfig(settled).raw).goals.mode).toBe('points');
   });
 
   it.each([undefined, null, 'texte', {}, { goals: OLD_GOALS }, { schemaVersion: '5', goals: OLD_GOALS }])(
-    'ne remet rien à zéro quand le fichier ne dit pas sa version : %o',
+    'ne touche pas à la barre d’un fichier qui ne dit pas sa version : %o',
     (raw) => {
-      expect(prepareRawConfig(raw).goalsReset).toBe(false);
+      expect(prepareRawConfig(raw).notes).toStrictEqual([]);
     },
   );
 
   it('ne lève pas sur un sous-arbre d’objectifs illisible', () => {
     expect(() => prepareRawConfig({ schemaVersion: 5, goals: 'texte' })).not.toThrow();
-    expect(goalsOf({ schemaVersion: 5, goals: 'texte' })).toBeUndefined();
   });
 
   it('convertit les bits du barème de temps dans le même passage', () => {
-    const prepared = prepareRawConfig({ schemaVersion: 5, rewards: { bits: TIERS }, goals: OLD_GOALS });
-
     expect(bitsOf({ schemaVersion: 5, rewards: { bits: TIERS }, goals: OLD_GOALS })).toStrictEqual({
       unit: 100,
       seconds: 45,
     });
-    expect(prepared.goalsReset).toBe(true);
+  });
+
+  it('n’annonce plus de remise à zéro : rien n’est effacé', () => {
+    expect(prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS })).not.toHaveProperty('goalsReset');
   });
 });
+
+describe('prepareRawConfig — bits par point abandonné', () => {
+  const NOTE = 'bits par point abandonné : un bit vaut désormais un point';
+
+  it('signale l’ancienne valeur quand elle n’était pas 1', () => {
+    const prepared = prepareRawConfig({ schemaVersion: 9, goals: { bitsPerSub: 500 } });
+
+    expect(prepared.notes).toContainEqual({ message: NOTE, context: { previous: 500 } });
+  });
+
+  it.each([{ bitsPerSub: 1 }, {}, { bitsPerSub: 'x' }])('ne signale rien pour %j', (goals) => {
+    const messages = prepareRawConfig({ schemaVersion: 9, goals }).notes.map((note) => note.message);
+
+    expect(messages).not.toContain(NOTE);
+  });
+
+  it('ne signale rien pour une configuration antérieure aux points, où ce réglage avait un autre sens', () => {
+    const messages = prepareRawConfig({ schemaVersion: 5, goals: { bitsPerSub: 500 } }).notes.map(
+      (note) => note.message,
+    );
+
+    expect(messages).not.toContain(NOTE);
+  });
+});
+

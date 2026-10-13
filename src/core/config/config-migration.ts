@@ -16,12 +16,6 @@ export interface PreparedConfig {
 
   /** Ce qui a été converti et mérite une ligne de journal. */
   readonly notes: readonly MigrationNote[];
-
-  /**
-   * Vrai quand le comptage de la barre d'objectif a été écarté du fichier : le compte en cours,
-   * tenu ailleurs, n'a alors plus de sens et l'appelant doit le remettre à zéro.
-   */
-  readonly goalsReset: boolean;
 }
 
 type RawRecord = Record<string, unknown>;
@@ -135,29 +129,57 @@ function withConvertedBits(rewards: RawRecord, notes: MigrationNote[]): RawRecor
   };
 }
 
-// À partir de cette version du schéma, la barre d'objectif compte en points pour tout le monde.
-// Le comptage d'un fichier antérieur — bits par point, points par soutien, unité, paliers — est
-// écarté pour que le schéma repose ses valeurs de départ ; l'apparence de la barre reste.
+// À partir de cette version du schéma, la barre d'objectif compte en points par défaut. Celle d'un
+// fichier antérieur comptait des abonnements : elle est gardée telle quelle, dans le mode qui lui
+// correspond, plutôt que remise aux valeurs de départ.
 const GOALS_IN_POINTS_SCHEMA_VERSION = 9;
 
-const GOAL_APPEARANCE_KEY = 'overlay';
+const SUBS_MODE = 'subs';
+
+const SUBS_UNIT_LABEL = 'abo.';
 
 function predatesGoalsInPoints(raw: RawRecord): boolean {
   const version = raw['schemaVersion'];
   return typeof version === 'number' && version < GOALS_IN_POINTS_SCHEMA_VERSION;
 }
 
-function withoutGoalCounting(raw: RawRecord): RawRecord {
-  const { goals, ...rest } = raw;
+// L'échelle est posée vide quand le fichier n'en dit rien : le schéma y mettrait sinon son palier de
+// départ, et une barre jusque-là éteinte s'allumerait toute seule.
+function withBarKeptInSubsMode(raw: RawRecord): RawRecord {
+  const goals = isRecord(raw['goals']) ? raw['goals'] : {};
 
-  return isRecord(goals) && Object.hasOwn(goals, GOAL_APPEARANCE_KEY)
-    ? { ...rest, goals: { [GOAL_APPEARANCE_KEY]: goals[GOAL_APPEARANCE_KEY] } }
-    : rest;
+  return {
+    ...raw,
+    goals: {
+      ...goals,
+      tiers: Object.hasOwn(goals, 'tiers') ? goals['tiers'] : [],
+      mode: SUBS_MODE,
+      unitLabel: SUBS_UNIT_LABEL,
+    },
+  };
+}
+
+const ONE_BIT_PER_POINT = 1;
+
+// Jusqu'à la version 9 du schéma, la barre en points portait un nombre de bits par point. Le schéma
+// écarte la clé de lui-même ; reste à dire au streamer qui l'avait changée que ses bits pèsent
+// désormais un point chacun.
+function abandonedBitsPerPoint(raw: RawRecord): number | undefined {
+  // Un fichier qui ne dit pas sa version, ou d'avant les points, ne donnait pas ce sens à la clé.
+  if (typeof raw['schemaVersion'] !== 'number' || predatesGoalsInPoints(raw)) {
+    return undefined;
+  }
+  if (!isRecord(raw['goals'])) {
+    return undefined;
+  }
+
+  const previous = positiveInteger(raw['goals']['bitsPerSub']);
+  return previous === undefined || previous === ONE_BIT_PER_POINT ? undefined : previous;
 }
 
 export function prepareRawConfig(raw: unknown): PreparedConfig {
   if (!isRecord(raw)) {
-    return { raw, notes: [], goalsReset: false };
+    return { raw, notes: [] };
   }
 
   const notes: MigrationNote[] = [];
@@ -167,14 +189,21 @@ export function prepareRawConfig(raw: unknown): PreparedConfig {
     prepared = { ...prepared, rewards: withConvertedBits(raw['rewards'], notes) };
   }
 
-  const goalsReset = predatesGoalsInPoints(raw);
-  if (goalsReset) {
-    prepared = withoutGoalCounting(prepared);
+  if (predatesGoalsInPoints(raw)) {
+    prepared = withBarKeptInSubsMode(prepared);
     notes.push({
-      message: 'comptage de la barre d’objectif remis aux valeurs de départ',
+      message: 'barre d’objectif conservée en mode subs : les bits ne la font plus avancer',
       context: { fromSchemaVersion: Number(raw['schemaVersion']) },
     });
   }
 
-  return { raw: prepared, notes, goalsReset };
+  const abandoned = abandonedBitsPerPoint(raw);
+  if (abandoned !== undefined) {
+    notes.push({
+      message: 'bits par point abandonné : un bit vaut désormais un point',
+      context: { previous: abandoned },
+    });
+  }
+
+  return { raw: prepared, notes };
 }

@@ -36,17 +36,7 @@ describe('annonce de mise à jour', () => {
     expect(notice.get()).toBeNull();
   });
 
-  it('retient et persiste la remise à zéro de la barre, avec le compte qu’elle avait', async () => {
-    const notice = build();
-    await notice.start();
-
-    await notice.announceGoalsReset(37);
-
-    expect(notice.get()).toStrictEqual({ goalsReset: { previousCount: 37 } });
-    expect(persisted).toStrictEqual({ goalsReset: { previousCount: 37 } });
-  });
-
-  it('reste en attente d’une ouverture à l’autre tant qu’elle n’est pas acquittée', async () => {
+  it('relit l’annonce laissée par la 1.4.0, tant qu’elle n’est pas acquittée', async () => {
     persisted = { goalsReset: { previousCount: 12 } };
     const notice = build();
     await notice.start();

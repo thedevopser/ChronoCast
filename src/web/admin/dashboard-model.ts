@@ -227,6 +227,42 @@ export function happyHourLabels(active: boolean): HappyHourLabels {
     : { state: 'Éteint', action: 'Activer' };
 }
 
+export type GoalBarMode = 'points' | 'subs';
+
+export interface GoalModeView {
+  readonly title: string;
+  readonly description: string;
+
+  /** Le libellé du bouton qui change de mode : la confirmation une fois armé. */
+  readonly action: string;
+}
+
+const GOAL_MODE_VIEWS: Readonly<Record<GoalBarMode, Omit<GoalModeView, 'action'> & { switchTo: string }>> = {
+  points: {
+    title: 'Points',
+    description:
+      'Un bit vaut un point, et chaque abonnement, réabonnement ou sub offert vaut les points de son tier.',
+    switchTo: 'Compter seulement les abonnements',
+  },
+  subs: {
+    title: 'Abonnements seuls',
+    description:
+      'Seuls les abonnements, réabonnements et subs offerts font avancer la barre. Les bits ne comptent pas.',
+    switchTo: 'Compter en points',
+  },
+};
+
+/** Ce que la vue Objectifs dit du mode de la barre, et de ce que coûte d'en changer. */
+export function goalModeView(mode: GoalBarMode, armed: boolean): GoalModeView {
+  const { title, description, switchTo } = GOAL_MODE_VIEWS[mode];
+
+  return {
+    title,
+    description,
+    action: armed ? 'Confirmer : le compte repart de zéro' : switchTo,
+  };
+}
+
 export interface UpdateNoticeView {
   readonly goalsReset: { readonly previousCount: number };
 }
@@ -246,7 +282,8 @@ export function goalsResetNotice(notice: UpdateNoticeView | null): string {
   return (
     'La barre d’objectif compte désormais en points : un point par bit, et des points par ' +
     'abonnement selon son tier. Son barème, ses paliers et son compte ont été remis aux valeurs ' +
-    `de départ ; son apparence est conservée.${recall}`
+    `de départ ; son apparence est conservée.${recall} Pour une barre qui ne compte que les ` +
+    'abonnements, choisissez « Abonnements seuls » dans la vue Objectifs.'
   );
 }
 
