@@ -55,6 +55,7 @@ export interface GiftEvent extends BaseDomainEvent {
 export interface BitsEvent extends BaseDomainEvent {
   readonly type: 'bits';
   readonly bits: number;
+  readonly usage?: 'cheer' | 'power_up' | 'custom_power_up' | 'unknown';
 }
 
 export interface CommandEvent extends BaseDomainEvent {

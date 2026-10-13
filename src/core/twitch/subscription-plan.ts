@@ -78,8 +78,10 @@ export const SUBSCRIPTION_PLAN: readonly SubscriptionDefinition[] = [
     isEnabled: () => true,
     buildCondition: broadcasterCondition,
   },
+  // Remplace `channel.cheer`, sous le même scope : il porte les cheers et les bits dépensés en
+  // Power-ups. Garder les deux ferait arriver chaque cheer deux fois.
   {
-    type: 'channel.cheer',
+    type: 'channel.bits.use',
     version: '1',
     scopes: ['bits:read'],
     required: true,

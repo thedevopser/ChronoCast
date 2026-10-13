@@ -296,6 +296,40 @@ describe('commande de chat', () => {
   });
 });
 
+describe('origine d’une dépense de bits', () => {
+  function bits(usage?: BitsEvent['usage']): BitsEvent {
+    return { ...baseEvent(), type: 'bits', bits: 250, ...(usage === undefined ? {} : { usage }) };
+  }
+
+  it('crédite un Power-up comme un cheer du même montant', () => {
+    expect(computeReward(bits('power_up'), REWARDS).seconds).toBe(
+      computeReward(bits('cheer'), REWARDS).seconds,
+    );
+    expect(computeReward(bits('custom_power_up'), REWARDS).seconds).toBe(
+      computeReward(bits(), REWARDS).seconds,
+    );
+  });
+
+  it('laisse le motif d’un cheer tel qu’il était', () => {
+    expect(computeReward(bits('cheer'), REWARDS).reason).toBe('250 bits, 2 unité(s)');
+    expect(computeReward(bits(), REWARDS).reason).toBe('250 bits, 2 unité(s)');
+  });
+
+  it.each([
+    ['power_up', '250 bits en Power-up, 2 unité(s)'],
+    ['custom_power_up', '250 bits en Power-up personnalisé, 2 unité(s)'],
+    ['unknown', '250 bits d’origine inconnue, 2 unité(s)'],
+  ] as const)('dit dans le motif qu’une dépense %s n’est pas un cheer', (usage, reason) => {
+    expect(computeReward(bits(usage), REWARDS).reason).toBe(reason);
+  });
+
+  it('le dit aussi sur un refus', () => {
+    const small: BitsEvent = { ...baseEvent(), type: 'bits', bits: 30, usage: 'power_up' };
+
+    expect(computeReward(small, REWARDS).reason).toContain('30 bits en Power-up');
+  });
+});
+
 describe('Happy Hour', () => {
   const DOUBLED: RewardsConfig = rewardsWith({ happyHour: true });
 

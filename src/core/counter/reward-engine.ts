@@ -1,5 +1,10 @@
 import type { RewardsConfig } from '../config/schema.js';
-import type { DomainEvent, GiftTier, SubscriptionTier } from '../events/domain-event.js';
+import type {
+  BitsUsage,
+  DomainEvent,
+  GiftTier,
+  SubscriptionTier,
+} from '../events/domain-event.js';
 
 export interface RewardComputation {
   readonly seconds: number;
@@ -54,36 +59,49 @@ function giftTierSeconds(
   }
 }
 
-function computeBitsReward(bits: number, config: RewardsConfig['bits']): RewardComputation {
+const BITS_USAGE_MENTIONS: Readonly<Record<BitsUsage, string>> = {
+  cheer: '',
+  power_up: ' en Power-up',
+  custom_power_up: ' en Power-up personnalisé',
+  unknown: ' d’origine inconnue',
+};
+
+function computeBitsReward(
+  bits: number,
+  usage: BitsUsage,
+  config: RewardsConfig['bits'],
+): RewardComputation {
   if (bits <= 0) {
     return refused('nombre de bits invalide');
   }
 
+  const spent = `${String(bits)} bits${BITS_USAGE_MENTIONS[usage]}`;
+
   if (config.mode === 'tiers') {
     const matching = config.tiers.filter((tier) => bits >= tier.minBits);
     if (matching.length === 0) {
-      return refused(`${String(bits)} bits, sous le premier palier`);
+      return refused(`${spent}, sous le premier palier`);
     }
 
     const best = matching.reduce((highest, candidate) =>
       candidate.minBits > highest.minBits ? candidate : highest,
     );
 
-    return granted(best.seconds, `${String(bits)} bits, palier ${String(best.minBits)}`);
+    return granted(best.seconds, `${spent}, palier ${String(best.minBits)}`);
   }
 
   if (bits < config.linear.minBits) {
-    return refused(`${String(bits)} bits, sous le seuil de ${String(config.linear.minBits)}`);
+    return refused(`${spent}, sous le seuil de ${String(config.linear.minBits)}`);
   }
 
   const units = Math.floor(bits / config.linear.unit);
   if (units <= 0) {
-    return refused(`${String(bits)} bits, moins d'une unité de ${String(config.linear.unit)}`);
+    return refused(`${spent}, moins d'une unité de ${String(config.linear.unit)}`);
   }
 
   return granted(
     units * config.linear.secondsPerUnit,
-    `${String(bits)} bits, ${String(units)} unité(s)`,
+    `${spent}, ${String(units)} unité(s)`,
   );
 }
 
@@ -122,7 +140,7 @@ export function computeReward(event: DomainEvent, rewards: RewardsConfig): Rewar
     }
 
     case 'bits':
-      return mentioned(computeBitsReward(event.bits, table.bits), mention);
+      return mentioned(computeBitsReward(event.bits, event.usage ?? 'cheer', table.bits), mention);
 
     case 'command': {
       if (!Number.isFinite(event.seconds) || event.seconds <= 0) {

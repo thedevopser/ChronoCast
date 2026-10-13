@@ -414,6 +414,12 @@ export function createApplication(options: ApplicationOptions): Application {
       return;
     }
 
+    if (mapped.warning !== undefined) {
+      pipeline.warning('dépense de bits de type inconnu, comptée pour ses bits', {
+        detail: mapped.warning,
+      });
+    }
+
     if (!semanticDedup.admit(semanticKey(mapped.event), now)) {
       pipeline.debug('événement déjà crédité par une autre source', { eventId: mapped.event.id });
       return;

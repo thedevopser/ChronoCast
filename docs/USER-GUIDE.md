@@ -43,7 +43,7 @@ Le secret est chiffré sur votre machine par Windows, lié à votre compte, et n
 | Autorisation | Sert à |
 | --- | --- |
 | `channel:read:subscriptions` | Les subs, resubs et sub offerts |
-| `bits:read` | Les dons de bits |
+| `bits:read` | Les dons de bits, et les bits dépensés en Power-ups |
 | `user:read:chat`, `user:bot` | Distinguer un sub Prime d'un Tier 1, et lire la commande `!addtime` |
 
 ## 4. Ajouter l'overlay dans OBS
@@ -167,6 +167,8 @@ La barre ne dépend pas du compteur : elle peut servir à elle seule d'objectif 
 ## 6. Les dons hors Twitch
 
 ChronoCast crédite ce que **Twitch** lui rapporte : subs, resubs, sub offerts, sub Prime, bits. C'est tout.
+
+**Les Power-ups comptent comme des bits.** Un spectateur qui dépense des bits dans un Power-up — message animé, emote géante, célébration, ou Power-up personnalisé de votre chaîne — crédite le même temps qu'un cheer du même montant, selon le barème des bits, et fait avancer la barre d'objectif de la même façon. L'historique indique « en Power-up » à côté du montant. Un Power-up que vous déclenchez gratuitement sur votre propre chaîne ne compte pas : Twitch ne le signale pas. Aucune autorisation supplémentaire n'est demandée, vous n'avez pas à reconnecter votre chaîne.
 
 Rien n'est plafonné. Mille abonnements offerts d'un coup valent mille fois le tarif du palier, et le compteur peut monter aussi haut que votre communauté le décide.
 

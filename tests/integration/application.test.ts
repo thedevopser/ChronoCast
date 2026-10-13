@@ -23,7 +23,9 @@ import type {
 import { CSRF_HEADER } from '../../src/core/server/security/csrf.js';
 import { makeRequest } from '../helpers/http-request.js';
 import {
-  channelCheer,
+  channelBitsUseCheer,
+  channelBitsUseCustomPowerUp,
+  channelBitsUsePowerUp,
   channelSubscribe,
   channelSubscribeGifted,
   channelSubscriptionGift,
@@ -361,10 +363,10 @@ describe('application complète', () => {
       });
 
       it('crédite un don de bits le double du barème réglé, seuil d’entrée inchangé', async () => {
-        await notify('channel.cheer', channelCheer);
+        await notify('channel.bits.use', channelBitsUseCheer);
         expect(await lastRewardSeconds()).toBe(1_200);
 
-        await notify('channel.cheer', { ...(channelCheer as object), bits: 99 });
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 99 });
         expect(await lastRewardSeconds()).toBe(0);
       });
 
@@ -385,7 +387,7 @@ describe('application complète', () => {
         application = build();
         port = await application.start();
 
-        await notify('channel.cheer', channelCheer);
+        await notify('channel.bits.use', channelBitsUseCheer);
         expect(await lastRewardSeconds()).toBe(900);
 
         await notify('channel.subscribe', channelSubscribe);
@@ -448,6 +450,69 @@ describe('application complète', () => {
       });
     });
 
+    describe('Power-ups', () => {
+      async function lastEntry(): Promise<{ type: string; rewardSeconds: number; reason: string } | undefined> {
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { type: string; rewardSeconds: number; reason: string }[];
+        };
+        return history.entries[0];
+      }
+
+      async function goalCount(): Promise<number> {
+        return ((await (await api('/api/goals')).json()) as { goal: { subs: number } }).goal.subs;
+      }
+
+      it('crédite un Power-up comme un cheer du même montant et le distingue dans l’historique', async () => {
+        const powerUp = { ...(channelBitsUsePowerUp as object), bits: 1000 };
+
+        await notify('channel.bits.use', channelBitsUseCheer);
+        const cheer = await lastEntry();
+        await notify('channel.bits.use', powerUp);
+        const spent = await lastEntry();
+
+        expect(spent?.type).toBe('bits');
+        expect(spent?.rewardSeconds).toBe(cheer?.rewardSeconds);
+        expect(spent?.rewardSeconds).toBe(600);
+        expect(spent?.reason).toContain('Power-up');
+        expect(cheer?.reason).not.toContain('Power-up');
+      });
+
+      it('fait avancer la barre d’objectif', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUseCustomPowerUp as object), bits: 1500 });
+
+        expect(await goalCount()).toBe(3);
+      });
+
+      it('compte deux Power-ups identiques envoyés coup sur coup par le même spectateur', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUsePowerUp as object), bits: 500 });
+        await notify('channel.bits.use', { ...(channelBitsUsePowerUp as object), bits: 500 });
+
+        expect(await goalCount()).toBe(2);
+      });
+
+      it('ne compte qu’une fois un même envoi rejoué par Twitch', async () => {
+        const powerUp = { ...(channelBitsUsePowerUp as object), bits: 500 };
+
+        await notify('channel.bits.use', powerUp, 'msg-rejoué');
+        await notify('channel.bits.use', powerUp, 'msg-rejoué');
+
+        expect(await goalCount()).toBe(1);
+      });
+
+      it('compte pour ses bits une dépense de type inconnu et le journalise', async () => {
+        await notify('channel.bits.use', { ...(channelBitsUseCheer as object), type: 'combo' });
+
+        expect((await lastEntry())?.rewardSeconds).toBe(600);
+
+        const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+          records: { message: string }[];
+        };
+        expect(records.map((record) => record.message)).toContain(
+          'dépense de bits de type inconnu, comptée pour ses bits',
+        );
+      });
+    });
+
     it('ignore le rejeu du même message_id', async () => {
       await notify('channel.subscribe', channelSubscribe, 'msg-identique');
       await notify('channel.subscribe', channelSubscribe, 'msg-identique');
@@ -488,7 +553,7 @@ describe('application complète', () => {
     });
 
     it('crédite les bits selon le barème', async () => {
-      await notify('channel.cheer', channelCheer);
+      await notify('channel.bits.use', channelBitsUseCheer);
 
       const history = (await (await api('/api/history')).json()) as {
         entries: { type: string; applied: boolean }[];
@@ -595,7 +660,7 @@ describe('application complète', () => {
         goals: { bitsPerSub: 500 },
       });
 
-      await notify('channel.cheer', channelCheer);
+      await notify('channel.bits.use', channelBitsUseCheer);
 
       const history = (await (await api('/api/history')).json()) as {
         entries: { type: string; applied: boolean }[];
@@ -605,7 +670,7 @@ describe('application complète', () => {
     });
 
     it('n’avance pas sur un événement invalide, que le barème de temps refusait déjà', async () => {
-      await notify('channel.cheer', { ...(channelCheer as object), bits: -500 });
+      await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: -500 });
       await notify('channel.subscription.gift', { ...(channelSubscriptionGift as object), total: 0 });
 
       expect(await goalCount()).toBe(0);
@@ -617,7 +682,7 @@ describe('application complète', () => {
       });
 
       await notify('channel.subscribe', channelSubscribe);
-      await notify('channel.cheer', channelCheer);
+      await notify('channel.bits.use', channelBitsUseCheer);
       await notify('channel.subscription.gift', channelSubscriptionGift);
 
       expect(await goalCount()).toBe(250 + 1_000 + 200);
