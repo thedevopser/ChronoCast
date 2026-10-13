@@ -230,6 +230,26 @@ describe('application complète', () => {
     await rm(dataDirectory, { recursive: true, force: true });
   });
 
+  // Règle la barre pour compter en abonnements, sans palier : un point par soutien, cinq cents
+  // bits par point. Les valeurs de départ, elles, comptent en points sur un palier à 1 000.
+  async function countGoalsInSubscriptions(): Promise<void> {
+    const one = { tier1: 1, tier2: 1, tier3: 1, prime: 1 };
+    const response = await api('/api/config', {
+      method: 'PATCH',
+      headers: { [CSRF_HEADER]: application.getCsrfToken() },
+      body: JSON.stringify({
+        config: {
+          goals: {
+            bitsPerSub: 500,
+            points: { sub: one, resub: one, gift: { tier1: 1, tier2: 1, tier3: 1 } },
+            tiers: [],
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+  }
+
   function connectOverlay(): WebSocket {
     const socket = new WebSocket(`ws://127.0.0.1:${String(port)}/ws`);
     sockets.push(socket);
@@ -451,6 +471,8 @@ describe('application complète', () => {
     });
 
     describe('Power-ups', () => {
+      beforeEach(countGoalsInSubscriptions);
+
       async function lastEntry(): Promise<{ type: string; rewardSeconds: number; reason: string } | undefined> {
         const history = (await (await api('/api/history')).json()) as {
           entries: { type: string; rewardSeconds: number; reason: string }[];
@@ -695,6 +717,8 @@ describe('application complète', () => {
   });
 
   describe('objectifs', () => {
+    beforeEach(countGoalsInSubscriptions);
+
     async function readPersistedGoals(): Promise<{ subs: number; reached: { target: number }[] }> {
       const raw = await readFile(join(dataDirectory, 'goals.json'), 'utf8');
       return JSON.parse(raw) as { subs: number; reached: { target: number }[] };
@@ -822,31 +846,6 @@ describe('application complète', () => {
       const persisted = await readPersistedGoals();
       expect(persisted.subs).toBe(10);
       expect(persisted.reached.map((entry) => entry.target)).toEqual([1, 2, 10]);
-    });
-
-    it('relit sans perte la progression écrite par une version sans barème de points', async () => {
-      await application.stop();
-      await writeFile(
-        join(dataDirectory, 'goals.json'),
-        JSON.stringify({
-          subs: 37,
-          reached: [{ target: 5, reachedAt: 1_754_000_000_000 }],
-          updatedAt: 1_754_000_000_000,
-          schemaVersion: 1,
-        }),
-        'utf8',
-      );
-      application = build();
-      port = await application.start();
-
-      const payload = (await (await api('/api/goals')).json()) as {
-        goal: { subs: number; reached: { target: number }[] };
-      };
-      expect(payload.goal.subs).toBe(37);
-      expect(payload.goal.reached.map((entry) => entry.target)).toEqual([5]);
-
-      await notify('channel.subscribe', channelSubscribe);
-      expect(await goalCount()).toBe(38);
     });
 
     it('accepte l’écriture d’un compte en points, mille fois plus grand qu’un compte d’abonnements', async () => {
@@ -1372,6 +1371,153 @@ describe('application complète', () => {
       expect(put.status).toBe(403);
       expect(cancel.status).toBe(403);
       expect(await currentSchedule()).toBeNull();
+    });
+  });
+
+  describe('mise à jour depuis une version où la barre comptait en abonnements', () => {
+    const OLD_CONFIG = {
+      schemaVersion: 5,
+      goals: {
+        bitsPerSub: 500,
+        tiers: [
+          { target: 50, label: 'Je me rase la tête' },
+          { target: 100, label: 'Karaoké' },
+        ],
+        overlay: { fontSize: 40, bar: { height: 60 } },
+      },
+    };
+
+    const OLD_GOALS = {
+      subs: 37,
+      reached: [{ target: 5, reachedAt: 1_754_000_000_000 }],
+      updatedAt: 1_754_000_000_000,
+      schemaVersion: 1,
+    };
+
+    async function restart(): Promise<void> {
+      await application.stop();
+      application = build();
+      port = await application.start();
+    }
+
+    async function notice(): Promise<unknown> {
+      return ((await (await api('/api/update-notice')).json()) as { notice: unknown }).notice;
+    }
+
+    async function goals(): Promise<{ goal: { subs: number; reached: unknown[] }; tiers: unknown[] }> {
+      return (await (await api('/api/goals')).json()) as {
+        goal: { subs: number; reached: unknown[] };
+        tiers: unknown[];
+      };
+    }
+
+    async function goalsConfig(): Promise<Record<string, unknown> & { overlay: { fontSize: number; bar: { height: number } } }> {
+      const { config } = (await (await api('/api/config')).json()) as {
+        config: { goals: Record<string, unknown> & { overlay: { fontSize: number; bar: { height: number } } } };
+      };
+      return config.goals;
+    }
+
+    beforeEach(async () => {
+      await application.stop();
+      await writeFile(join(dataDirectory, 'config.json'), JSON.stringify(OLD_CONFIG), 'utf8');
+      await writeFile(join(dataDirectory, 'goals.json'), JSON.stringify(OLD_GOALS), 'utf8');
+      application = build();
+      port = await application.start();
+    });
+
+    it('remet le comptage aux valeurs de départ et garde l’apparence de la barre', async () => {
+      const config = await goalsConfig();
+
+      expect(config['bitsPerSub']).toBe(1);
+      expect(config['unitLabel']).toBe('points');
+      expect(config['points']).toMatchObject({ sub: { tier1: 500, tier2: 1_000, tier3: 2_500 } });
+      expect(config['tiers']).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+      expect(config.overlay.fontSize).toBe(40);
+      expect(config.overlay.bar.height).toBe(60);
+    });
+
+    it('remet le compte et les paliers atteints à zéro', async () => {
+      const { goal } = await goals();
+
+      expect(goal.subs).toBe(0);
+      expect(goal.reached).toStrictEqual([]);
+    });
+
+    it('annonce la remise à zéro en rappelant l’ancien compte', async () => {
+      expect(await notice()).toStrictEqual({ goalsReset: { previousCount: 37 } });
+    });
+
+    it('trace la remise à zéro dans le journal', async () => {
+      const { records } = (await (await api('/api/logs?limit=200')).json()) as {
+        records: { message: string }[];
+      };
+
+      expect(records.map((record) => record.message)).toContain(
+        'comptage de la barre d’objectif remis aux valeurs de départ',
+      );
+    });
+
+    it('compte en points dès le premier soutien', async () => {
+      await notify('channel.subscribe', channelSubscribe);
+      await notify('channel.bits.use', { ...(channelBitsUseCheer as object), bits: 120 });
+
+      expect((await goals()).goal.subs).toBe(620);
+    });
+
+    it('garde l’annonce d’un lancement à l’autre tant qu’elle n’est pas acquittée, sans rejouer la remise à zéro', async () => {
+      await notify('channel.subscribe', channelSubscribe);
+      await restart();
+
+      expect(await notice()).toStrictEqual({ goalsReset: { previousCount: 37 } });
+      expect((await goals()).goal.subs).toBe(500);
+    });
+
+    it('ne revient plus une fois acquittée, même après relance', async () => {
+      const response = await mutate('/api/update-notice/acknowledge');
+      expect(response.status).toBe(200);
+
+      await restart();
+
+      expect(await notice()).toBeNull();
+    });
+
+    it('ne remet plus rien à zéro une fois la barre réglée de nouveau', async () => {
+      await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config: { goals: { bitsPerSub: 250, tiers: [{ target: 7, label: 'Mien' }] } } }),
+      });
+      await mutate('/api/goals/subs', JSON.stringify({ subs: 4 }));
+
+      await restart();
+
+      expect((await goalsConfig())['bitsPerSub']).toBe(250);
+      expect((await goals()).goal.subs).toBe(4);
+    });
+
+    it('refuse d’acquitter l’annonce sans jeton CSRF', async () => {
+      const response = await api('/api/update-notice/acknowledge', { method: 'POST' });
+
+      expect(response.status).toBe(403);
+      expect(await notice()).not.toBeNull();
+    });
+  });
+
+  describe('installation neuve', () => {
+    it('n’annonce aucune mise à jour', async () => {
+      const { notice } = (await (await api('/api/update-notice')).json()) as { notice: unknown };
+
+      expect(notice).toBeNull();
+    });
+
+    it('affiche d’office une barre sur un palier à 1 000 points', async () => {
+      const payload = (await (await api('/api/goals')).json()) as {
+        goal: { subs: number; position: { to: number; label: string } };
+      };
+
+      expect(payload.goal.subs).toBe(0);
+      expect(payload.goal.position).toMatchObject({ to: 1_000, label: 'Objectif' });
     });
   });
 

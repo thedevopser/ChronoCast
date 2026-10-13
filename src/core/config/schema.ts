@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 8;
+export const CONFIG_SCHEMA_VERSION = 9;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -216,22 +216,32 @@ const goalOverlaySchema = z
 
 const points = z.number().int().nonnegative();
 
-// Mêmes formes que les barèmes de temps, mais en points et à 1 partout : par défaut, la barre
-// compte en abonnements, comme avant que ces poids soient réglables.
+// La barre compte en points, à un point par bit. Les abonnements valent au départ leur prix en
+// bits, pour qu'un euro de soutien pèse à peu près pareil quelle que soit sa forme.
+const DEFAULT_TIER_POINTS = { tier1: 500, tier2: 1_000, tier3: 2_500, prime: 500 } as const;
+
+const DEFAULT_BITS_PER_POINT = 1;
+
+const DEFAULT_GOAL_UNIT_LABEL = 'points';
+
+// Sans palier, la page /goal reste vide : une installation neuve en porte un, pour que la barre
+// se montre et que le modèle se comprenne.
+const DEFAULT_GOAL_TIERS = [{ target: 1_000, label: 'Objectif' }] as const;
+
 const tieredPointsSchema = z
   .object({
-    tier1: points.default(1),
-    tier2: points.default(1),
-    tier3: points.default(1),
-    prime: points.default(1),
+    tier1: points.default(DEFAULT_TIER_POINTS.tier1),
+    tier2: points.default(DEFAULT_TIER_POINTS.tier2),
+    tier3: points.default(DEFAULT_TIER_POINTS.tier3),
+    prime: points.default(DEFAULT_TIER_POINTS.prime),
   })
   .strip();
 
 const giftPointsSchema = z
   .object({
-    tier1: points.default(1),
-    tier2: points.default(1),
-    tier3: points.default(1),
+    tier1: points.default(DEFAULT_TIER_POINTS.tier1),
+    tier2: points.default(DEFAULT_TIER_POINTS.tier2),
+    tier3: points.default(DEFAULT_TIER_POINTS.tier3),
   })
   .strip();
 
@@ -247,17 +257,17 @@ const goalsSchema = z
   .object({
     // Le nombre de bits qui vaut un point. La clé date du temps où la barre ne comptait qu'en
     // abonnements : la renommer imposerait une migration pour une question de vocabulaire.
-    bitsPerSub: z.number().int().positive().default(500),
+    bitsPerSub: z.number().int().positive().default(DEFAULT_BITS_PER_POINT),
 
     points: goalPointsSchema.default({}),
 
     // Ce que le panneau écrit après le compte. Jamais diffusé aux spectateurs : la page /goal
     // affiche « 12 / 50 » sans unité.
-    unitLabel: z.string().max(GOAL_LABEL_MAX_LENGTH).default('abo.'),
+    unitLabel: z.string().max(GOAL_LABEL_MAX_LENGTH).default(DEFAULT_GOAL_UNIT_LABEL),
 
     // Ni tri ni unicité ici : un refine qui rejette ferait tomber toute la configuration au
     // chargement. L'échelle se normalise à la lecture, et la saisie se valide dans le panneau.
-    tiers: z.array(goalTierSchema).default([]),
+    tiers: z.array(goalTierSchema).default(DEFAULT_GOAL_TIERS.map((tier) => ({ ...tier }))),
 
     overlay: goalOverlaySchema.default({}),
   })

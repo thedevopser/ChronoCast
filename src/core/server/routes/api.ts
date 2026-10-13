@@ -10,6 +10,7 @@ import { normalizeLadder } from '../../goals/goal-ladder.js';
 import type { GoalService } from '../../goals/goal-service.js';
 import type { HappyHourSchedule } from '../../happy-hour/happy-hour-schedule.js';
 import { InvalidWindowError } from '../../schedule/one-shot-window.js';
+import type { UpdateNotice } from '../../update/update-notice.js';
 import type { EventHistoryService } from '../../history/event-history-service.js';
 import type { Logger, LogLevel } from '../../logging/logger.js';
 import type { RingBufferSink } from '../../logging/sinks/ring-buffer-sink.js';
@@ -50,6 +51,7 @@ export interface ApiContext {
   readonly counter: CounterService;
   readonly goals: GoalService;
   readonly happyHourSchedule: HappyHourSchedule;
+  readonly updateNotice: UpdateNotice;
   readonly history: EventHistoryService;
 
   readonly system?: SystemSettingsOpener | undefined;
@@ -178,6 +180,7 @@ export function createApiRoutes(context: ApiContext): Route[] {
     counter,
     goals,
     happyHourSchedule,
+    updateNotice,
     previewGoal,
     history,
     logs,
@@ -366,6 +369,21 @@ export function createApiRoutes(context: ApiContext): Route[] {
         return jsonResponse(200, {
           counter: await counter.setInitialSeconds(parsed.data.seconds),
         });
+      },
+    },
+
+    {
+      method: 'GET',
+      path: '/api/update-notice',
+      handler: () => jsonResponse(200, { notice: updateNotice.get() }),
+    },
+
+    {
+      method: 'POST',
+      path: '/api/update-notice/acknowledge',
+      handler: async () => {
+        await updateNotice.acknowledge();
+        return jsonResponse(200, { notice: updateNotice.get() });
       },
     },
 

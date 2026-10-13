@@ -18,6 +18,7 @@ import {
 import { createLogger, type LogSink } from '../../src/core/logging/logger.js';
 import { createHappyHourSchedule } from '../../src/core/happy-hour/happy-hour-schedule.js';
 import type { WindowState } from '../../src/core/schedule/one-shot-window.js';
+import { createUpdateNotice, type UpdateNoticeState } from '../../src/core/update/update-notice.js';
 import type { ApiContext, TwitchApiPort } from '../../src/core/server/routes/api.js';
 
 const SILENT_SINK: LogSink = { name: 'silencieux', write: () => undefined };
@@ -229,11 +230,25 @@ export function createApiDoubles(): ApiDoubles {
     logger,
   });
 
+  let noticeState: UpdateNoticeState | null = null;
+  const updateNotice = createUpdateNotice({
+    store: {
+      filePath: '/mémoire/update-notice.json',
+      read: () => Promise.resolve(noticeState),
+      write: (value) => {
+        noticeState = value;
+        return Promise.resolve();
+      },
+    },
+    logger,
+  });
+
   const context: ApiContext = {
     config: configService,
     counter: counterService,
     goals,
     happyHourSchedule,
+    updateNotice,
     history,
     logs: ringBuffer,
     twitch,

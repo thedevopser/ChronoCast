@@ -90,7 +90,13 @@ function createHarness(options: { tiers?: unknown; bitsPerSub?: number; initial?
   const config: ChronoCastConfig = configSchema.parse({
     goals: {
       tiers: options.tiers ?? LADDER,
-      ...(options.bitsPerSub === undefined ? {} : { bitsPerSub: options.bitsPerSub }),
+      // Une barre réglée pour compter en abonnements, comme l'échelle de ces tests.
+      bitsPerSub: options.bitsPerSub ?? 500,
+      points: {
+        sub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
+        resub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
+        gift: { tier1: 1, tier2: 1, tier3: 1 },
+      },
     },
   });
 

@@ -16,6 +16,12 @@ export interface PreparedConfig {
 
   /** Ce qui a été converti et mérite une ligne de journal. */
   readonly notes: readonly MigrationNote[];
+
+  /**
+   * Vrai quand le comptage de la barre d'objectif a été écarté du fichier : le compte en cours,
+   * tenu ailleurs, n'a alors plus de sens et l'appelant doit le remettre à zéro.
+   */
+  readonly goalsReset: boolean;
 }
 
 type RawRecord = Record<string, unknown>;
@@ -115,21 +121,60 @@ function convertBitsAt(holder: RawRecord, path: string, notes: MigrationNote[]):
   return { ...holder, bits: rate };
 }
 
+function withConvertedBits(rewards: RawRecord, notes: MigrationNote[]): RawRecord {
+  const converted = convertBitsAt(rewards, 'rewards.bits', notes);
+
+  const happyHourRewards = converted['happyHourRewards'];
+  if (!isRecord(happyHourRewards)) {
+    return converted;
+  }
+
+  return {
+    ...converted,
+    happyHourRewards: convertBitsAt(happyHourRewards, 'rewards.happyHourRewards.bits', notes),
+  };
+}
+
+// À partir de cette version du schéma, la barre d'objectif compte en points pour tout le monde.
+// Le comptage d'un fichier antérieur — bits par point, points par soutien, unité, paliers — est
+// écarté pour que le schéma repose ses valeurs de départ ; l'apparence de la barre reste.
+const GOALS_IN_POINTS_SCHEMA_VERSION = 9;
+
+const GOAL_APPEARANCE_KEY = 'overlay';
+
+function predatesGoalsInPoints(raw: RawRecord): boolean {
+  const version = raw['schemaVersion'];
+  return typeof version === 'number' && version < GOALS_IN_POINTS_SCHEMA_VERSION;
+}
+
+function withoutGoalCounting(raw: RawRecord): RawRecord {
+  const { goals, ...rest } = raw;
+
+  return isRecord(goals) && Object.hasOwn(goals, GOAL_APPEARANCE_KEY)
+    ? { ...rest, goals: { [GOAL_APPEARANCE_KEY]: goals[GOAL_APPEARANCE_KEY] } }
+    : rest;
+}
+
 export function prepareRawConfig(raw: unknown): PreparedConfig {
-  if (!isRecord(raw) || !isRecord(raw['rewards'])) {
-    return { raw, notes: [] };
+  if (!isRecord(raw)) {
+    return { raw, notes: [], goalsReset: false };
   }
 
   const notes: MigrationNote[] = [];
-  let rewards = convertBitsAt(raw['rewards'], 'rewards.bits', notes);
+  let prepared: RawRecord = raw;
 
-  const happyHourRewards = rewards['happyHourRewards'];
-  if (isRecord(happyHourRewards)) {
-    rewards = {
-      ...rewards,
-      happyHourRewards: convertBitsAt(happyHourRewards, 'rewards.happyHourRewards.bits', notes),
-    };
+  if (isRecord(raw['rewards'])) {
+    prepared = { ...prepared, rewards: withConvertedBits(raw['rewards'], notes) };
   }
 
-  return { raw: { ...raw, rewards }, notes };
+  const goalsReset = predatesGoalsInPoints(raw);
+  if (goalsReset) {
+    prepared = withoutGoalCounting(prepared);
+    notes.push({
+      message: 'comptage de la barre d’objectif remis aux valeurs de départ',
+      context: { fromSchemaVersion: Number(raw['schemaVersion']) },
+    });
+  }
+
+  return { raw: prepared, notes, goalsReset };
 }

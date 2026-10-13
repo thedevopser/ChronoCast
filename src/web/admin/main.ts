@@ -32,6 +32,8 @@ import {
   createDashboardModel,
   EVENT_LABELS,
   formatGoalCount,
+  goalsResetNotice,
+  type UpdateNoticeView,
   happyHourLabels,
   happyHourScheduleView,
   isResetArmed,
@@ -1372,6 +1374,30 @@ function start(): void {
       reportFailure(error);
     },
   );
+
+  const updateNoticeCard = requireElement(document, '#update-notice');
+
+  function paintUpdateNotice(notice: UpdateNoticeView | null): void {
+    setText(requireElement(document, '#update-notice-goals'), goalsResetNotice(notice), 600);
+    updateNoticeCard.hidden = notice === null;
+  }
+
+  const updateNoticeAck = button('#update-notice-ack');
+  updateNoticeAck.addEventListener('click', () => {
+    void guarded(updateNoticeAck, async () => {
+      await api.post('/api/update-notice/acknowledge');
+      paintUpdateNotice(null);
+    });
+  });
+
+  void api
+    .get<{ notice: UpdateNoticeView | null }>('/api/update-notice')
+    .then(({ notice }) => {
+      paintUpdateNotice(notice);
+    })
+    .catch((error: unknown) => {
+      reportFailure(error);
+    });
 
   void refreshHistory().catch((error: unknown) => {
     reportFailure(error);

@@ -555,4 +555,31 @@ describe('createApiRoutes', () => {
       expect(doubles.calls).toContain('happyHour.setActive:true');
     });
   });
+
+  describe('annonce de mise à jour', () => {
+    it('ne rend aucune annonce quand rien n’est en attente', async () => {
+      const response = await call('GET', '/api/update-notice');
+
+      expect(response.status).toBe(200);
+      expect(body(response)).toStrictEqual({ notice: null });
+    });
+
+    it('rend l’annonce en attente, avec l’ancien compte de la barre', async () => {
+      await doubles.context.updateNotice.announceGoalsReset(37);
+
+      expect(body(await call('GET', '/api/update-notice'))).toStrictEqual({
+        notice: { goalsReset: { previousCount: 37 } },
+      });
+    });
+
+    it('l’acquitte pour de bon', async () => {
+      await doubles.context.updateNotice.announceGoalsReset(37);
+
+      const response = await call('POST', '/api/update-notice/acknowledge');
+
+      expect(response.status).toBe(200);
+      expect(body(response)).toStrictEqual({ notice: null });
+      expect(body(await call('GET', '/api/update-notice'))).toStrictEqual({ notice: null });
+    });
+  });
 });

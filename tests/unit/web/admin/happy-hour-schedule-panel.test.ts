@@ -17,6 +17,7 @@ interface FakeSocket {
 const sockets: FakeSocket[] = [];
 const requests: { method: string; url: string; body: string | null }[] = [];
 let scheduleResponse: () => Response = () => new Response('{"schedule":null}', { status: 200 });
+let pendingNotice: unknown = { goalsReset: { previousCount: 37 } };
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -60,65 +61,91 @@ const HELLO = {
   happyHourSchedule: null,
 };
 
-describe('carte Happy Hour du tableau de bord', () => {
-  beforeAll(async () => {
-    // Les aperçus encadrés restent dans la page, mais n'ont pas à charger /overlay ni /goal ici.
-    (
-      window as unknown as { happyDOM: { settings: { disableIframePageLoading: boolean } } }
-    ).happyDOM.settings.disableIframePageLoading = true;
+// La page réelle du panneau, chargée une fois pour tout le fichier.
+beforeAll(async () => {
+  // Les aperçus encadrés restent dans la page, mais n'ont pas à charger /overlay ni /goal ici.
+  (
+    window as unknown as { happyDOM: { settings: { disableIframePageLoading: boolean } } }
+  ).happyDOM.settings.disableIframePageLoading = true;
 
-    const parsed = new DOMParser().parseFromString(HTML, 'text/html');
-    document.head.replaceChildren(...parsed.head.querySelectorAll('meta'));
-    document.body.replaceChildren(...parsed.body.children);
-    for (const script of document.querySelectorAll('script')) {
-      script.remove();
+  const parsed = new DOMParser().parseFromString(HTML, 'text/html');
+  document.head.replaceChildren(...parsed.head.querySelectorAll('meta'));
+  document.body.replaceChildren(...parsed.body.children);
+  for (const script of document.querySelectorAll('script')) {
+    script.remove();
+  }
+
+  vi.stubGlobal(
+    'WebSocket',
+    class {
+      public listeners: Record<string, ((event: unknown) => void)[]> = {};
+      public onmessage = null;
+      public readyState = 1;
+      public constructor() {
+        sockets.push(this);
+        setTimeout(() => {
+          for (const listener of this.listeners['open'] ?? []) {
+            listener({});
+          }
+        }, 0);
+      }
+      public addEventListener(type: string, listener: (event: unknown) => void): void {
+        (this.listeners[type] ??= []).push(listener);
+      }
+      public send(): void {
+        // Rien n'est attendu du serveur factice.
+      }
+      public close(): void {
+        // Idem.
+      }
+    },
+  );
+
+  window.fetch = ((input: string, init?: RequestInit) => {
+    const method = init?.method ?? 'GET';
+    requests.push({ method, url: input, body: typeof init?.body === 'string' ? init.body : null });
+
+    if (input === '/api/happy-hour/schedule') {
+      return Promise.resolve(scheduleResponse());
     }
+    if (input === '/api/update-notice') {
+      return Promise.resolve(json({ notice: pendingNotice }));
+    }
+    if (input === '/api/update-notice/acknowledge') {
+      pendingNotice = null;
+      return Promise.resolve(json({ notice: null }));
+    }
+    if (input === '/api/config') {
+      return Promise.resolve(json({ config: DEFAULT_CONFIG, hasClientSecret: false }));
+    }
+    return Promise.resolve(json({ entries: [], records: [], subscriptions: [], goal: null, tiers: [] }));
+  }) as typeof window.fetch;
 
-    vi.stubGlobal(
-      'WebSocket',
-      class {
-        public listeners: Record<string, ((event: unknown) => void)[]> = {};
-        public onmessage = null;
-        public readyState = 1;
-        public constructor() {
-          sockets.push(this);
-          setTimeout(() => {
-            for (const listener of this.listeners['open'] ?? []) {
-              listener({});
-            }
-          }, 0);
-        }
-        public addEventListener(type: string, listener: (event: unknown) => void): void {
-          (this.listeners[type] ??= []).push(listener);
-        }
-        public send(): void {
-          // Rien n'est attendu du serveur factice.
-        }
-        public close(): void {
-          // Idem.
-        }
-      },
-    );
+  await import('../../../../src/web/admin/main.js');
+  await settle();
+  deliver(HELLO);
+  await settle();
+});
 
-    window.fetch = ((input: string, init?: RequestInit) => {
-      const method = init?.method ?? 'GET';
-      requests.push({ method, url: input, body: typeof init?.body === 'string' ? init.body : null });
+describe('annonce de mise à jour sur le tableau de bord', () => {
+  it('s’affiche tant qu’elle est en attente, avec l’ancien compte de la barre', () => {
+    const notice = element('#update-notice');
 
-      if (input === '/api/happy-hour/schedule') {
-        return Promise.resolve(scheduleResponse());
-      }
-      if (input === '/api/config') {
-        return Promise.resolve(json({ config: DEFAULT_CONFIG, hasClientSecret: false }));
-      }
-      return Promise.resolve(json({ entries: [], records: [], subscriptions: [], goal: null, tiers: [] }));
-    }) as typeof window.fetch;
-
-    await import('../../../../src/web/admin/main.js');
-    await settle();
-    deliver(HELLO);
-    await settle();
+    expect(notice.hidden).toBe(false);
+    expect(element('#view-dashboard').contains(notice)).toBe(true);
+    expect(element('#update-notice-goals').textContent).toContain('37');
   });
 
+  it('disparaît quand on l’acquitte', async () => {
+    element('#update-notice-ack').click();
+    await settle();
+
+    expect(requests.some((request) => request.url === '/api/update-notice/acknowledge')).toBe(true);
+    expect(element('#update-notice').hidden).toBe(true);
+  });
+});
+
+describe('carte Happy Hour du tableau de bord', () => {
   it('envoie la plage saisie quand on clique sur Programmer', async () => {
     field('#happy-hour-start').value = '21:00';
     field('#happy-hour-end').value = '23:00';

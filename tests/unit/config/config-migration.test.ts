@@ -112,3 +112,81 @@ describe('une configuration 1.3.0 par paliers, de bout en bout', () => {
     expect(config.rewards.happyHourRewards.bits).toStrictEqual({ unit: 100, seconds: 90 });
   });
 });
+
+describe('prepareRawConfig — remise à zéro du comptage de la barre', () => {
+  const OLD_GOALS = {
+    bitsPerSub: 500,
+    points: { sub: { tier1: 1 } },
+    unitLabel: 'abo.',
+    tiers: [{ target: 50, label: 'Je me rase la tête' }],
+    overlay: { fontSize: 40, bar: { width: 600 } },
+  };
+
+  function goalsOf(raw: unknown): unknown {
+    return (prepareRawConfig(raw).raw as { goals?: unknown }).goals;
+  }
+
+  it.each([5, 6, 7, 8])('écarte le comptage d’une configuration en version %d et garde l’apparence', (schemaVersion) => {
+    expect(goalsOf({ schemaVersion, goals: OLD_GOALS })).toStrictEqual({
+      overlay: { fontSize: 40, bar: { width: 600 } },
+    });
+  });
+
+  it('le signale, pour que l’appelant remette le compte à zéro et prévienne le streamer', () => {
+    const prepared = prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS });
+
+    expect(prepared.goalsReset).toBe(true);
+    expect(prepared.notes.map((note) => note.message)).toContain(
+      'comptage de la barre d’objectif remis aux valeurs de départ',
+    );
+  });
+
+  it('remet aux valeurs de départ une fois passé par le schéma', () => {
+    const prepared = prepareRawConfig({ schemaVersion: 5, goals: OLD_GOALS });
+    const goals = configSchema.parse(prepared.raw).goals;
+
+    expect(goals.bitsPerSub).toBe(1);
+    expect(goals.points.sub.tier1).toBe(500);
+    expect(goals.unitLabel).toBe('points');
+    expect(goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+    expect(goals.overlay.fontSize).toBe(40);
+    expect(goals.overlay.bar.width).toBe(600);
+  });
+
+  it('ne touche plus à une configuration déjà passée par la remise à zéro', () => {
+    const settled = { schemaVersion: 9, goals: { ...OLD_GOALS, tiers: [] } };
+    const prepared = prepareRawConfig(settled);
+
+    expect(prepared.goalsReset).toBe(false);
+    expect(goalsOf(settled)).toStrictEqual(settled.goals);
+  });
+
+  it('remet à zéro une configuration ancienne même sans sous-arbre d’objectifs', () => {
+    const prepared = prepareRawConfig({ schemaVersion: 5, rewards: {} });
+
+    expect(prepared.goalsReset).toBe(true);
+    expect(goalsOf({ schemaVersion: 5, rewards: {} })).toBeUndefined();
+  });
+
+  it.each([undefined, null, 'texte', {}, { goals: OLD_GOALS }, { schemaVersion: '5', goals: OLD_GOALS }])(
+    'ne remet rien à zéro quand le fichier ne dit pas sa version : %o',
+    (raw) => {
+      expect(prepareRawConfig(raw).goalsReset).toBe(false);
+    },
+  );
+
+  it('ne lève pas sur un sous-arbre d’objectifs illisible', () => {
+    expect(() => prepareRawConfig({ schemaVersion: 5, goals: 'texte' })).not.toThrow();
+    expect(goalsOf({ schemaVersion: 5, goals: 'texte' })).toBeUndefined();
+  });
+
+  it('convertit les bits du barème de temps dans le même passage', () => {
+    const prepared = prepareRawConfig({ schemaVersion: 5, rewards: { bits: TIERS }, goals: OLD_GOALS });
+
+    expect(bitsOf({ schemaVersion: 5, rewards: { bits: TIERS }, goals: OLD_GOALS })).toStrictEqual({
+      unit: 100,
+      seconds: 45,
+    });
+    expect(prepared.goalsReset).toBe(true);
+  });
+});

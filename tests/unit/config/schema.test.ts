@@ -304,14 +304,6 @@ describe('setup', () => {
 });
 
 describe('goals', () => {
-  it('compte un abonnement pour cinq cents bits', () => {
-    expect(configSchema.parse({}).goals.bitsPerSub).toBe(500);
-  });
-
-  it('part sans aucun palier : une échelle vide est l’état éteint', () => {
-    expect(configSchema.parse({}).goals.tiers).toEqual([]);
-  });
-
   it('retient une échelle nommée', () => {
     const parsed = configSchema.parse({
       goals: { tiers: [{ target: 50, label: 'Je me rase la tête' }] },
@@ -488,12 +480,6 @@ describe('apparence de la page Objectifs', () => {
   });
 });
 
-describe('version du schéma', () => {
-  it('passe à 8 avec le taux unique des bits, sans quoi les clés des anciens modes resteraient dans le fichier', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(8);
-  });
-});
-
 describe('barème Happy Hour', () => {
   it('vaut par défaut le double du barème normal par défaut', () => {
     expect(configSchema.parse({}).rewards.happyHourRewards).toStrictEqual({
@@ -518,14 +504,6 @@ describe('barème Happy Hour', () => {
 });
 
 describe('barème de points de la barre d’objectif', () => {
-  it('vaut un point partout par défaut : la barre compte alors en abonnements', () => {
-    expect(configSchema.parse({}).goals.points).toStrictEqual({
-      sub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
-      resub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
-      gift: { tier1: 1, tier2: 1, tier3: 1 },
-    });
-  });
-
   it('accepte un poids nul, qui retire un type d’événement de la barre', () => {
     expect(configSchema.parse({ goals: { points: { sub: { tier1: 0 } } } }).goals.points.sub.tier1).toBe(0);
   });
@@ -540,15 +518,43 @@ describe('barème de points de la barre d’objectif', () => {
 });
 
 describe('libellé d’unité de la barre d’objectif', () => {
-  it('vaut « abo. » par défaut', () => {
-    expect(configSchema.parse({}).goals.unitLabel).toBe('abo.');
-  });
-
   it('accepte un libellé vide : le compte s’affiche alors sans unité', () => {
     expect(configSchema.parse({ goals: { unitLabel: '' } }).goals.unitLabel).toBe('');
   });
 
   it('refuse un libellé plus long qu’un libellé de palier', () => {
     expect(() => configSchema.parse({ goals: { unitLabel: 'x'.repeat(41) } })).toThrow();
+  });
+});
+
+describe('valeurs de départ de la barre d’objectif, comptée en points', () => {
+  const goals = configSchema.parse({}).goals;
+
+  it('compte un point par bit', () => {
+    expect(goals.bitsPerSub).toBe(1);
+  });
+
+  it('cale les points des abonnements sur leur prix en bits', () => {
+    expect(goals.points).toStrictEqual({
+      sub: { tier1: 500, tier2: 1_000, tier3: 2_500, prime: 500 },
+      resub: { tier1: 500, tier2: 1_000, tier3: 2_500, prime: 500 },
+      gift: { tier1: 500, tier2: 1_000, tier3: 2_500 },
+    });
+  });
+
+  it('nomme son unité « points »', () => {
+    expect(goals.unitLabel).toBe('points');
+  });
+
+  it('porte d’office un premier palier à 1 000 points', () => {
+    expect(goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+  });
+
+  it('laisse supprimer ce palier : une échelle vide reste une échelle vide', () => {
+    expect(configSchema.parse({ goals: { tiers: [] } }).goals.tiers).toStrictEqual([]);
+  });
+
+  it('passe le schéma en version 9, pour que la remise à zéro ne joue qu’une fois', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(9);
   });
 });

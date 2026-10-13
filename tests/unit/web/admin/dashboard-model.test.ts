@@ -5,6 +5,7 @@ import {
   counterControls,
   createDashboardModel,
   formatGoalCount,
+  goalsResetNotice,
   happyHourLabels,
   happyHourScheduleView,
   isResetArmed,
@@ -472,3 +473,27 @@ describe('formatGoalCount', () => {
     expect(formatGoalCount(12, '   ')).toBe('12');
   });
 });
+
+describe('goalsResetNotice', () => {
+  it('dit ce qui a été remis aux valeurs de départ, et ce qui ne l’a pas été', () => {
+    const text = goalsResetNotice({ goalsReset: { previousCount: 0 } });
+
+    expect(text).toContain('compte désormais en points');
+    expect(text).toContain('barème');
+    expect(text).toContain('paliers');
+    expect(text).toContain('apparence');
+  });
+
+  it('rappelle le compte qu’avait la barre, pour qu’on puisse la recaler', () => {
+    expect(goalsResetNotice({ goalsReset: { previousCount: 37 } })).toContain('37');
+  });
+
+  it('ne parle pas d’un ancien compte quand la barre était à zéro', () => {
+    expect(goalsResetNotice({ goalsReset: { previousCount: 0 } })).not.toMatch(/était de/u);
+  });
+
+  it('ne dit rien sans annonce', () => {
+    expect(goalsResetNotice(null)).toBe('');
+  });
+});
+

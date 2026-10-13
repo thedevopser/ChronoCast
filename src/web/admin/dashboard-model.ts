@@ -227,6 +227,29 @@ export function happyHourLabels(active: boolean): HappyHourLabels {
     : { state: 'Éteint', action: 'Activer' };
 }
 
+export interface UpdateNoticeView {
+  readonly goalsReset: { readonly previousCount: number };
+}
+
+/** Ce que l'encart du tableau de bord dit d'une barre d'objectif remise aux valeurs de départ. */
+export function goalsResetNotice(notice: UpdateNoticeView | null): string {
+  if (notice === null) {
+    return '';
+  }
+
+  const { previousCount } = notice.goalsReset;
+  const recall =
+    previousCount > 0
+      ? ` Avant la mise à jour, son compte était de ${String(previousCount)} : reportez-le dans « Compte déjà acquis » si vous voulez la recaler.`
+      : '';
+
+  return (
+    'La barre d’objectif compte désormais en points : un point par bit, et des points par ' +
+    'abonnement selon son tier. Son barème, ses paliers et son compte ont été remis aux valeurs ' +
+    `de départ ; son apparence est conservée.${recall}`
+  );
+}
+
 /** Le compte de la barre suivi de son unité, ou seul quand le streamer n'en a pas nommé. */
 export function formatGoalCount(count: number, unitLabel: string): string {
   return `${String(count)} ${unitLabel.trim()}`.trim();

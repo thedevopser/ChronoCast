@@ -43,6 +43,20 @@
             </p>
           </header>
 
+          <div class="card" id="update-notice" hidden>
+            <p class="card__label">Ce qui a changé avec cette version</p>
+            <p class="card__hint" id="update-notice-goals"></p>
+            <p class="card__hint">
+              Les bits du barème de temps se règlent par un taux unique, où chaque bit compte : le
+              mode par paliers et le seuil minimum n'existent plus. Vérifiez vos réglages dans
+              <a href="#rewards">Barème</a>, <a href="#happy-hour">Happy Hour</a> et
+              <a href="#goals">Objectifs</a>.
+            </p>
+            <div class="actions">
+              <button class="button" type="button" id="update-notice-ack">J'ai compris</button>
+            </div>
+          </div>
+
           <div class="board">
             <div class="card card--counter">
               <p class="card__label">Temps restant</p>
@@ -251,9 +265,9 @@
           <header class="view__head">
             <h1 class="view__title">Objectifs</h1>
             <p class="view__subtitle">
-              L'échelle des promesses, et ce que pèse chaque soutien dans la barre. Par défaut un
-              sub, un réabonnement et chaque sub offert valent un point ; les bits comptent par
-              tranches.
+              L'échelle des promesses, et ce que pèse chaque soutien dans la barre. Elle compte en
+              points : au départ un point par bit, et 500, 1 000 ou 2 500 points par abonnement
+              selon son tier. Tout se règle ci-dessous.
             </p>
           </header>
 
@@ -285,7 +299,7 @@
                 type="number"
                 min="0"
                 step="1"
-                placeholder="80"
+                placeholder="25000"
                 autocomplete="off"
               />
             </label>

@@ -45,6 +45,12 @@ import { createStaticHandler } from '../server/static-handler.js';
 import { createWsAdapter, type WsAdapter } from '../server/ws-adapter.js';
 import { createWsHub, type HubTimers, type WsHub } from '../server/ws-hub.js';
 import type { WindowState } from '../schedule/one-shot-window.js';
+import {
+  createUpdateNotice,
+  parseUpdateNotice,
+  type UpdateNotice,
+  type UpdateNoticeState,
+} from '../update/update-notice.js';
 import { createAtomicJsonStore } from '../storage/atomic-json-store.js';
 import { createJsonlStore } from '../storage/jsonl-store.js';
 import { mapNotification, semanticKey } from '../twitch/event-mapper.js';
@@ -88,6 +94,8 @@ const COUNTER_FILE = 'counter.json';
 const GOALS_FILE = 'goals.json';
 
 const HAPPY_HOUR_SCHEDULE_FILE = 'happy-hour-schedule.json';
+
+const UPDATE_NOTICE_FILE = 'update-notice.json';
 
 const WS_PATH = '/ws';
 
@@ -194,6 +202,20 @@ export function createApplication(options: ApplicationOptions): Application {
     },
   });
 
+  // Levé par la lecture d'une configuration dont le comptage de la barre vient d'être écarté : le
+  // compte en cours, tenu par le service des objectifs, reste à remettre à zéro au démarrage.
+  let goalsResetPending = false;
+
+  const updateNotice: UpdateNotice = createUpdateNotice({
+    store: createAtomicJsonStore<UpdateNoticeState | null>({
+      filePath: paths.resolveDataFile(UPDATE_NOTICE_FILE),
+      parse: parseUpdateNotice,
+      createDefault: () => null,
+      logger: logger.child('update-notice-store'),
+    }),
+    logger: logger.child('update-notice'),
+  });
+
   const configService: ConfigService = createConfigService({
     store: createAtomicJsonStore<ChronoCastConfig>({
       filePath: paths.resolveDataFile(CONFIG_FILE),
@@ -206,6 +228,10 @@ export function createApplication(options: ApplicationOptions): Application {
 
         for (const note of prepared.notes) {
           logger.child('config').info(note.message, note.context);
+        }
+
+        if (prepared.goalsReset) {
+          goalsResetPending = true;
         }
 
         return config;
@@ -651,6 +677,7 @@ export function createApplication(options: ApplicationOptions): Application {
       counter: counterService,
       goals: goalService,
       happyHourSchedule,
+      updateNotice,
       history,
       logs: ringBuffer,
       twitch: twitchApi,
@@ -800,6 +827,17 @@ export function createApplication(options: ApplicationOptions): Application {
       await counterService.start();
       await goalService.start();
       await happyHourSchedule.start();
+      await updateNotice.start();
+
+      if (goalsResetPending) {
+        goalsResetPending = false;
+
+        // L'ancien compte était en abonnements : il ne veut plus rien dire face à un barème en
+        // points. Il est rappelé dans l'annonce pour que le streamer puisse recaler sa barre.
+        const previousCount = goalService.getState().subs;
+        await goalService.reset();
+        await updateNotice.announceGoalsReset(previousCount);
+      }
       hub.start();
 
       httpServer = createHttpServer({

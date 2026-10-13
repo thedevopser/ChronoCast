@@ -138,15 +138,27 @@ Les nuits de changement d'heure, une heure qui n'existe pas — 02:30 au passage
 
 Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesses. « À 50 subs je me rase la tête. » Les objectifs comptent ces promesses et les montrent à vos spectateurs, pour qu'ils voient ce que leur abonnement vient de faire avancer.
 
-**Ce qui fait avancer le compte.** La barre compte en **points**, selon un barème que vous réglez dans la vue *Objectifs* : trois cartes — *Points · Abonnements*, *Points · Réabonnements*, *Points · Sub offerts* — donnent le poids de chaque tier, Prime compris. Un lot de sub offerts ajoute les points de son tier multipliés par le nombre de sub. Les **bits** se convertissent par tranches entières, réglées par *Bits par point* — à 500, un don de 1 200 bits ajoute deux points, et le reste n'est pas conservé ; à 1, un bit vaut un point.
+**Ce qui fait avancer le compte.** La barre compte en **points**, selon un barème que vous réglez dans la vue *Objectifs* : *Bits par point* pour les bits, et trois cartes — *Points · Abonnements*, *Points · Réabonnements*, *Points · Sub offerts* — pour le poids de chaque tier, Prime compris. Un lot de sub offerts ajoute les points de son tier multipliés par le nombre de sub. Le bouton *Copier vers…* au pied de chaque carte recopie ses valeurs dans les deux autres.
 
-**Par défaut, tout vaut 1** : un abonnement, un réabonnement et chaque sub offert ajoutent un point quel que soit le tier, si bien que la barre compte en abonnements — « à 50 subs je me rase la tête ». Rien ne vous oblige à y toucher. Un poids à 0 retire ce type de soutien de la barre. Le bouton *Copier vers…* au pied de chaque carte recopie ses valeurs dans les deux autres.
+**Les valeurs de départ sont calées sur les prix**, pour qu'un euro de soutien pèse à peu près pareil quelle que soit sa forme :
+
+| Soutien | Points |
+| --- | --- |
+| 1 bit | 1 |
+| Abonnement ou réabonnement, Prime ou Tier 1 | 500 |
+| Abonnement ou réabonnement, Tier 2 | 1 000 |
+| Abonnement ou réabonnement, Tier 3 | 2 500 |
+| Sub offert | 500, 1 000 ou 2 500 selon le tier, par sub offert |
+
+Ce ne sont que des valeurs de départ : réglez-les à votre main. Un poids à 0 retire ce type de soutien de la barre. Pour une barre qui compte **en abonnements** — « à 50 subs je me rase la tête » —, mettez 1 partout, relevez *Bits par point* (à 500, cinq cents bits valent un abonnement) et nommez l'unité « abo. ». Au-delà de 1, les bits comptent par tranches entières et le reste n'est pas conservé.
+
+**Une barre vous attend dès l'installation**, sur un premier palier à 1 000 points nommé « Objectif ». Renommez-le, changez son seuil, ajoutez-en d'autres ou supprimez-le : sans aucun palier, la page reste vide.
 
 **Modifier le barème de points ne recalcule pas le compte en cours** : il ne vaut que pour les soutiens à venir.
 
-**Le barème de points est indépendant du barème de temps.** Un don de bits trop petit pour créditer du temps fait quand même avancer la barre s'il atteint une tranche de *Bits par point*, et inversement.
+**Le barème de points est indépendant du barème de temps.** Ce qu'un soutien ajoute au compteur et ce qu'il ajoute à la barre se règlent séparément : mettre les secondes des bits à 0 dans le barème n'empêche pas les bits de faire avancer la barre, et inversement.
 
-**Le nom de l'unité.** Le champ *Nom de l'unité* dit ce que le panneau écrit après le compte — « abo. » par défaut, « points » si c'est ce que vous comptez. Il n'apparaît que dans le panneau : vos spectateurs lisent le nom du palier et « 12 / 50 », sans unité.
+**Le nom de l'unité.** Le champ *Nom de l'unité* dit ce que le panneau écrit après le compte — « points » par défaut. Il n'apparaît que dans le panneau : vos spectateurs lisent le nom du palier et « 620 / 1000 », sans unité.
 
 **Ce qui ne compte pas** : la commande `!addtime`. C'est un crédit accordé à la main par un modérateur, et le faire gonfler une promesse affichée aux spectateurs la rendrait mensongère.
 
@@ -156,16 +168,13 @@ Un subathon tient rarement sur un chiffre qui grimpe : il tient sur des promesse
 
 **La remise à zéro** se trouve sur le tableau de bord, et demande deux clics : le premier arme, le second exécute. Elle n'efface **que** la progression des objectifs — votre compteur n'y touche pas, et l'inverse est vrai aussi : réinitialiser le chrono ne remet pas les objectifs à zéro. La progression est enregistrée dans son propre fichier et survit à la fermeture de l'application.
 
+**À la mise à jour vers la 1.4.0**, la barre est passée en points chez tout le monde : son barème, ses paliers et son compte ont été remis aux valeurs de départ, et son apparence conservée. Un encart sur le tableau de bord le signale au premier lancement et rappelle le compte qu'elle avait ; il reste affiché jusqu'à ce que vous le fermiez.
+
 **Si votre subathon a commencé avant ChronoCast**, le champ *Compte déjà acquis*, sous l'échelle dans la vue *Objectifs*, cale la barre sur votre compte réel. La valeur saisie **remplace** le compte : elle ne s'y ajoute pas, elle n'annonce aucun palier à vos spectateurs même si elle en dépasse plusieurs, et elle ne crédite aucune seconde au compteur. Servez-vous-en pour rattraper un retard ou corriger une saisie, et non pour gonfler une promesse : c'est le seul endroit où le compte affiché peut s'écarter de ce que ChronoCast a réellement vu passer.
 
 #### Employer la barre seule, hors subathon
 
-La barre ne dépend pas du compteur : elle peut servir à elle seule d'objectif mensuel en points, où abonnements, réabonnements, sub offerts, bits et Power-ups s'additionnent selon vos règles.
-
-1. **Réglez le barème de points.** Par exemple un bit pour un point et un abonnement Tier 1 pour 250 points : *Bits par point* à 1, et 250 dans le Tier 1 des cartes de points.
-2. **Nommez l'unité** — « points » — pour que le panneau cesse de parler d'abonnements.
-3. **Écrivez vos paliers** dans cette unité : 50 000, 100 000…
-4. **Remettez à zéro à la main en début de période**, depuis le tableau de bord. Rien ne repart à zéro tout seul le 1er du mois.
+La barre ne dépend pas du compteur : elle sert à elle seule d'objectif mensuel, où abonnements, réabonnements, sub offerts, bits et Power-ups s'additionnent en points. Rien n'est à régler de plus que pour un subathon : écrivez vos paliers — 50 000, 100 000… — et **remettez la barre à zéro à la main en début de période**, depuis le tableau de bord. Rien ne repart à zéro tout seul le 1er du mois.
 
 **Seuls les soutiens reçus pendant que ChronoCast est ouvert sont comptés.** L'application ne rattrape pas ce qui s'est passé pendant qu'elle était fermée : pour un objectif mensuel, laissez-la tourner pendant vos directs, et corrigez un écart avec le champ *Compte déjà acquis*.
 

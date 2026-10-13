@@ -290,6 +290,50 @@ describe('createConfigService', () => {
       expect(double.persisted).toMatchObject({ rewards: { happyHour: false } });
     });
 
+    describe('import d’une configuration exportée avant la barre en points', () => {
+      const EXPORTED = {
+        schemaVersion: 5,
+        goals: {
+          bitsPerSub: 500,
+          tiers: [{ target: 50, label: 'Je me rase la tête' }],
+          overlay: { fontSize: 40 },
+        },
+        rewards: { bits: { mode: 'tiers', linear: {}, tiers: [{ minBits: 200, seconds: 100 }] } },
+      };
+
+      it('remet le comptage de la barre aux valeurs de départ et garde son apparence', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(JSON.stringify(EXPORTED));
+
+        expect(imported.goals.bitsPerSub).toBe(1);
+        expect(imported.goals.unitLabel).toBe('points');
+        expect(imported.goals.tiers).toStrictEqual([{ target: 1_000, label: 'Objectif' }]);
+        expect(imported.goals.overlay.fontSize).toBe(40);
+      });
+
+      it('convertit ses paliers de bits en taux unique', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(JSON.stringify(EXPORTED));
+
+        expect(imported.rewards.bits).toStrictEqual({ unit: 200, seconds: 100 });
+      });
+
+      it('respecte le comptage d’une configuration exportée depuis', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(
+          JSON.stringify({ ...EXPORTED, schemaVersion: CONFIG_SCHEMA_VERSION }),
+        );
+
+        expect(imported.goals.bitsPerSub).toBe(500);
+      });
+    });
+
     describe('import d’une configuration qui ne porte pas de barème Happy Hour', () => {
       const LEGACY = {
         schemaVersion: 5,

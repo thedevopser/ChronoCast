@@ -21,6 +21,7 @@ const NO_STATIC: StaticHandler = {
 const MUTATIONS: readonly (readonly [string, string])[] = [
   ['PATCH', '/api/config'],
   ['PUT', '/api/happy-hour/schedule'],
+  ['POST', '/api/update-notice/acknowledge'],
   ['DELETE', '/api/happy-hour/schedule'],
   ['POST', '/api/config/import'],
   ['POST', '/api/counter/pause'],

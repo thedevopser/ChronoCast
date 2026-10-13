@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import { configSchema, type GoalsConfig } from '../../../src/core/config/schema.js';
 import type {
   BitsEvent,
@@ -11,11 +10,17 @@ import type {
 } from '../../../src/core/events/domain-event.js';
 import { pointsGained } from '../../../src/core/goals/goal-progress.js';
 
-const GOALS: GoalsConfig = DEFAULT_CONFIG.goals;
-
 function goalsWith(patch: unknown): GoalsConfig {
   return configSchema.parse({ goals: patch }).goals;
 }
+
+// Une barre réglée pour compter en abonnements : un point par soutien, cinq cents bits par point.
+const ONE_POINT = { tier1: 1, tier2: 1, tier3: 1, prime: 1 };
+
+const GOALS: GoalsConfig = goalsWith({
+  bitsPerSub: 500,
+  points: { sub: ONE_POINT, resub: ONE_POINT, gift: { tier1: 1, tier2: 1, tier3: 1 } },
+});
 
 function baseEvent(): {
   id: string;
@@ -41,7 +46,7 @@ describe('pointsGained', () => {
       expect(pointsGained(event, GOALS)).toBe(1);
     });
 
-    it('vaut un par défaut quel que soit le tier, comme avant le barème de points', () => {
+    it('vaut un quel que soit le tier quand tous les poids sont à un', () => {
       const tier3: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier3' };
       const prime: SubEvent = { ...baseEvent(), type: 'sub', tier: 'prime' };
 
@@ -230,6 +235,24 @@ describe('pointsGained', () => {
 
       expect(pointsGained(cheer, monthly)).toBe(250);
       expect(pointsGained(sub, monthly)).toBe(250);
+    });
+  });
+
+  describe('valeurs de départ', () => {
+    const DEFAULTS = goalsWith({});
+
+    it('ajoute un point par bit', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 137 };
+
+      expect(pointsGained(event, DEFAULTS)).toBe(137);
+    });
+
+    it('pèse un abonnement à son prix en bits, selon son tier', () => {
+      const tier1: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+      const tier3: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier3' };
+
+      expect(pointsGained(tier1, DEFAULTS)).toBe(500);
+      expect(pointsGained(tier3, DEFAULTS)).toBe(2_500);
     });
   });
 });
