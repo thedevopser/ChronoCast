@@ -208,7 +208,7 @@ export interface HappyHourLabels {
 
 export function happyHourLabels(active: boolean): HappyHourLabels {
   return active
-    ? { state: 'Actif ×2', action: 'Désactiver' }
+    ? { state: 'Actif', action: 'Désactiver' }
     : { state: 'Éteint', action: 'Activer' };
 }
 

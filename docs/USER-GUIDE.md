@@ -98,11 +98,15 @@ Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre 
 
 ### Le Happy Hour
 
-Une bascule qui **double les secondes créditées**, le temps que vous décidez. Elle se trouve sur le **tableau de bord**, dans la carte *Happy Hour*, et aussi dans la vue *Barème* — c'est le même réglage, et les deux restent d'accord même si vous gardez plusieurs onglets ouverts.
+Une bascule qui **fait passer les crédits sur un barème à part**, le temps que vous décidez. Elle se trouve sur le **tableau de bord**, dans la carte *Happy Hour*, et aussi dans la vue *Barème* — c'est le même réglage, et les deux restent d'accord même si vous gardez plusieurs onglets ouverts.
 
-Sont doublés les **abonnements, réabonnements, sub offerts et bits**. Un sub Tier 1 qui vaut trois minutes en vaut six.
+**Les abonnements, réabonnements et sub offerts ont leur barème Happy Hour**, que vous réglez dans la vue *Barème*, sous la bascule : trois cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, comme le barème normal. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
 
-Ne sont **pas** doublés : la commande `!addtime`, parce qu'un modérateur qui tape 300 veut créditer 300 ; et les seuils d'entrée, parce que doubler le nombre de bits minimum rendrait le barème moins généreux au lieu de plus. Un don qui ne créditait rien ne crédite toujours rien.
+Ce barème vaut au départ **le double de votre barème normal** : si vous aviez réglé un sub Tier 1 à cinq minutes, il en vaut dix en Happy Hour, comme avant. Il est ensuite indépendant — modifier le barème normal ne le change plus, et inversement. Le bouton *Copier vers…* au pied de chaque carte recopie ses valeurs dans les deux autres.
+
+**Les bits comptent double**, sans que leurs seuils d'entrée bougent : un don qui ne créditait rien ne crédite toujours rien.
+
+La commande `!addtime` n'est **jamais** concernée, parce qu'un modérateur qui tape 300 veut créditer 300.
 
 **Le Happy Hour ne s'éteint pas tout seul** : il reste actif tant que vous ne le désactivez pas, et il survit à la fermeture de l'application. C'est pour cela que son état est affiché en permanence sur le tableau de bord — pensez à le couper quand la promesse est passée.
 

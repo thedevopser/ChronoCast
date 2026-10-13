@@ -304,26 +304,44 @@ describe('Happy Hour', () => {
   }
 
   describe('ce qui double', () => {
-    it('double les secondes d’un abonnement', () => {
-      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
-
-      expect(computeReward(event, DOUBLED).seconds).toBe(360);
+    const CUSTOM: RewardsConfig = rewardsWith({
+      happyHour: true,
+      sub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+      resub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+      gift: { tier1: 300, tier2: 600, tier3: 900 },
+      happyHourRewards: {
+        sub: { prime: 110, tier1: 700, tier2: 710, tier3: 720 },
+        resub: { prime: 120, tier1: 800, tier2: 810, tier3: 820 },
+        gift: { tier1: 50, tier2: 60, tier3: 70 },
+      },
     });
 
-    it('double les secondes d’un réabonnement', () => {
+    it('crédite un abonnement selon le barème Happy Hour, et non le double du barème normal', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, CUSTOM).seconds).toBe(700);
+    });
+
+    it('lit le tier et le Prime dans le barème Happy Hour', () => {
+      const tier3: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier3' };
+      const prime: SubEvent = { ...baseEvent(), type: 'sub', tier: 'prime' };
+
+      expect(computeReward(tier3, CUSTOM).seconds).toBe(720);
+      expect(computeReward(prime, CUSTOM).seconds).toBe(110);
+    });
+
+    it('crédite un réabonnement selon le barème Happy Hour', () => {
       const event: ResubEvent = {
         ...baseEvent(),
         type: 'resub',
-        tier: 'tier1',
+        tier: 'tier2',
         cumulativeMonths: 12,
       };
 
-      expect(computeReward(event, DOUBLED).seconds).toBe(
-        computeReward(event, REWARDS).seconds * 2,
-      );
+      expect(computeReward(event, CUSTOM).seconds).toBe(810);
     });
 
-    it('double une salve d’abonnements offerts, déjà multipliée par le total', () => {
+    it('crédite une salve d’abonnements offerts au tarif Happy Hour du tier, fois le total', () => {
       const event: GiftEvent = {
         ...baseEvent(),
         type: 'gift',
@@ -332,7 +350,19 @@ describe('Happy Hour', () => {
         isAnonymous: false,
       };
 
-      expect(computeReward(event, DOUBLED).seconds).toBe(1_800);
+      expect(computeReward(event, CUSTOM).seconds).toBe(250);
+    });
+
+    it('revient au barème normal une fois éteint', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, { ...CUSTOM, happyHour: false }).seconds).toBe(300);
+    });
+
+    it('vaut le double du barème par défaut tant que rien n’est réglé', () => {
+      const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, DOUBLED).seconds).toBe(360);
     });
 
     it('double un don de bits en mode linéaire', () => {
@@ -402,8 +432,14 @@ describe('Happy Hour', () => {
   });
 
   describe('motif', () => {
-    it('dit le doublement, pour que l’historique ne mente pas sur le calcul', () => {
+    it('dit que le crédit vient du barème Happy Hour, pour que l’historique ne mente pas sur le calcul', () => {
       const event: SubEvent = { ...baseEvent(), type: 'sub', tier: 'tier1' };
+
+      expect(computeReward(event, DOUBLED).reason).toBe('abonnement tier1, Happy Hour');
+    });
+
+    it('garde la mention du doublement pour les bits', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
 
       expect(computeReward(event, DOUBLED).reason).toContain('Happy Hour ×2');
     });

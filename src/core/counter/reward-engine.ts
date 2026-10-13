@@ -89,15 +89,20 @@ function computeBitsReward(bits: number, config: RewardsConfig['bits']): RewardC
 
 const HAPPY_HOUR_MULTIPLIER = 2;
 
+const HAPPY_HOUR_MENTION = 'Happy Hour';
+
 function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
+  const subscriptions = rewards.happyHour ? rewards.happyHourRewards : rewards;
+  const mention = rewards.happyHour ? `, ${HAPPY_HOUR_MENTION}` : '';
+
   switch (event.type) {
     case 'sub':
-      return granted(tierSeconds(rewards.sub, event.tier), `abonnement ${event.tier}`);
+      return granted(tierSeconds(subscriptions.sub, event.tier), `abonnement ${event.tier}${mention}`);
 
     case 'resub':
       return granted(
-        tierSeconds(rewards.resub, event.tier),
-        `réabonnement ${event.tier}, ${String(event.cumulativeMonths)} mois`,
+        tierSeconds(subscriptions.resub, event.tier),
+        `réabonnement ${event.tier}, ${String(event.cumulativeMonths)} mois${mention}`,
       );
 
     case 'gift': {
@@ -105,10 +110,10 @@ function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardCo
         return refused("nombre d'abonnements offerts invalide");
       }
 
-      const unitSeconds = giftTierSeconds(rewards.gift, event.tier);
+      const unitSeconds = giftTierSeconds(subscriptions.gift, event.tier);
       return granted(
         unitSeconds * event.total,
-        `${String(event.total)} abonnement(s) offert(s) ${event.tier}`,
+        `${String(event.total)} abonnement(s) offert(s) ${event.tier}${mention}`,
       );
     }
 
@@ -132,15 +137,15 @@ function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardCo
 export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
   const base = computeBaseReward(event, rewards);
 
-  // Seul le résultat est multiplié : les seuils d'entrée sont hors d'atteinte par construction, et
-  // un modérateur qui tape 300 veut créditer 300.
-  if (!rewards.happyHour || !base.applied || event.type === 'command') {
+  // Les abonnements ont leur barème Happy Hour ; seuls les bits passent encore par le doublement,
+  // qui ne touche pas à leurs seuils d'entrée.
+  if (!rewards.happyHour || !base.applied || event.type !== 'bits') {
     return base;
   }
 
   return {
     ...base,
     seconds: base.seconds * HAPPY_HOUR_MULTIPLIER,
-    reason: `${base.reason}, Happy Hour ×${String(HAPPY_HOUR_MULTIPLIER)}`,
+    reason: `${base.reason}, ${HAPPY_HOUR_MENTION} ×${String(HAPPY_HOUR_MULTIPLIER)}`,
   };
 }

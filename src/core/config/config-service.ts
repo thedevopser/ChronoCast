@@ -1,6 +1,7 @@
 import type { Logger } from '../logging/logger.js';
 import type { AtomicJsonStore } from '../storage/atomic-json-store.js';
 import { createDefaultConfig } from './defaults.js';
+import { withDerivedHappyHourRewards } from './happy-hour-rewards.js';
 import { CONFIG_SCHEMA_VERSION, configSchema, type ChronoCastConfig } from './schema.js';
 
 const EXPORT_INDENTATION = 2;
@@ -218,14 +219,18 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
         throw new ConfigImportError('fichier JSON illisible', [], error);
       }
 
-      const parsed = configSchema.safeParse(sanitize(decoded));
+      const sanitized = sanitize(decoded);
+      const parsed = configSchema.safeParse(sanitized);
       if (!parsed.success) {
         const details = describeIssues(parsed.error);
         logger.warning('import de configuration refusé', { issues: details });
         throw new ConfigImportError('configuration importée invalide', details, parsed.error);
       }
 
-      const imported: ChronoCastConfig = { ...parsed.data, schemaVersion: CONFIG_SCHEMA_VERSION };
+      const imported: ChronoCastConfig = {
+        ...withDerivedHappyHourRewards(sanitized, parsed.data),
+        schemaVersion: CONFIG_SCHEMA_VERSION,
+      };
       await store.write(imported);
       current = imported;
 

@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 
 import { evaluateChatMessage } from '../chat/command-service.js';
 import { createConfigService, type ConfigService } from '../config/config-service.js';
+import { withDerivedHappyHourRewards } from '../config/happy-hour-rewards.js';
 import { configSchema, type ChronoCastConfig } from '../config/schema.js';
 import {
   createCounterService,
@@ -187,7 +188,9 @@ export function createApplication(options: ApplicationOptions): Application {
   const configService: ConfigService = createConfigService({
     store: createAtomicJsonStore<ChronoCastConfig>({
       filePath: paths.resolveDataFile(CONFIG_FILE),
-      parse: (raw) => configSchema.parse(raw),
+      // Dérivé ici, sur le fichier tel qu'il est écrit : une fois passé par le schéma, rien ne
+      // distingue plus un barème Happy Hour absent d'un barème laissé à ses valeurs par défaut.
+      parse: (raw) => withDerivedHappyHourRewards(raw, configSchema.parse(raw)),
       createDefault: () => configSchema.parse({}),
       logger: logger.child('config-store'),
     }),

@@ -184,6 +184,27 @@ describe('fieldsOf', () => {
 });
 
 describe('regroupement', () => {
+  it('sépare la bascule du Happy Hour de son barème', () => {
+    expect(groupOf('rewards.happyHour')).toBe('Happy Hour');
+    expect(groupOf('rewards.happyHourRewards.sub.tier1')).toBe('Happy Hour · Abonnements');
+    expect(groupOf('rewards.happyHourRewards.resub.prime')).toBe('Happy Hour · Réabonnements');
+    expect(groupOf('rewards.happyHourRewards.gift.tier3')).toBe('Happy Hour · Sub offerts');
+  });
+
+  it('présente le barème normal, puis la bascule du Happy Hour suivie de son barème', () => {
+    expect(groupsOf('rewards')).toStrictEqual([
+      'Abonnements',
+      'Réabonnements',
+      'Sub offerts',
+      'Bits',
+      'Happy Hour',
+      'Happy Hour · Abonnements',
+      'Happy Hour · Réabonnements',
+      'Happy Hour · Sub offerts',
+      'Commande de chat',
+    ]);
+  });
+
   it('range chaque champ dans un groupe nommé', () => {
     for (const field of ADMIN_FIELDS) {
       expect(groupOf(field.path), field.path).not.toBe('Divers');

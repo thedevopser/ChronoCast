@@ -90,4 +90,26 @@ describe('copyReward', () => {
 
     expect(values['#reward-resub-tier1']).toBe('200');
   });
+
+  it('recopie de même entre les cartes du barème Happy Hour, sans toucher au barème normal', () => {
+    const values = copied(
+      'rewards.happyHourRewards.gift.',
+      ['rewards.happyHourRewards.sub.', 'rewards.happyHourRewards.resub.'],
+      {
+        ...DRAFT,
+        '#reward-hh-gift-tier1': '31',
+        '#reward-hh-gift-tier2': '32',
+        '#reward-hh-gift-tier3': '33',
+      },
+    );
+
+    expect(values).toStrictEqual({
+      '#reward-hh-sub-tier1': '31',
+      '#reward-hh-sub-tier2': '32',
+      '#reward-hh-sub-tier3': '33',
+      '#reward-hh-resub-tier1': '31',
+      '#reward-hh-resub-tier2': '32',
+      '#reward-hh-resub-tier3': '33',
+    });
+  });
 });

@@ -55,8 +55,8 @@ describe('createDashboardModel', () => {
 });
 
 describe('happyHourLabels', () => {
-  it('dit le multiplicateur quand il est actif, pour qu’on ne l’oublie pas en direct', () => {
-    expect(happyHourLabels(true).state).toContain('×2');
+  it('dit qu’il est actif sans annoncer de multiplicateur, le barème Happy Hour étant réglable', () => {
+    expect(happyHourLabels(true).state).toBe('Actif');
   });
 
   it('propose l’action inverse de l’état courant', () => {

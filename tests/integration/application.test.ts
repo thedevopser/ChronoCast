@@ -27,6 +27,7 @@ import {
   channelSubscribe,
   channelSubscribeGifted,
   channelSubscriptionGift,
+  channelSubscriptionMessage,
   chatMessageBroadcasterPause,
   chatMessageBroadcasterResume,
   chatMessageModeratorAddTime,
@@ -287,7 +288,7 @@ describe('application complète', () => {
       expect(overlay.ofType('event')).toHaveLength(1);
     });
 
-    it('double le crédit d’un abonnement une fois le Happy Hour activé', async () => {
+    it('crédite un abonnement au barème Happy Hour une fois celui-ci activé', async () => {
       const response = await api('/api/config', {
         method: 'PATCH',
         headers: { [CSRF_HEADER]: application.getCsrfToken() },
@@ -306,7 +307,96 @@ describe('application complète', () => {
         entries: { rewardSeconds: number; reason: string }[];
       };
       expect(history.entries[0]?.rewardSeconds).toBe(360);
-      expect(history.entries[0]?.reason).toContain('Happy Hour ×2');
+      expect(history.entries[0]?.reason).toContain('Happy Hour');
+    });
+
+    describe('configuration écrite avant le barème Happy Hour', () => {
+      beforeEach(async () => {
+        await application.stop();
+
+        await writeFile(
+          join(dataDirectory, 'config.json'),
+          JSON.stringify({
+            schemaVersion: 5,
+            rewards: {
+              happyHour: true,
+              sub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+              resub: { prime: 100, tier1: 400, tier2: 600, tier3: 900 },
+              gift: { tier1: 500, tier2: 600, tier3: 900 },
+            },
+          }),
+          'utf8',
+        );
+
+        application = build();
+        port = await application.start();
+      });
+
+      async function lastRewardSeconds(): Promise<number | undefined> {
+        const history = (await (await api('/api/history')).json()) as {
+          entries: { rewardSeconds: number }[];
+        };
+        return history.entries[0]?.rewardSeconds;
+      }
+
+      it('crédite chaque type d’abonnement le double du barème réglé, comme avant la mise à jour', async () => {
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(600);
+
+        await notify('channel.subscription.message', channelSubscriptionMessage);
+        expect(await lastRewardSeconds()).toBe(800);
+
+        await notify('channel.subscription.gift', channelSubscriptionGift);
+        expect(await lastRewardSeconds()).toBe(2_000);
+      });
+
+      it('écrit le barème dérivé sur le disque, sous la version courante du schéma', async () => {
+        const raw = await readFile(join(dataDirectory, 'config.json'), 'utf8');
+
+        expect(JSON.parse(raw)).toMatchObject({
+          schemaVersion: CONFIG_SCHEMA_VERSION,
+          rewards: {
+            happyHourRewards: {
+              sub: { prime: 200, tier1: 600, tier2: 1_200, tier3: 1_800 },
+              resub: { prime: 200, tier1: 800, tier2: 1_200, tier3: 1_800 },
+              gift: { tier1: 1_000, tier2: 1_200, tier3: 1_800 },
+            },
+          },
+        });
+      });
+
+      it('ne dérive qu’une fois : régler ensuite le barème normal ne touche plus au barème Happy Hour', async () => {
+        const response = await api('/api/config', {
+          method: 'PATCH',
+          headers: { [CSRF_HEADER]: application.getCsrfToken() },
+          body: JSON.stringify({ config: { rewards: { sub: { tier1: 1_000 } } } }),
+        });
+        expect(response.status).toBe(200);
+
+        await application.stop();
+        application = build();
+        port = await application.start();
+
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(600);
+      });
+
+      it('laisse régler le barème Happy Hour sans toucher au barème normal', async () => {
+        const response = await api('/api/config', {
+          method: 'PATCH',
+          headers: { [CSRF_HEADER]: application.getCsrfToken() },
+          body: JSON.stringify({ config: { rewards: { happyHourRewards: { sub: { tier1: 42 } } } } }),
+        });
+        expect(response.status).toBe(200);
+
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(42);
+
+        const { config } = (await (await api('/api/config')).json()) as {
+          config: { rewards: { sub: { tier1: number } } };
+        };
+        expect(config.rewards.sub.tier1).toBe(300);
+      });
     });
 
     it('ignore le rejeu du même message_id', async () => {

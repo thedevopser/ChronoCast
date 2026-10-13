@@ -89,6 +89,11 @@ import {
 // Chaque jeu réunit les barèmes qui se recopient l'un dans l'autre, désignés par leur préfixe.
 const REWARD_COPY_SETS: readonly (readonly string[])[] = [
   ['rewards.sub.', 'rewards.resub.', 'rewards.gift.'],
+  [
+    'rewards.happyHourRewards.sub.',
+    'rewards.happyHourRewards.resub.',
+    'rewards.happyHourRewards.gift.',
+  ],
 ];
 
 const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {

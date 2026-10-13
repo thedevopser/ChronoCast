@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 5;
+export const CONFIG_SCHEMA_VERSION = 6;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -58,20 +58,40 @@ const counterSchema = z
   })
   .strip();
 
-const tieredRewardSchema = z
-  .object({
-    tier1: seconds.default(180),
-    tier2: seconds.default(240),
-    tier3: seconds.default(300),
-    prime: seconds.default(180),
-  })
-  .strip();
+const DEFAULT_TIER_SECONDS = { tier1: 180, tier2: 240, tier3: 300, prime: 180 } as const;
 
-const giftRewardSchema = z
+// Le Happy Hour valait le double du barème avant d'avoir le sien : ses défauts gardent ce rapport.
+export const HAPPY_HOUR_DEFAULT_FACTOR = 2;
+
+function tieredReward(factor: number) {
+  return z
+    .object({
+      tier1: seconds.default(DEFAULT_TIER_SECONDS.tier1 * factor),
+      tier2: seconds.default(DEFAULT_TIER_SECONDS.tier2 * factor),
+      tier3: seconds.default(DEFAULT_TIER_SECONDS.tier3 * factor),
+      prime: seconds.default(DEFAULT_TIER_SECONDS.prime * factor),
+    })
+    .strip();
+}
+
+function giftReward(factor: number) {
+  return z
+    .object({
+      tier1: seconds.default(DEFAULT_TIER_SECONDS.tier1 * factor),
+      tier2: seconds.default(DEFAULT_TIER_SECONDS.tier2 * factor),
+      tier3: seconds.default(DEFAULT_TIER_SECONDS.tier3 * factor),
+    })
+    .strip();
+}
+
+const tieredRewardSchema = tieredReward(1);
+const giftRewardSchema = giftReward(1);
+
+const happyHourRewardsSchema = z
   .object({
-    tier1: seconds.default(180),
-    tier2: seconds.default(240),
-    tier3: seconds.default(300),
+    sub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    resub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    gift: giftReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
   })
   .strip();
 
@@ -126,9 +146,10 @@ const chatCommandSchema = z
 
 const rewardsSchema = z
   .object({
-    // Double les secondes créditées par les abonnements, les réabonnements, les subs offerts et
-    // les bits, jamais les seuils d'entrée ni la saisie d'un modérateur.
+    // Actif, les abonnements, réabonnements et subs offerts se lisent dans `happyHourRewards` et
+    // les bits comptent double. La saisie d'un modérateur n'est jamais concernée.
     happyHour: z.boolean().default(false),
+    happyHourRewards: happyHourRewardsSchema.default({}),
 
     chatCommand: chatCommandSchema.default({}),
     sub: tieredRewardSchema.default({}),

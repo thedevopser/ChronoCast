@@ -33,15 +33,43 @@ function reward(selector: string, path: string, label: string, view: FieldViewId
   return { selector, path, label, view, kind: 'integer', min: 0, max: DAY };
 }
 
+// Le barème Happy Hour d'une configuration mise à jour vaut le double du barème normal : sa borne
+// doit laisser passer le double de la borne normale.
+function happyHourReward(selector: string, leaf: string, label: string): AdminField {
+  return {
+    selector,
+    path: `rewards.happyHourRewards.${leaf}`,
+    label,
+    view: 'rewards',
+    kind: 'integer',
+    min: 0,
+    max: 2 * DAY,
+  };
+}
+
 const REWARD_FIELDS: readonly AdminField[] = [
   {
     selector: '#reward-happy-hour',
     path: 'rewards.happyHour',
-    label: 'Doubler les secondes créditées',
-    hint: 'Abonnements, réabonnements, sub offerts et bits comptent double. La saisie d’un modérateur et les seuils d’entrée ne bougent pas. Se bascule aussi depuis le tableau de bord.',
+    label: 'Activer le Happy Hour',
+    hint: 'Abonnements, réabonnements et sub offerts créditent alors le barème Happy Hour ci-dessous, et les bits comptent double sans que leurs seuils d’entrée bougent. La saisie d’un modérateur n’est pas concernée. Se bascule aussi depuis le tableau de bord.',
     view: 'rewards',
     kind: 'boolean',
   },
+
+  happyHourReward('#reward-hh-sub-prime', 'sub.prime', 'Prime'),
+  happyHourReward('#reward-hh-sub-tier1', 'sub.tier1', 'Tier 1'),
+  happyHourReward('#reward-hh-sub-tier2', 'sub.tier2', 'Tier 2'),
+  happyHourReward('#reward-hh-sub-tier3', 'sub.tier3', 'Tier 3'),
+
+  happyHourReward('#reward-hh-resub-prime', 'resub.prime', 'Prime'),
+  happyHourReward('#reward-hh-resub-tier1', 'resub.tier1', 'Tier 1'),
+  happyHourReward('#reward-hh-resub-tier2', 'resub.tier2', 'Tier 2'),
+  happyHourReward('#reward-hh-resub-tier3', 'resub.tier3', 'Tier 3'),
+
+  happyHourReward('#reward-hh-gift-tier1', 'gift.tier1', 'Tier 1'),
+  happyHourReward('#reward-hh-gift-tier2', 'gift.tier2', 'Tier 2'),
+  happyHourReward('#reward-hh-gift-tier3', 'gift.tier3', 'Tier 3'),
 
   reward('#reward-sub-prime', 'rewards.sub.prime', 'Prime'),
   reward('#reward-sub-tier1', 'rewards.sub.tier1', 'Tier 1'),
@@ -736,17 +764,20 @@ export function fieldsOf(view: FieldViewId): readonly AdminField[] {
   return ADMIN_FIELDS.filter((field) => field.view === view);
 }
 
+// Un préfixe terminé par un point couvre un sous-arbre ; sans point final, il désigne une feuille
+// et rien d'autre — `rewards.happyHour` ne doit pas capter `rewards.happyHourRewards.*`.
 const GROUPS: readonly (readonly [string, string])[] = [
-  // Sans point final : la feuille n'a pas de sous-objet.
-  ['rewards.happyHour', 'Happy Hour'],
   ['rewards.sub.', 'Abonnements'],
   ['rewards.resub.', 'Réabonnements'],
   ['rewards.gift.', 'Sub offerts'],
   ['rewards.bits.', 'Bits'],
+  ['rewards.happyHour', 'Happy Hour'],
+  ['rewards.happyHourRewards.sub.', 'Happy Hour · Abonnements'],
+  ['rewards.happyHourRewards.resub.', 'Happy Hour · Réabonnements'],
+  ['rewards.happyHourRewards.gift.', 'Happy Hour · Sub offerts'],
   ['rewards.chatCommand.', 'Commande de chat'],
 
-  // Sans point final : le comptage n'a qu'une feuille, tout le reste de `goals.` est l'apparence
-  // de la page /goal. Une feuille de comptage ajoutée plus tard tombera dans « Divers », et le
+  // Le comptage n'a qu'une feuille, tout le reste de `goals.` est l'apparence de la page /goal. Une feuille de comptage ajoutée plus tard tombera dans « Divers », et le
   // garde-fou la signalera — c'est voulu.
   ['goals.bitsPerSub', 'Objectifs'],
   ['goals.overlay.bar.', 'Barre'],
@@ -777,12 +808,16 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['history.', 'Historique'],
 ];
 
+function covers(prefix: string, path: string): boolean {
+  return prefix.endsWith('.') ? path.startsWith(prefix) : path === prefix;
+}
+
 export function groupsOf(view: FieldViewId): readonly string[] {
   const seen: string[] = [];
 
   for (const [prefix, label] of GROUPS) {
     const matches = ADMIN_FIELDS.some(
-      (field) => field.view === view && groupOf(field.path) === label && field.path.startsWith(prefix),
+      (field) => field.view === view && groupOf(field.path) === label && covers(prefix, field.path),
     );
     if (matches && !seen.includes(label)) {
       seen.push(label);
@@ -794,7 +829,7 @@ export function groupsOf(view: FieldViewId): readonly string[] {
 
 export function groupOf(path: string): string {
   for (const [prefix, label] of GROUPS) {
-    if (path.startsWith(prefix)) {
+    if (covers(prefix, path)) {
       return label;
     }
   }

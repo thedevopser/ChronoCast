@@ -283,6 +283,40 @@ describe('createConfigService', () => {
       expect(double.persisted).toMatchObject({ rewards: { happyHour: false } });
     });
 
+    describe('import d’une configuration qui ne porte pas de barème Happy Hour', () => {
+      const LEGACY = {
+        schemaVersion: 5,
+        rewards: {
+          happyHour: true,
+          sub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
+        },
+      };
+
+      it('le dérive du barème importé, doublé', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(JSON.stringify(LEGACY));
+
+        expect(imported.rewards.happyHourRewards.sub.tier1).toBe(600);
+        expect(imported.rewards.happyHourRewards.gift.tier1).toBe(360);
+      });
+
+      it('respecte un barème Happy Hour déjà réglé', async () => {
+        const { service } = createService();
+        await service.load();
+
+        const imported = await service.import(
+          JSON.stringify({
+            ...LEGACY,
+            rewards: { ...LEGACY.rewards, happyHourRewards: { sub: { tier1: 42 } } },
+          }),
+        );
+
+        expect(imported.rewards.happyHourRewards.sub.tier1).toBe(42);
+      });
+    });
+
     it('ne réécrit rien lorsque la version est déjà à jour', async () => {
       const { service, double } = createService();
       const avant = double.persisted;
