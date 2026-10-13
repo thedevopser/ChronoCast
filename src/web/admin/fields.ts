@@ -23,6 +23,9 @@ export const UNBOUND_PATHS: Readonly<Record<string, string>> = {
   'rewards.bits.tiers':
     'Tableau de paliers à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Barème avec son propre module.',
 
+  'rewards.happyHourRewards.bits.tiers':
+    'Même éditeur de paliers que le barème normal, paramétré pour le Happy Hour : un tableau à cardinalité variable n’est pas un champ.',
+
   'goals.tiers':
     'Échelle de paliers nommés, à cardinalité variable : ce n’est pas un champ mais un éditeur, tenu par la vue Objectifs avec son propre module.',
 };
@@ -52,7 +55,7 @@ const REWARD_FIELDS: readonly AdminField[] = [
     selector: '#reward-happy-hour',
     path: 'rewards.happyHour',
     label: 'Activer le Happy Hour',
-    hint: 'Abonnements, réabonnements et sub offerts créditent alors le barème Happy Hour ci-dessous, et les bits comptent double sans que leurs seuils d’entrée bougent. La saisie d’un modérateur n’est pas concernée. Se bascule aussi depuis le tableau de bord.',
+    hint: 'Abonnements, réabonnements, sub offerts et bits créditent alors le barème Happy Hour ci-dessous, seuils d’entrée des bits compris. La saisie d’un modérateur n’est pas concernée. Se bascule aussi depuis le tableau de bord.',
     view: 'rewards',
     kind: 'boolean',
   },
@@ -70,6 +73,33 @@ const REWARD_FIELDS: readonly AdminField[] = [
   happyHourReward('#reward-hh-gift-tier1', 'gift.tier1', 'Tier 1'),
   happyHourReward('#reward-hh-gift-tier2', 'gift.tier2', 'Tier 2'),
   happyHourReward('#reward-hh-gift-tier3', 'gift.tier3', 'Tier 3'),
+  {
+    selector: '#reward-hh-bits-mode',
+    path: 'rewards.happyHourRewards.bits.mode',
+    label: 'Mode de calcul',
+    hint: 'Proportionnel au nombre de bits, ou par seuils. Indépendant du mode du barème normal.',
+    view: 'rewards',
+    kind: 'enum',
+    options: ['linear', 'tiers'],
+  },
+  {
+    selector: '#reward-hh-bits-unit',
+    path: 'rewards.happyHourRewards.bits.linear.unit',
+    label: 'Bits par unité',
+    view: 'rewards',
+    kind: 'integer',
+    min: 1,
+  },
+  happyHourReward('#reward-hh-bits-seconds', 'bits.linear.secondsPerUnit', 'Secondes par unité'),
+  {
+    selector: '#reward-hh-bits-min',
+    path: 'rewards.happyHourRewards.bits.linear.minBits',
+    label: 'Bits minimum',
+    hint: 'En deçà de ce seuil, rien n’est crédité pendant le Happy Hour. Se règle à part du seuil normal.',
+    view: 'rewards',
+    kind: 'integer',
+    min: 1,
+  },
 
   reward('#reward-sub-prime', 'rewards.sub.prime', 'Prime'),
   reward('#reward-sub-tier1', 'rewards.sub.tier1', 'Tier 1'),
@@ -775,6 +805,7 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.happyHourRewards.sub.', 'Happy Hour · Abonnements'],
   ['rewards.happyHourRewards.resub.', 'Happy Hour · Réabonnements'],
   ['rewards.happyHourRewards.gift.', 'Happy Hour · Sub offerts'],
+  ['rewards.happyHourRewards.bits.', 'Happy Hour · Bits'],
   ['rewards.chatCommand.', 'Commande de chat'],
 
   // Le comptage n'a qu'une feuille, tout le reste de `goals.` est l'apparence de la page /goal. Une feuille de comptage ajoutée plus tard tombera dans « Divers », et le

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeTiers, type TierInput } from '../../../../src/web/admin/bits-tiers.js';
+import { normalizeTiers, tiersChange, type TierInput } from '../../../../src/web/admin/bits-tiers.js';
 
 function rows(...pairs: [string, string][]): TierInput[] {
   return pairs.map(([minBits, seconds]) => ({ minBits, seconds }));
@@ -92,5 +92,47 @@ describe('normalizeTiers', () => {
     normalizeTiers(input);
 
     expect(JSON.stringify(input)).toBe(snapshot);
+  });
+});
+
+describe('tiersChange', () => {
+  const CURRENT = [
+    { minBits: 100, seconds: 60 },
+    { minBits: 500, seconds: 360 },
+  ];
+
+  it('rend les paliers à écrire quand ils diffèrent de la configuration', () => {
+    const change = tiersChange(rows(['500', '400'], ['100', '60']), 'tiers', CURRENT);
+
+    expect(change.errors).toStrictEqual([]);
+    expect(change.tiers).toStrictEqual([
+      { minBits: 100, seconds: 60 },
+      { minBits: 500, seconds: 400 },
+    ]);
+  });
+
+  it('n’écrit rien quand les paliers saisis sont ceux de la configuration', () => {
+    expect(tiersChange(rows(['100', '60'], ['500', '360']), 'tiers', CURRENT)).toStrictEqual({
+      tiers: null,
+      errors: [],
+    });
+  });
+
+  it('refuse le mode par paliers sans palier : le schéma rejetterait toute la configuration', () => {
+    const change = tiersChange([], 'tiers', CURRENT);
+
+    expect(change.tiers).toBeNull();
+    expect(change.errors).toHaveLength(1);
+  });
+
+  it('laisse en paix une liste vide hors du mode par paliers', () => {
+    expect(tiersChange(rows(['', '']), 'linear', CURRENT)).toStrictEqual({ tiers: null, errors: [] });
+  });
+
+  it('valide une liste remplie même hors du mode par paliers', () => {
+    expect(tiersChange(rows(['abc', '60']), 'linear', CURRENT).errors).toHaveLength(1);
+    expect(tiersChange(rows(['200', '5']), 'linear', CURRENT).tiers).toStrictEqual([
+      { minBits: 200, seconds: 5 },
+    ]);
   });
 });

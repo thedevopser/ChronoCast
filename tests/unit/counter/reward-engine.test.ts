@@ -365,26 +365,58 @@ describe('Happy Hour', () => {
       expect(computeReward(event, DOUBLED).seconds).toBe(360);
     });
 
-    it('double un don de bits en mode linéaire', () => {
+    it('vaut pour les bits le double du barème par défaut tant que rien n’est réglé', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
 
       expect(computeReward(event, DOUBLED).seconds).toBe(240);
     });
 
-    it('double le palier retenu en mode paliers, sans toucher à la table', () => {
+    it('évalue un don de bits contre le barème linéaire du Happy Hour', () => {
       const rewards = rewardsWith({
         happyHour: true,
-        bits: {
-          mode: 'tiers',
-          tiers: [
-            { minBits: 100, seconds: 60 },
-            { minBits: 500, seconds: 360 },
-          ],
+        bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60, minBits: 1 } },
+        happyHourRewards: {
+          bits: { mode: 'linear', linear: { unit: 50, secondsPerUnit: 7, minBits: 1 } },
+        },
+      });
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
+
+      expect(computeReward(event, rewards).seconds).toBe(35);
+    });
+
+    it('évalue un don de bits contre les paliers du Happy Hour, quel que soit le mode normal', () => {
+      const rewards = rewardsWith({
+        happyHour: true,
+        bits: { mode: 'linear' },
+        happyHourRewards: {
+          bits: {
+            mode: 'tiers',
+            tiers: [
+              { minBits: 100, seconds: 11 },
+              { minBits: 500, seconds: 22 },
+            ],
+          },
         },
       });
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 700 };
 
-      expect(computeReward(event, rewards).seconds).toBe(720);
+      expect(computeReward(event, rewards).seconds).toBe(22);
+    });
+
+    it('applique le seuil d’entrée du Happy Hour, et non celui du barème normal', () => {
+      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100 };
+      const stricter = rewardsWith({
+        happyHour: true,
+        happyHourRewards: { bits: { linear: { unit: 1, secondsPerUnit: 1, minBits: 500 } } },
+      });
+      const looser = rewardsWith({
+        happyHour: true,
+        bits: { linear: { unit: 1, secondsPerUnit: 1, minBits: 500 } },
+        happyHourRewards: { bits: { linear: { unit: 1, secondsPerUnit: 3, minBits: 1 } } },
+      });
+
+      expect(computeReward(event, stricter).applied).toBe(false);
+      expect(computeReward(event, looser).seconds).toBe(300);
     });
   });
 
@@ -397,17 +429,6 @@ describe('Happy Hour', () => {
       const rewards = rewardsWith({ happyHour: true, chatCommand: { maxSeconds: 600 } });
 
       expect(computeReward(commandEvent(99_999), rewards).seconds).toBe(600);
-    });
-
-    it('laisse le seuil de bits où il est, un don sous le seuil restant refusé', () => {
-      const rewards = rewardsWith({
-        happyHour: true,
-        bits: { mode: 'linear', linear: { unit: 1, secondsPerUnit: 1, minBits: 500 } },
-      });
-      const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 100 };
-
-      expect(computeReward(event, rewards).applied).toBe(false);
-      expect(computeReward(event, rewards).seconds).toBe(0);
     });
 
     it('laisse l’unité linéaire où elle est, un don sous une unité restant refusé', () => {
@@ -438,10 +459,10 @@ describe('Happy Hour', () => {
       expect(computeReward(event, DOUBLED).reason).toBe('abonnement tier1, Happy Hour');
     });
 
-    it('garde la mention du doublement pour les bits', () => {
+    it('dit de même pour les bits, sans plus annoncer de multiplicateur', () => {
       const event: BitsEvent = { ...baseEvent(), type: 'bits', bits: 250 };
 
-      expect(computeReward(event, DOUBLED).reason).toContain('Happy Hour ×2');
+      expect(computeReward(event, DOUBLED).reason).toBe('250 bits, 2 unité(s), Happy Hour');
     });
 
     it('conserve le motif de base devant la mention', () => {

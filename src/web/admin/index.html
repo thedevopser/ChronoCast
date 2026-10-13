@@ -80,8 +80,8 @@
                 <span class="pill" id="happy-hour-status">—</span>
               </p>
               <p class="card__hint">
-                Abonnements, réabonnements et sub offerts créditent le barème Happy Hour, réglable
-                dans la vue Barème ; les bits comptent double. La commande de chat ne bouge pas.
+                Abonnements, réabonnements, sub offerts et bits créditent le barème Happy Hour,
+                réglable dans la vue Barème. La commande de chat ne bouge pas.
               </p>
               <div class="actions">
                 <button class="button" type="button" id="happy-hour-toggle">Activer</button>
@@ -196,6 +196,18 @@
             <ul class="tiers" id="bits-tiers"></ul>
             <div class="actions">
               <button class="button" type="button" id="add-tier">Ajouter un palier</button>
+            </div>
+          </div>
+
+          <div class="card" id="hh-bits-tiers-card">
+            <p class="card__label">Paliers de bits du Happy Hour</p>
+            <p class="card__hint">
+              Utilisés pendant le Happy Hour, lorsque son mode de calcul est « par paliers ». Seuils
+              et durées se règlent à part de ceux du barème normal.
+            </p>
+            <ul class="tiers" id="hh-bits-tiers"></ul>
+            <div class="actions">
+              <button class="button" type="button" id="add-hh-tier">Ajouter un palier</button>
             </div>
           </div>
 

@@ -189,6 +189,7 @@ describe('regroupement', () => {
     expect(groupOf('rewards.happyHourRewards.sub.tier1')).toBe('Happy Hour · Abonnements');
     expect(groupOf('rewards.happyHourRewards.resub.prime')).toBe('Happy Hour · Réabonnements');
     expect(groupOf('rewards.happyHourRewards.gift.tier3')).toBe('Happy Hour · Sub offerts');
+    expect(groupOf('rewards.happyHourRewards.bits.linear.unit')).toBe('Happy Hour · Bits');
   });
 
   it('présente le barème normal, puis la bascule du Happy Hour suivie de son barème', () => {
@@ -201,6 +202,7 @@ describe('regroupement', () => {
       'Happy Hour · Abonnements',
       'Happy Hour · Réabonnements',
       'Happy Hour · Sub offerts',
+      'Happy Hour · Bits',
       'Commande de chat',
     ]);
   });

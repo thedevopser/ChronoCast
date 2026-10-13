@@ -8,6 +8,12 @@ export interface BitsTier {
   readonly seconds: number;
 }
 
+export interface TiersChange {
+  /** Les paliers à écrire, ou `null` quand il n'y a rien à écrire. */
+  readonly tiers: readonly BitsTier[] | null;
+  readonly errors: readonly string[];
+}
+
 export interface TiersResult {
   readonly tiers: readonly BitsTier[];
   readonly errors: readonly string[];
@@ -63,4 +69,31 @@ export function normalizeTiers(rows: readonly TierInput[]): TiersResult {
   return errors.length > 0
     ? { tiers: [], errors }
     : { tiers: [...tiers].sort((left, right) => left.minBits - right.minBits), errors };
+}
+
+const TIERS_MODE = 'tiers';
+
+/**
+ * Ce que l'éditeur de paliers demande d'écrire, au regard du mode choisi et des paliers en place.
+ *
+ * Hors du mode par paliers, une liste laissée vide n'est pas une faute ; dans ce mode elle l'est,
+ * et il faut l'arrêter ici : le schéma la refuserait au chargement, configuration entière avec.
+ */
+export function tiersChange(
+  rows: readonly TierInput[],
+  mode: string | undefined,
+  current: unknown,
+): TiersChange {
+  if (mode !== TIERS_MODE && rows.every(isBlank)) {
+    return { tiers: null, errors: [] };
+  }
+
+  const { tiers, errors } = normalizeTiers(rows);
+  if (errors.length > 0) {
+    return { tiers: null, errors };
+  }
+
+  return JSON.stringify(tiers) === JSON.stringify(current)
+    ? { tiers: null, errors: [] }
+    : { tiers, errors: [] };
 }

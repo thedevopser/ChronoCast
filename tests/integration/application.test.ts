@@ -323,6 +323,7 @@ describe('application complète', () => {
               sub: { prime: 100, tier1: 300, tier2: 600, tier3: 900 },
               resub: { prime: 100, tier1: 400, tier2: 600, tier3: 900 },
               gift: { tier1: 500, tier2: 600, tier3: 900 },
+              bits: { mode: 'linear', linear: { unit: 50, secondsPerUnit: 30, minBits: 100 } },
             },
           }),
           'utf8',
@@ -350,6 +351,44 @@ describe('application complète', () => {
         expect(await lastRewardSeconds()).toBe(2_000);
       });
 
+      it('crédite un don de bits le double du barème réglé, seuil d’entrée inchangé', async () => {
+        await notify('channel.cheer', channelCheer);
+        expect(await lastRewardSeconds()).toBe(1_200);
+
+        await notify('channel.cheer', { ...(channelCheer as object), bits: 99 });
+        expect(await lastRewardSeconds()).toBe(0);
+      });
+
+      it('dérive le barème des bits d’une configuration qui ne porte que celui des abonnements', async () => {
+        await application.stop();
+        await writeFile(
+          join(dataDirectory, 'config.json'),
+          JSON.stringify({
+            schemaVersion: 6,
+            rewards: {
+              happyHour: true,
+              bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 45, minBits: 1 } },
+              happyHourRewards: { sub: { tier1: 777 } },
+            },
+          }),
+          'utf8',
+        );
+        application = build();
+        port = await application.start();
+
+        await notify('channel.cheer', channelCheer);
+        expect(await lastRewardSeconds()).toBe(900);
+
+        await notify('channel.subscribe', channelSubscribe);
+        expect(await lastRewardSeconds()).toBe(777);
+
+        const raw = await readFile(join(dataDirectory, 'config.json'), 'utf8');
+        expect(JSON.parse(raw)).toMatchObject({
+          schemaVersion: CONFIG_SCHEMA_VERSION,
+          rewards: { happyHourRewards: { bits: { linear: { secondsPerUnit: 90 } } } },
+        });
+      });
+
       it('écrit le barème dérivé sur le disque, sous la version courante du schéma', async () => {
         const raw = await readFile(join(dataDirectory, 'config.json'), 'utf8');
 
@@ -360,6 +399,7 @@ describe('application complète', () => {
               sub: { prime: 200, tier1: 600, tier2: 1_200, tier3: 1_800 },
               resub: { prime: 200, tier1: 800, tier2: 1_200, tier3: 1_800 },
               gift: { tier1: 1_000, tier2: 1_200, tier3: 1_800 },
+              bits: { mode: 'linear', linear: { unit: 50, secondsPerUnit: 60, minBits: 100 } },
             },
           },
         });

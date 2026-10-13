@@ -100,11 +100,11 @@ Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre 
 
 Une bascule qui **fait passer les crédits sur un barème à part**, le temps que vous décidez. Elle se trouve sur le **tableau de bord**, dans la carte *Happy Hour*, et aussi dans la vue *Barème* — c'est le même réglage, et les deux restent d'accord même si vous gardez plusieurs onglets ouverts.
 
-**Les abonnements, réabonnements et sub offerts ont leur barème Happy Hour**, que vous réglez dans la vue *Barème*, sous la bascule : trois cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, comme le barème normal. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
+**Le Happy Hour a son propre barème**, que vous réglez dans la vue *Barème*, sous la bascule : les cartes *Happy Hour · Abonnements*, *Happy Hour · Réabonnements* et *Happy Hour · Sub offerts*, tier par tier et en secondes, puis *Happy Hour · Bits* et ses paliers, avec les mêmes réglages que le barème normal. Tant que le Happy Hour est actif, c'est ce barème qui crédite, et lui seul ; un lot de sub offerts crédite toujours la valeur du tier multipliée par le nombre de sub.
 
-Ce barème vaut au départ **le double de votre barème normal** : si vous aviez réglé un sub Tier 1 à cinq minutes, il en vaut dix en Happy Hour, comme avant. Il est ensuite indépendant — modifier le barème normal ne le change plus, et inversement. Le bouton *Copier vers…* au pied de chaque carte recopie ses valeurs dans les deux autres.
+Ce barème vaut au départ **le double de votre barème normal** : si vous aviez réglé un sub Tier 1 à cinq minutes, il en vaut dix en Happy Hour, comme avant. Il est ensuite indépendant — modifier le barème normal ne le change plus, et inversement. Le bouton *Copier vers…* au pied de chaque carte d'abonnement recopie ses valeurs dans les deux autres.
 
-**Les bits comptent double**, sans que leurs seuils d'entrée bougent : un don qui ne créditait rien ne crédite toujours rien.
+**Les seuils d'entrée des bits se règlent à part pour le Happy Hour** : le nombre de bits minimum, l'unité et le seuil de chaque palier lui appartiennent. Au départ ils reprennent ceux du barème normal, seules les secondes étant doublées ; libre à vous ensuite d'abaisser le minimum pendant le Happy Hour, ou de le relever. Un don sous le seuil du Happy Hour ne crédite rien tant que celui-ci est actif.
 
 La commande `!addtime` n'est **jamais** concernée, parce qu'un modérateur qui tape 300 veut créditer 300.
 

@@ -1,4 +1,4 @@
-import { HAPPY_HOUR_DEFAULT_FACTOR, type ChronoCastConfig } from './schema.js';
+import { HAPPY_HOUR_DEFAULT_FACTOR, type ChronoCastConfig, type RewardsConfig } from './schema.js';
 
 type SecondsTable = Readonly<Record<string, number>>;
 
@@ -17,6 +17,22 @@ function scaled<T extends SecondsTable>(table: T): T {
   return Object.fromEntries(
     Object.entries(table).map(([tier, seconds]) => [tier, seconds * HAPPY_HOUR_DEFAULT_FACTOR]),
   ) as T;
+}
+
+// Seules les secondes doublent : le mode, l'unité et les seuils d'entrée se recopient tels quels,
+// puisque le doublement d'avant ne les touchait pas.
+function scaledBits(bits: RewardsConfig['bits']): RewardsConfig['bits'] {
+  return {
+    mode: bits.mode,
+    linear: {
+      ...bits.linear,
+      secondsPerUnit: bits.linear.secondsPerUnit * HAPPY_HOUR_DEFAULT_FACTOR,
+    },
+    tiers: bits.tiers.map((tier) => ({
+      minBits: tier.minBits,
+      seconds: tier.seconds * HAPPY_HOUR_DEFAULT_FACTOR,
+    })),
+  };
 }
 
 /**
@@ -39,6 +55,7 @@ export function withDerivedHappyHourRewards(raw: unknown, config: ChronoCastConf
         sub: Object.hasOwn(written, 'sub') ? current.sub : scaled(rewards.sub),
         resub: Object.hasOwn(written, 'resub') ? current.resub : scaled(rewards.resub),
         gift: Object.hasOwn(written, 'gift') ? current.gift : scaled(rewards.gift),
+        bits: Object.hasOwn(written, 'bits') ? current.bits : scaledBits(rewards.bits),
       },
     },
   };

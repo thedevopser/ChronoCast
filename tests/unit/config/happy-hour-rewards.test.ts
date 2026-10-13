@@ -18,7 +18,7 @@ function derived(raw: unknown) {
 
 describe('withDerivedHappyHourRewards', () => {
   it('double le barème du streamer quand le fichier ne porte pas de barème Happy Hour', () => {
-    expect(derived({ schemaVersion: 5, rewards: CUSTOM_REWARDS })).toStrictEqual({
+    expect(derived({ schemaVersion: 5, rewards: CUSTOM_REWARDS })).toMatchObject({
       sub: { prime: 200, tier1: 600, tier2: 1_200, tier3: 1_800 },
       resub: { prime: 100, tier1: 300, tier2: 500, tier3: 700 },
       gift: { tier1: 400, tier2: 800, tier3: 1_600 },
@@ -45,7 +45,7 @@ describe('withDerivedHappyHourRewards', () => {
       gift: { tier1: 9, tier2: 10, tier3: 11 },
     };
 
-    expect(derived({ rewards: { ...CUSTOM_REWARDS, happyHourRewards } })).toStrictEqual(
+    expect(derived({ rewards: { ...CUSTOM_REWARDS, happyHourRewards } })).toMatchObject(
       happyHourRewards,
     );
   });
@@ -70,6 +70,46 @@ describe('withDerivedHappyHourRewards', () => {
     expect({ ...outcome, rewards: { ...outcome.rewards, happyHourRewards: null } }).toStrictEqual({
       ...before,
       rewards: { ...before.rewards, happyHourRewards: null },
+    });
+  });
+
+  describe('bits', () => {
+    const CUSTOM_BITS = {
+      mode: 'tiers',
+      linear: { unit: 50, secondsPerUnit: 30, minBits: 200 },
+      tiers: [
+        { minBits: 300, seconds: 45 },
+        { minBits: 900, seconds: 400 },
+      ],
+    };
+
+    it('double les secondes et recopie tels quels le mode, l’unité et les seuils', () => {
+      expect(derived({ schemaVersion: 6, rewards: { bits: CUSTOM_BITS } }).bits).toStrictEqual({
+        mode: 'tiers',
+        linear: { unit: 50, secondsPerUnit: 60, minBits: 200 },
+        tiers: [
+          { minBits: 300, seconds: 90 },
+          { minBits: 900, seconds: 800 },
+        ],
+      });
+    });
+
+    it('dérive les bits d’une configuration qui porte déjà le barème des abonnements', () => {
+      const outcome = derived({
+        schemaVersion: 6,
+        rewards: { bits: CUSTOM_BITS, happyHourRewards: { sub: { tier1: 999 } } },
+      });
+
+      expect(outcome.sub.tier1).toBe(999);
+      expect(outcome.bits.linear.secondsPerUnit).toBe(60);
+    });
+
+    it('ne touche pas à un barème de bits déjà écrit', () => {
+      const bits = { mode: 'linear', linear: { unit: 10, secondsPerUnit: 1, minBits: 5 }, tiers: [] };
+
+      expect(derived({ rewards: { bits: CUSTOM_BITS, happyHourRewards: { bits } } }).bits).toStrictEqual(
+        bits,
+      );
     });
   });
 });

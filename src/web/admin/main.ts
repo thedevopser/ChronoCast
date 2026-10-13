@@ -18,7 +18,7 @@ import {
 } from '../shared/protocol.js';
 import { createWsClient, type WsClientStatus, type WsSocket } from '../shared/ws-client.js';
 import { readWebSocketPort, resolveWebSocketUrl } from '../shared/ws-url.js';
-import { normalizeTiers, type TierInput } from './bits-tiers.js';
+import { tiersChange, type TierInput } from './bits-tiers.js';
 import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
@@ -40,7 +40,13 @@ import {
 } from './dashboard-model.js';
 import { inactiveGroups, mutedSelectors } from './field-dependencies.js';
 import { fieldsOf, groupOf, groupsOf } from './fields.js';
-import { patchFrom, valuesFrom, type FieldError } from './form-binding.js';
+import {
+  patchFrom,
+  readAtPath,
+  valuesFrom,
+  writeAtPath,
+  type FieldError,
+} from './form-binding.js';
 import { draftSubtree } from './overlay-draft.js';
 import { copyReward } from './reward-copy.js';
 import {
@@ -95,6 +101,24 @@ const REWARD_COPY_SETS: readonly (readonly string[])[] = [
     'rewards.happyHourRewards.gift.',
   ],
 ];
+
+// Le même éditeur de paliers sert le barème normal et celui du Happy Hour.
+const BITS_TIER_EDITORS = [
+  {
+    list: '#bits-tiers',
+    add: '#add-tier',
+    mode: '#reward-bits-mode',
+    path: 'rewards.bits.tiers',
+    errorPrefix: '',
+  },
+  {
+    list: '#hh-bits-tiers',
+    add: '#add-hh-tier',
+    mode: '#reward-hh-bits-mode',
+    path: 'rewards.happyHourRewards.bits.tiers',
+    errorPrefix: 'Happy Hour — ',
+  },
+] as const;
 
 const LINK_CLASSES: Readonly<Record<WsClientStatus, string>> = {
   connecting: 'dot dot--warning',
@@ -586,61 +610,75 @@ function start(): void {
     }
   }
 
-  const tiersList = requireElement(document, '#bits-tiers');
+  interface TierEditor {
+    read(): TierInput[];
+    render(tiers: readonly { minBits: number; seconds: number }[]): void;
+  }
 
-  function appendTierRow(minBits: string, seconds: string): void {
-    const row = document.createElement('li');
-    row.className = 'tier';
+  function createTierEditor(listSelector: string, addSelector: string): TierEditor {
+    const tiersList = requireElement(document, listSelector);
 
-    const makeField = (label: string, value: string, role: string): HTMLElement => {
-      const wrapper = document.createElement('label');
-      wrapper.className = 'field field--compact';
+    function appendTierRow(minBits: string, seconds: string): void {
+      const row = document.createElement('li');
+      row.className = 'tier';
 
-      const caption = document.createElement('span');
-      caption.className = 'field__label';
-      setText(caption, label);
+      const makeField = (label: string, value: string, role: string): HTMLElement => {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'field field--compact';
 
-      const input = document.createElement('input');
-      input.className = 'field__input';
-      input.type = 'number';
-      input.min = '0';
-      input.step = '1';
-      input.value = value;
-      input.dataset['tier'] = role;
+        const caption = document.createElement('span');
+        caption.className = 'field__label';
+        setText(caption, label);
 
-      wrapper.append(caption, input);
-      return wrapper;
-    };
+        const input = document.createElement('input');
+        input.className = 'field__input';
+        input.type = 'number';
+        input.min = '0';
+        input.step = '1';
+        input.value = value;
+        input.dataset['tier'] = role;
 
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'button button--danger';
-    setText(remove, 'Retirer');
-    remove.addEventListener('click', () => {
-      row.remove();
+        wrapper.append(caption, input);
+        return wrapper;
+      };
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'button button--danger';
+      setText(remove, 'Retirer');
+      remove.addEventListener('click', () => {
+        row.remove();
+      });
+
+      row.append(makeField('Seuil, en bits', minBits, 'min'), makeField('Secondes', seconds, 'seconds'), remove);
+      tiersList.append(row);
+    }
+
+    function readTierRows(): TierInput[] {
+      return [...tiersList.querySelectorAll('.tier')].map((row) => ({
+        minBits: row.querySelector<HTMLInputElement>('[data-tier="min"]')?.value ?? '',
+        seconds: row.querySelector<HTMLInputElement>('[data-tier="seconds"]')?.value ?? '',
+      }));
+    }
+
+    function renderTiers(tiers: readonly { minBits: number; seconds: number }[]): void {
+      clearChildren(tiersList);
+      for (const tier of tiers) {
+        appendTierRow(String(tier.minBits), String(tier.seconds));
+      }
+    }
+
+    requireElement(document, addSelector).addEventListener('click', () => {
+      appendTierRow('', '');
     });
 
-    row.append(makeField('Seuil, en bits', minBits, 'min'), makeField('Secondes', seconds, 'seconds'), remove);
-    tiersList.append(row);
+    return { read: readTierRows, render: renderTiers };
   }
 
-  function readTierRows(): TierInput[] {
-    return [...tiersList.querySelectorAll('.tier')].map((row) => ({
-      minBits: row.querySelector<HTMLInputElement>('[data-tier="min"]')?.value ?? '',
-      seconds: row.querySelector<HTMLInputElement>('[data-tier="seconds"]')?.value ?? '',
-    }));
-  }
-
-  function renderTiers(tiers: readonly { minBits: number; seconds: number }[]): void {
-    clearChildren(tiersList);
-    for (const tier of tiers) {
-      appendTierRow(String(tier.minBits), String(tier.seconds));
-    }
-  }
-
-  requireElement(document, '#add-tier').addEventListener('click', () => {
-    appendTierRow('', '');
-  });
+  const tierEditors = BITS_TIER_EDITORS.map((spec) => ({
+    ...spec,
+    editor: createTierEditor(spec.list, spec.add),
+  }));
 
   const goalTiersList = requireElement(document, '#goal-tiers');
 
@@ -918,9 +956,10 @@ function start(): void {
       refreshAppearanceState(tab);
     }
 
-    const tiers = (config as { rewards?: { bits?: { tiers?: { minBits: number; seconds: number }[] } } })
-      .rewards?.bits?.tiers;
-    renderTiers(tiers ?? []);
+    for (const { editor, path } of tierEditors) {
+      const tiers = readAtPath(config, path);
+      editor.render(Array.isArray(tiers) ? (tiers as { minBits: number; seconds: number }[]) : []);
+    }
 
     renderGoalTiers(readGoalTiersFromConfig());
     paintGoalView();
@@ -943,19 +982,16 @@ function start(): void {
     const tierMessages: string[] = [];
 
     if (view === 'rewards') {
-      const rows = readTierRows();
-      const filled = rows.filter((row) => row.minBits.trim() !== '' || row.seconds.trim() !== '');
-      const modeField = container.querySelector<HTMLSelectElement>('#reward-bits-mode');
+      for (const { editor, path, mode, errorPrefix } of tierEditors) {
+        const change = tiersChange(
+          editor.read(),
+          container.querySelector<HTMLSelectElement>(mode)?.value,
+          readAtPath(config, path) ?? [],
+        );
 
-      if (modeField?.value === 'tiers' || filled.length > 0) {
-        const { tiers, errors: tierErrors } = normalizeTiers(rows);
-        if (tierErrors.length > 0) {
-          tierMessages.push(...tierErrors);
-        } else if (JSON.stringify(tiers) !== JSON.stringify(readTiersFromConfig())) {
-          patch['rewards'] = { ...(patch['rewards'] as object | undefined), bits: {
-            ...((patch['rewards'] as { bits?: object } | undefined)?.bits ?? {}),
-            tiers,
-          } };
+        tierMessages.push(...change.errors.map((message) => `${errorPrefix}${message}`));
+        if (change.tiers !== null) {
+          writeAtPath(patch, path, change.tiers);
         }
       }
     }
@@ -989,12 +1025,6 @@ function start(): void {
   function readGoalTiersFromConfig(): readonly { target: number; label: string }[] {
     return (
       (config as { goals?: { tiers?: { target: number; label: string }[] } }).goals?.tiers ?? []
-    );
-  }
-
-  function readTiersFromConfig(): unknown {
-    return (
-      (config as { rewards?: { bits?: { tiers?: unknown } } }).rewards?.bits?.tiers ?? []
     );
   }
 

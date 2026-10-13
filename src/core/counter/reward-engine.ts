@@ -87,21 +87,25 @@ function computeBitsReward(bits: number, config: RewardsConfig['bits']): RewardC
   );
 }
 
-const HAPPY_HOUR_MULTIPLIER = 2;
-
 const HAPPY_HOUR_MENTION = 'Happy Hour';
 
-function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
-  const subscriptions = rewards.happyHour ? rewards.happyHourRewards : rewards;
+function mentioned(reward: RewardComputation, mention: string): RewardComputation {
+  return reward.applied ? { ...reward, reason: `${reward.reason}${mention}` } : reward;
+}
+
+// Le Happy Hour n'est qu'un choix de barème, seuils d'entrée compris. La commande de chat n'en a
+// pas : un modérateur qui tape 300 veut créditer 300.
+export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
+  const table = rewards.happyHour ? rewards.happyHourRewards : rewards;
   const mention = rewards.happyHour ? `, ${HAPPY_HOUR_MENTION}` : '';
 
   switch (event.type) {
     case 'sub':
-      return granted(tierSeconds(subscriptions.sub, event.tier), `abonnement ${event.tier}${mention}`);
+      return granted(tierSeconds(table.sub, event.tier), `abonnement ${event.tier}${mention}`);
 
     case 'resub':
       return granted(
-        tierSeconds(subscriptions.resub, event.tier),
+        tierSeconds(table.resub, event.tier),
         `réabonnement ${event.tier}, ${String(event.cumulativeMonths)} mois${mention}`,
       );
 
@@ -110,7 +114,7 @@ function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardCo
         return refused("nombre d'abonnements offerts invalide");
       }
 
-      const unitSeconds = giftTierSeconds(subscriptions.gift, event.tier);
+      const unitSeconds = giftTierSeconds(table.gift, event.tier);
       return granted(
         unitSeconds * event.total,
         `${String(event.total)} abonnement(s) offert(s) ${event.tier}${mention}`,
@@ -118,7 +122,7 @@ function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardCo
     }
 
     case 'bits':
-      return computeBitsReward(event.bits, rewards.bits);
+      return mentioned(computeBitsReward(event.bits, table.bits), mention);
 
     case 'command': {
       if (!Number.isFinite(event.seconds) || event.seconds <= 0) {
@@ -132,20 +136,4 @@ function computeBaseReward(event: DomainEvent, rewards: RewardsConfig): RewardCo
       );
     }
   }
-}
-
-export function computeReward(event: DomainEvent, rewards: RewardsConfig): RewardComputation {
-  const base = computeBaseReward(event, rewards);
-
-  // Les abonnements ont leur barème Happy Hour ; seuls les bits passent encore par le doublement,
-  // qui ne touche pas à leurs seuils d'entrée.
-  if (!rewards.happyHour || !base.applied || event.type !== 'bits') {
-    return base;
-  }
-
-  return {
-    ...base,
-    seconds: base.seconds * HAPPY_HOUR_MULTIPLIER,
-    reason: `${base.reason}, ${HAPPY_HOUR_MENTION} ×${String(HAPPY_HOUR_MULTIPLIER)}`,
-  };
 }

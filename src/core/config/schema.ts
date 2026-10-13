@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 6;
+export const CONFIG_SCHEMA_VERSION = 7;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -87,14 +87,6 @@ function giftReward(factor: number) {
 const tieredRewardSchema = tieredReward(1);
 const giftRewardSchema = giftReward(1);
 
-const happyHourRewardsSchema = z
-  .object({
-    sub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
-    resub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
-    gift: giftReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
-  })
-  .strip();
-
 const bitsTierSchema = z
   .object({
     minBits: z.number().int().positive(),
@@ -102,32 +94,51 @@ const bitsTierSchema = z
   })
   .strip();
 
-const bitsRewardSchema = z
+const DEFAULT_SECONDS_PER_UNIT = 60;
+
+const DEFAULT_BITS_TIERS = [
+  { minBits: 100, seconds: 60 },
+  { minBits: 500, seconds: 360 },
+  { minBits: 1_000, seconds: 900 },
+] as const;
+
+function bitsReward(factor: number) {
+  return z
+    .object({
+      mode: z.enum(['linear', 'tiers']).default('linear'),
+
+      linear: z
+        .object({
+          unit: z.number().int().positive().default(100),
+          secondsPerUnit: seconds.default(DEFAULT_SECONDS_PER_UNIT * factor),
+          minBits: z.number().int().positive().default(1),
+        })
+        .strip()
+        .default({}),
+
+      tiers: z
+        .array(bitsTierSchema)
+        .default(
+          DEFAULT_BITS_TIERS.map((tier) => ({ minBits: tier.minBits, seconds: tier.seconds * factor })),
+        ),
+    })
+    .strip()
+    .refine((value) => value.mode !== 'tiers' || value.tiers.length > 0, {
+      message: 'le mode « tiers » exige au moins un palier',
+      path: ['tiers'],
+    });
+}
+
+const bitsRewardSchema = bitsReward(1);
+
+const happyHourRewardsSchema = z
   .object({
-    mode: z.enum(['linear', 'tiers']).default('linear'),
-
-    linear: z
-      .object({
-        unit: z.number().int().positive().default(100),
-        secondsPerUnit: seconds.default(60),
-        minBits: z.number().int().positive().default(1),
-      })
-      .strip()
-      .default({}),
-
-    tiers: z
-      .array(bitsTierSchema)
-      .default([
-        { minBits: 100, seconds: 60 },
-        { minBits: 500, seconds: 360 },
-        { minBits: 1_000, seconds: 900 },
-      ]),
+    sub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    resub: tieredReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    gift: giftReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
+    bits: bitsReward(HAPPY_HOUR_DEFAULT_FACTOR).default({}),
   })
-  .strip()
-  .refine((value) => value.mode !== 'tiers' || value.tiers.length > 0, {
-    message: 'le mode « tiers » exige au moins un palier',
-    path: ['tiers'],
-  });
+  .strip();
 
 const chatCommandSchema = z
   .object({
@@ -146,8 +157,8 @@ const chatCommandSchema = z
 
 const rewardsSchema = z
   .object({
-    // Actif, les abonnements, réabonnements et subs offerts se lisent dans `happyHourRewards` et
-    // les bits comptent double. La saisie d'un modérateur n'est jamais concernée.
+    // Actif, abonnements, réabonnements, subs offerts et bits se lisent dans `happyHourRewards`.
+    // La saisie d'un modérateur n'est jamais concernée.
     happyHour: z.boolean().default(false),
     happyHourRewards: happyHourRewardsSchema.default({}),
 

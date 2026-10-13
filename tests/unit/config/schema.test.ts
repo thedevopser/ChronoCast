@@ -466,8 +466,8 @@ describe('apparence de la page Objectifs', () => {
 });
 
 describe('version du schéma', () => {
-  it('passe à 6 avec le barème Happy Hour, sans quoi le barème dérivé ne serait jamais écrit sur le disque', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(6);
+  it('passe à 7 avec le barème Happy Hour des bits, sans quoi le barème dérivé ne serait jamais écrit sur le disque', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(7);
   });
 });
 
@@ -477,7 +477,22 @@ describe('barème Happy Hour', () => {
       sub: { tier1: 360, tier2: 480, tier3: 600, prime: 360 },
       resub: { tier1: 360, tier2: 480, tier3: 600, prime: 360 },
       gift: { tier1: 360, tier2: 480, tier3: 600 },
+      bits: {
+        mode: 'linear',
+        linear: { unit: 100, secondsPerUnit: 120, minBits: 1 },
+        tiers: [
+          { minBits: 100, seconds: 120 },
+          { minBits: 500, seconds: 720 },
+          { minBits: 1_000, seconds: 1_800 },
+        ],
+      },
     });
+  });
+
+  it('refuse le mode par paliers sans palier, comme le barème normal', () => {
+    expect(() =>
+      configSchema.parse({ rewards: { happyHourRewards: { bits: { mode: 'tiers', tiers: [] } } } }),
+    ).toThrow();
   });
 
   it('complète un barème partiel', () => {
