@@ -246,7 +246,12 @@ describe('regroupement', () => {
   // L'apparence de la page /goal est un sous-arbre de `goals.` : sans préfixe plus spécifique
   // déclaré avant lui, ses trente-trois feuilles atterriraient toutes dans « Objectifs ».
   it('sépare l’apparence de la barre du comptage lui-même', () => {
-    expect(groupsOf('goals')).toStrictEqual(['Objectifs']);
+    expect(groupsOf('goals')).toStrictEqual([
+      'Points · Abonnements',
+      'Points · Réabonnements',
+      'Points · Sub offerts',
+      'Objectifs',
+    ]);
 
     expect(groupsOf('goal-appearance')).toStrictEqual([
       'Barre',

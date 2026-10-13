@@ -2,19 +2,20 @@ import type { GoalsConfig } from '../config/schema.js';
 import type { DomainEvent } from '../events/domain-event.js';
 
 /**
- * Traduit un événement en abonnements gagnés. Ne connaît ni l'échelle, ni l'état, ni le compteur :
- * c'est `goal-ladder.ts` qui traduit ensuite un compte en position sur l'échelle.
+ * Traduit un événement en points gagnés par la barre d'objectif, selon son barème de points. Ne
+ * connaît ni l'échelle, ni l'état, ni le compteur, ni le barème de temps : c'est `goal-ladder.ts`
+ * qui traduit ensuite un compte en position sur l'échelle.
  */
-export function subsGained(event: DomainEvent, goals: GoalsConfig): number {
+export function pointsGained(event: DomainEvent, goals: GoalsConfig): number {
   switch (event.type) {
-    // Le tier n'est pas pondéré. Twitch compte un Tier 3 pour six dans ses propres objectifs : la
-    // barre avancerait de six sur un seul abonnement, et l'affichage cesserait d'être lisible.
     case 'sub':
+      return goals.points.sub[event.tier];
+
     case 'resub':
-      return 1;
+      return goals.points.resub[event.tier];
 
     case 'gift':
-      return event.total > 0 ? event.total : 0;
+      return event.total > 0 ? event.total * goals.points.gift[event.tier] : 0;
 
     case 'bits': {
       if (event.bits <= 0) {

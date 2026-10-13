@@ -107,11 +107,13 @@ body {
 }
 
 .bar__label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .bar__count {
+  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
 }

@@ -336,11 +336,9 @@ export function createApplication(options: ApplicationOptions): Application {
     const outcome = await counterService.applyEvent(event);
     await history.record(event, outcome.reward, outcome.state);
 
-    // Après le barème et sur le même événement déjà dédupliqué : ce qu'il a refusé ne doit pas
-    // davantage faire avancer une promesse affichée aux spectateurs.
-    if (outcome.reward.applied) {
-      await goalService.applyEvent(event);
-    }
+    // Sur le même événement déjà dédupliqué, mais sans regarder ce que le barème de temps en a
+    // fait : la barre a son barème de points, et peut servir seule, hors subathon.
+    await goalService.applyEvent(event);
 
     return outcome;
   }

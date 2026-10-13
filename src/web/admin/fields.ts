@@ -199,7 +199,35 @@ function goalPixels(
   };
 }
 
+const MAX_GOAL_POINTS = 1_000_000;
+
+function goalPoints(selector: string, leaf: string, label: string): AdminField {
+  return {
+    selector,
+    path: `goals.points.${leaf}`,
+    label,
+    view: 'goals',
+    kind: 'integer',
+    min: 0,
+    max: MAX_GOAL_POINTS,
+  };
+}
+
 const GOAL_FIELDS: readonly AdminField[] = [
+  goalPoints('#goal-points-sub-prime', 'sub.prime', 'Prime'),
+  goalPoints('#goal-points-sub-tier1', 'sub.tier1', 'Tier 1'),
+  goalPoints('#goal-points-sub-tier2', 'sub.tier2', 'Tier 2'),
+  goalPoints('#goal-points-sub-tier3', 'sub.tier3', 'Tier 3'),
+
+  goalPoints('#goal-points-resub-prime', 'resub.prime', 'Prime'),
+  goalPoints('#goal-points-resub-tier1', 'resub.tier1', 'Tier 1'),
+  goalPoints('#goal-points-resub-tier2', 'resub.tier2', 'Tier 2'),
+  goalPoints('#goal-points-resub-tier3', 'resub.tier3', 'Tier 3'),
+
+  goalPoints('#goal-points-gift-tier1', 'gift.tier1', 'Tier 1'),
+  goalPoints('#goal-points-gift-tier2', 'gift.tier2', 'Tier 2'),
+  goalPoints('#goal-points-gift-tier3', 'gift.tier3', 'Tier 3'),
+
   {
     selector: '#goal-bits-per-sub',
     path: 'goals.bitsPerSub',
@@ -808,8 +836,11 @@ const GROUPS: readonly (readonly [string, string])[] = [
   ['rewards.happyHourRewards.bits.', 'Happy Hour · Bits'],
   ['rewards.chatCommand.', 'Commande de chat'],
 
-  // Le comptage n'a qu'une feuille, tout le reste de `goals.` est l'apparence de la page /goal. Une feuille de comptage ajoutée plus tard tombera dans « Divers », et le
-  // garde-fou la signalera — c'est voulu.
+  // Tout ce qui n'est pas comptage dans `goals.` est l'apparence de la page /goal. Une feuille de
+  // comptage ajoutée plus tard tombera dans « Divers », et le garde-fou la signalera — c'est voulu.
+  ['goals.points.sub.', 'Points · Abonnements'],
+  ['goals.points.resub.', 'Points · Réabonnements'],
+  ['goals.points.gift.', 'Points · Sub offerts'],
   ['goals.bitsPerSub', 'Objectifs'],
   ['goals.overlay.bar.', 'Barre'],
   ['goals.overlay.shadow.', 'Ombre du texte'],

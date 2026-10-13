@@ -576,6 +576,96 @@ describe('application complète', () => {
       expect(message.crossed.map((tier) => tier.label)).toEqual(['Je me rase la tête']);
     });
 
+    async function patchConfig(config: unknown): Promise<void> {
+      const response = await api('/api/config', {
+        method: 'PATCH',
+        headers: { [CSRF_HEADER]: application.getCsrfToken() },
+        body: JSON.stringify({ config }),
+      });
+      expect(response.status).toBe(200);
+    }
+
+    async function goalCount(): Promise<number> {
+      return ((await (await api('/api/goals')).json()) as { goal: { subs: number } }).goal.subs;
+    }
+
+    it('avance sur un cheer que le barème de temps refuse : les deux barèmes sont indépendants', async () => {
+      await patchConfig({
+        rewards: { bits: { mode: 'linear', linear: { unit: 100, secondsPerUnit: 60, minBits: 5_000 } } },
+        goals: { bitsPerSub: 500 },
+      });
+
+      await notify('channel.cheer', channelCheer);
+
+      const history = (await (await api('/api/history')).json()) as {
+        entries: { type: string; applied: boolean }[];
+      };
+      expect(history.entries[0]).toMatchObject({ type: 'bits', applied: false });
+      expect(await goalCount()).toBe(2);
+    });
+
+    it('n’avance pas sur un événement invalide, que le barème de temps refusait déjà', async () => {
+      await notify('channel.cheer', { ...(channelCheer as object), bits: -500 });
+      await notify('channel.subscription.gift', { ...(channelSubscriptionGift as object), total: 0 });
+
+      expect(await goalCount()).toBe(0);
+    });
+
+    it('pèse chaque soutien selon le barème de points', async () => {
+      await patchConfig({
+        goals: { bitsPerSub: 1, points: { sub: { tier1: 250 }, gift: { tier1: 100 } } },
+      });
+
+      await notify('channel.subscribe', channelSubscribe);
+      await notify('channel.cheer', channelCheer);
+      await notify('channel.subscription.gift', channelSubscriptionGift);
+
+      expect(await goalCount()).toBe(250 + 1_000 + 200);
+    });
+
+    it('annonce l’un après l’autre les paliers qu’un lot pondéré traverse', async () => {
+      await setLadder();
+      await patchConfig({ goals: { points: { gift: { tier1: 5 } } } });
+
+      await notify('channel.subscription.gift', channelSubscriptionGift);
+
+      const persisted = await readPersistedGoals();
+      expect(persisted.subs).toBe(10);
+      expect(persisted.reached.map((entry) => entry.target)).toEqual([1, 2, 10]);
+    });
+
+    it('relit sans perte la progression écrite par une version sans barème de points', async () => {
+      await application.stop();
+      await writeFile(
+        join(dataDirectory, 'goals.json'),
+        JSON.stringify({
+          subs: 37,
+          reached: [{ target: 5, reachedAt: 1_754_000_000_000 }],
+          updatedAt: 1_754_000_000_000,
+          schemaVersion: 1,
+        }),
+        'utf8',
+      );
+      application = build();
+      port = await application.start();
+
+      const payload = (await (await api('/api/goals')).json()) as {
+        goal: { subs: number; reached: { target: number }[] };
+      };
+      expect(payload.goal.subs).toBe(37);
+      expect(payload.goal.reached.map((entry) => entry.target)).toEqual([5]);
+
+      await notify('channel.subscribe', channelSubscribe);
+      expect(await goalCount()).toBe(38);
+    });
+
+    it('accepte l’écriture d’un compte en points, mille fois plus grand qu’un compte d’abonnements', async () => {
+      const response = await mutate('/api/goals/subs', JSON.stringify({ subs: 2_500_000 }));
+
+      expect(response.status).toBe(200);
+      expect(await goalCount()).toBe(2_500_000);
+    });
+
     it('n’avance pas sur une commande de chat, qui est une saisie humaine', async () => {
       await api('/api/config', {
         method: 'PATCH',

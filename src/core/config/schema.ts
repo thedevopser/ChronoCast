@@ -241,9 +241,42 @@ const goalOverlaySchema = z
   })
   .strip();
 
+const points = z.number().int().nonnegative();
+
+// Mêmes formes que les barèmes de temps, mais en points et à 1 partout : par défaut, la barre
+// compte en abonnements, comme avant que ces poids soient réglables.
+const tieredPointsSchema = z
+  .object({
+    tier1: points.default(1),
+    tier2: points.default(1),
+    tier3: points.default(1),
+    prime: points.default(1),
+  })
+  .strip();
+
+const giftPointsSchema = z
+  .object({
+    tier1: points.default(1),
+    tier2: points.default(1),
+    tier3: points.default(1),
+  })
+  .strip();
+
+const goalPointsSchema = z
+  .object({
+    sub: tieredPointsSchema.default({}),
+    resub: tieredPointsSchema.default({}),
+    gift: giftPointsSchema.default({}),
+  })
+  .strip();
+
 const goalsSchema = z
   .object({
+    // Le nombre de bits qui vaut un point. La clé date du temps où la barre ne comptait qu'en
+    // abonnements : la renommer imposerait une migration pour une question de vocabulaire.
     bitsPerSub: z.number().int().positive().default(500),
+
+    points: goalPointsSchema.default({}),
 
     // Ni tri ni unicité ici : un refine qui rejette ferait tomber toute la configuration au
     // chargement. L'échelle se normalise à la lecture, et la saisie se valide dans le panneau.

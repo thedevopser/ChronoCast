@@ -77,8 +77,9 @@ const MAX_ADJUSTMENT_SECONDS = 86_400;
 
 const MAX_INITIAL_SECONDS = 2_592_000;
 
-// Aucune chaîne Twitch n'atteindra ce compte : le plafond n'est là que pour borner une saisie.
-const MAX_GOAL_SUBS = 1_000_000;
+// Le compte s'exprime en points, et un abonnement peut en valoir des centaines : le plafond n'est
+// là que pour borner une saisie.
+const MAX_GOAL_COUNT = 1_000_000_000;
 
 const secondsSchema = z.number().int().positive().max(MAX_ADJUSTMENT_SECONDS);
 
@@ -94,7 +95,7 @@ const initialSchema = z
   .strip();
 
 const goalSubsSchema = z
-  .object({ subs: z.number().int().min(0).max(MAX_GOAL_SUBS) })
+  .object({ subs: z.number().int().min(0).max(MAX_GOAL_COUNT) })
   .strip();
 
 const scheduleSchema = z

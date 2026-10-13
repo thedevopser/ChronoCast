@@ -11,7 +11,7 @@ import {
   tiersCrossed,
   type LadderPosition,
 } from './goal-ladder.js';
-import { subsGained } from './goal-progress.js';
+import { pointsGained } from './goal-progress.js';
 
 export const GOAL_STATE_VERSION = 1;
 
@@ -134,9 +134,9 @@ export function createGoalService(options: GoalServiceOptions): GoalService {
 
     async applyEvent(event: DomainEvent): Promise<GoalOutcome> {
       const previous = requireState();
-      const gained = subsGained(event, getConfig().goals);
+      const gained = pointsGained(event, getConfig().goals);
 
-      // Rien à écrire ni à annoncer : un événement qui ne compte pour aucun abonnement ne doit pas
+      // Rien à écrire ni à annoncer : un événement qui ne rapporte aucun point ne doit pas
       // réveiller les pages ouvertes ni toucher au disque.
       if (gained <= 0) {
         return { snapshot: snapshotOf(previous), crossed: [] };

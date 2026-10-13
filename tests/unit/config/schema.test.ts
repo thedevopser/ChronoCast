@@ -507,3 +507,25 @@ describe('barème Happy Hour', () => {
     ).toThrow();
   });
 });
+
+describe('barème de points de la barre d’objectif', () => {
+  it('vaut un point partout par défaut : la barre compte alors en abonnements', () => {
+    expect(configSchema.parse({}).goals.points).toStrictEqual({
+      sub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
+      resub: { tier1: 1, tier2: 1, tier3: 1, prime: 1 },
+      gift: { tier1: 1, tier2: 1, tier3: 1 },
+    });
+  });
+
+  it('accepte un poids nul, qui retire un type d’événement de la barre', () => {
+    expect(configSchema.parse({ goals: { points: { sub: { tier1: 0 } } } }).goals.points.sub.tier1).toBe(0);
+  });
+
+  it.each([-1, 1.5])('refuse un poids de %d', (tier1) => {
+    expect(() => configSchema.parse({ goals: { points: { gift: { tier1 } } } })).toThrow();
+  });
+
+  it('garde la clé bitsPerSub, pour ne rien migrer', () => {
+    expect(configSchema.parse({ goals: { bitsPerSub: 1 } }).goals.bitsPerSub).toBe(1);
+  });
+});
