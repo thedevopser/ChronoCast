@@ -274,6 +274,43 @@ describe('createApiRoutes', () => {
       });
     });
 
+    describe.each([
+      ['/api/goals/add', 'goals.addSubs', 50],
+      ['/api/goals/remove', 'goals.removeSubs', 0],
+    ])('POST %s', (path, call_, expectedSubs) => {
+      beforeEach(() => {
+        doubles.goalSubs = 25;
+      });
+
+      it('ajuste le compte et rend la progression', async () => {
+        const response = await call('POST', path, { body: JSON.stringify({ amount: 25 }) });
+
+        expect(response.status).toBe(200);
+        expect(doubles.calls).toContain(`${call_}:25`);
+        expect(body(response)['goal']).toMatchObject({ subs: expectedSubs });
+      });
+
+      it.each([
+        {},
+        { amount: 0 },
+        { amount: -1 },
+        { amount: 1.5 },
+        { amount: '25' },
+        { amount: Number.MAX_SAFE_INTEGER },
+      ])('refuse %j', async (payload) => {
+        const response = await call('POST', path, { body: JSON.stringify(payload) });
+
+        expect(response.status).toBe(400);
+        expect(doubles.calls.some((entry) => entry.startsWith(call_))).toBe(false);
+      });
+
+      it('refuse un corps illisible', async () => {
+        const response = await call('POST', path, { body: 'pas du json' });
+
+        expect(response.status).toBe(400);
+      });
+    });
+
     describe('POST /api/goals/preview', () => {
       it('diffuse le palier en cours comme s’il venait d’être atteint', async () => {
         const response = await call('POST', '/api/goals/preview');

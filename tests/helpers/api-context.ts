@@ -170,6 +170,16 @@ export function createApiDoubles(): ApiDoubles {
       doubles.goalSubs = count;
       return Promise.resolve(goalState());
     },
+    addSubs: (amount: number) => {
+      calls.push(`goals.addSubs:${String(amount)}`);
+      doubles.goalSubs += amount;
+      return Promise.resolve({ snapshot: goalSnapshot(), crossed: [] });
+    },
+    removeSubs: (amount: number) => {
+      calls.push(`goals.removeSubs:${String(amount)}`);
+      doubles.goalSubs = Math.max(0, doubles.goalSubs - amount);
+      return Promise.resolve({ snapshot: goalSnapshot(), crossed: [] });
+    },
     reset: () => {
       calls.push('goals.reset');
       doubles.goalSubs = 0;

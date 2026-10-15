@@ -5,7 +5,9 @@ import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
   goalThresholdLabel,
+  parseGoalAdjustment,
   parseGoalSubs,
+  type GoalAdjustmentResult,
   type GoalSubsResult,
   type GoalTierInput,
 } from '../../../../src/web/admin/goal-tiers.js';
@@ -177,5 +179,19 @@ describe('vocabulaire neutre', () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0]).not.toMatch(/abonnement/iu);
+  });
+});
+
+describe('parseGoalAdjustment', () => {
+  function refusal(result: GoalAdjustmentResult): string {
+    return 'error' in result ? result.error : '';
+  }
+
+  it('accepte un entier saisi, espaces tolérés', () => {
+    expect(parseGoalAdjustment('  250 ')).toEqual({ amount: 250 });
+  });
+
+  it.each(['', '0', '-5', '1.5', '1e3', 'abc'])('refuse « %s »', (raw) => {
+    expect(refusal(parseGoalAdjustment(raw))).not.toBe('');
   });
 });

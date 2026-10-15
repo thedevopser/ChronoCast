@@ -352,6 +352,103 @@ describe('createGoalService', () => {
     });
   });
 
+  describe('ajout manuel', () => {
+    beforeEach(async () => {
+      await harness.service.start();
+    });
+
+    it('s’ajoute au compte existant', async () => {
+      await harness.service.applyEvent(giftEvent(3));
+
+      await harness.service.addSubs(4);
+
+      expect(harness.service.getState().subs).toBe(7);
+      expect(harness.store.persisted?.subs).toBe(7);
+    });
+
+    it('annonce les paliers qu’il franchit, comme un événement Twitch', async () => {
+      harness.clock.advance(60_000);
+
+      const outcome = await harness.service.addSubs(12);
+
+      expect(outcome.crossed.map((tier) => tier.target)).toEqual([5, 10]);
+      expect(harness.changes.at(-1)?.crossed.map((tier) => tier.target)).toEqual([5, 10]);
+      expect(harness.service.getState().reached).toEqual([
+        { target: 5, reachedAt: START_EPOCH + 60_000 },
+        { target: 10, reachedAt: START_EPOCH + 60_000 },
+      ]);
+    });
+
+    it('n’annonce rien quand il reste sous le palier suivant', async () => {
+      const outcome = await harness.service.addSubs(2);
+
+      expect(outcome.crossed).toEqual([]);
+      expect(outcome.snapshot.subs).toBe(2);
+    });
+
+    it.each([0, -3, 1.5, Number.NaN])('refuse le montant %s', async (amount) => {
+      await expect(harness.service.addSubs(amount)).rejects.toThrow();
+      expect(harness.service.getState().subs).toBe(0);
+    });
+
+    it('refuse d’ajouter avant le démarrage', async () => {
+      const cold = createHarness();
+
+      await expect(cold.service.addSubs(4)).rejects.toThrow();
+    });
+  });
+
+  describe('retrait manuel', () => {
+    beforeEach(async () => {
+      await harness.service.start();
+    });
+
+    it('se retranche du compte existant', async () => {
+      await harness.service.applyEvent(giftEvent(8));
+
+      const outcome = await harness.service.removeSubs(3);
+
+      expect(outcome.snapshot.subs).toBe(5);
+      expect(harness.store.persisted?.subs).toBe(5);
+    });
+
+    it('ne descend jamais sous zéro', async () => {
+      await harness.service.applyEvent(giftEvent(3));
+
+      await harness.service.removeSubs(10);
+
+      expect(harness.service.getState().subs).toBe(0);
+    });
+
+    it('n’annonce aucun palier et oublie ceux repassés au-dessus du compte', async () => {
+      await harness.service.applyEvent(giftEvent(20));
+
+      const outcome = await harness.service.removeSubs(13);
+
+      expect(outcome.crossed).toEqual([]);
+      expect(harness.changes.at(-1)?.crossed).toEqual([]);
+      expect(harness.service.getState().reached).toEqual([
+        { target: 5, reachedAt: START_EPOCH },
+      ]);
+    });
+
+    it('laisse un palier oublié s’annoncer de nouveau', async () => {
+      await harness.service.applyEvent(giftEvent(10));
+      await harness.service.removeSubs(2);
+
+      const outcome = await harness.service.addSubs(2);
+
+      expect(outcome.crossed.map((tier) => tier.target)).toEqual([10]);
+    });
+
+    it.each([0, -3, 1.5])('refuse le montant %s', async (amount) => {
+      await harness.service.applyEvent(giftEvent(8));
+
+      await expect(harness.service.removeSubs(amount)).rejects.toThrow();
+      expect(harness.service.getState().subs).toBe(8);
+    });
+  });
+
   describe('remise à zéro', () => {
     beforeEach(async () => {
       await harness.service.start();

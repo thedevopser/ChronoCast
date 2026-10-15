@@ -21,6 +21,8 @@ const INTEGER = /^\d+$/;
 
 export type GoalSubsResult = { readonly subs: number } | { readonly error: string };
 
+export type GoalAdjustmentResult = { readonly amount: number } | { readonly error: string };
+
 /** L'intitulé du seuil d'un palier, dans l'unité que le streamer a nommée. */
 export function goalThresholdLabel(unitLabel: string): string {
   const unit = unitLabel.trim();
@@ -41,6 +43,16 @@ export function parseGoalSubs(raw: string): GoalSubsResult {
   }
 
   return { subs: Number(value) };
+}
+
+export function parseGoalAdjustment(raw: string): GoalAdjustmentResult {
+  const value = raw.trim();
+
+  if (!INTEGER.test(value) || Number(value) === 0) {
+    return { error: 'Montant attendu : un entier supérieur à zéro.' };
+  }
+
+  return { amount: Number(value) };
 }
 
 function isBlank(row: GoalTierInput): boolean {

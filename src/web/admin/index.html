@@ -324,6 +324,29 @@
             <div class="actions">
               <button class="button" type="button" id="save-goal-subs">Enregistrer</button>
             </div>
+
+            <hr class="rule" />
+
+            <label class="field field--compact">
+              <span class="field__label">Ajuster la progression</span>
+              <input
+                class="field__input"
+                id="goal-adjust-amount"
+                type="number"
+                min="1"
+                step="1"
+                value="1"
+                autocomplete="off"
+              />
+            </label>
+            <p class="note">
+              Ajoute ou retire ce montant au compte, dans l'unité de la barre. Un ajout qui franchit
+              un palier l'annonce aux spectateurs ; aucun des deux ne crédite de seconde au compteur.
+            </p>
+            <div class="actions">
+              <button class="button button--primary" type="button" id="goal-add">Ajouter</button>
+              <button class="button" type="button" id="goal-remove">Retirer</button>
+            </div>
           </div>
 
           <div class="card">
