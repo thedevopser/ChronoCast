@@ -22,6 +22,8 @@ const MUTATIONS: readonly (readonly [string, string])[] = [
   ['PATCH', '/api/config'],
   ['PUT', '/api/happy-hour/schedule'],
   ['POST', '/api/goals/mode'],
+  ['POST', '/api/goals/add'],
+  ['POST', '/api/goals/remove'],
   ['POST', '/api/update-notice/acknowledge'],
   ['DELETE', '/api/happy-hour/schedule'],
   ['POST', '/api/config/import'],

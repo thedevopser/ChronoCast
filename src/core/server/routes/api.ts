@@ -100,6 +100,10 @@ const goalSubsSchema = z
   .object({ subs: z.number().int().min(0).max(MAX_GOAL_COUNT) })
   .strip();
 
+const goalAdjustmentSchema = z
+  .object({ amount: z.number().int().positive().max(MAX_GOAL_COUNT) })
+  .strip();
+
 const goalModeSchema = z.object({ mode: z.enum(['points', 'subs']) }).strip();
 
 // Le libellé écrit après le compte suit le mode : un compte d'abonnements ne se lit pas en points.
@@ -473,6 +477,34 @@ export function createApiRoutes(context: ApiContext): Route[] {
 
         await goals.setSubs(parsed.data.subs);
         return jsonResponse(200, { goal: goals.getSnapshot() });
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/api/goals/add',
+      handler: async (request) => {
+        const parsed = goalAdjustmentSchema.safeParse(parseJsonBody(request));
+        if (!parsed.success) {
+          return badRequest('Montant invalide.');
+        }
+
+        const { snapshot } = await goals.addSubs(parsed.data.amount);
+        return jsonResponse(200, { goal: snapshot });
+      },
+    },
+
+    {
+      method: 'POST',
+      path: '/api/goals/remove',
+      handler: async (request) => {
+        const parsed = goalAdjustmentSchema.safeParse(parseJsonBody(request));
+        if (!parsed.success) {
+          return badRequest('Montant invalide.');
+        }
+
+        const { snapshot } = await goals.removeSubs(parsed.data.amount);
+        return jsonResponse(200, { goal: snapshot });
       },
     },
 

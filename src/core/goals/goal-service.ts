@@ -58,6 +58,10 @@ export interface GoalService {
 
   setSubs(count: number): Promise<GoalState>;
 
+  addSubs(amount: number): Promise<GoalOutcome>;
+
+  removeSubs(amount: number): Promise<GoalOutcome>;
+
   reset(): Promise<GoalState>;
 }
 
@@ -112,6 +116,42 @@ export function createGoalService(options: GoalServiceOptions): GoalService {
     return snapshot;
   }
 
+  async function advance(previous: GoalState, gained: number): Promise<GoalOutcome> {
+    const subs = previous.subs + gained;
+    const reachedAt = clock.now();
+    const crossed = tiersCrossed(previous.subs, subs, ladder());
+
+    const next: GoalState = {
+      subs,
+      reached: [
+        ...previous.reached,
+        ...crossed.map((tier) => ({ target: tier.target, reachedAt })),
+      ],
+      updatedAt: reachedAt,
+      schemaVersion: GOAL_STATE_VERSION,
+    };
+
+    return { snapshot: await commit(next, crossed), crossed };
+  }
+
+  // Aucun franchissement fabriqué : `reached` n'enregistre que ce qui a été vécu en direct.
+  // Ceux qu'un compte abaissé laisse derrière lui s'en vont, faute de quoi il traînerait un
+  // historique qui le contredit.
+  function lowered(previous: GoalState, subs: number): GoalState {
+    return {
+      subs,
+      reached: previous.reached.filter((entry) => entry.target <= subs),
+      updatedAt: clock.now(),
+      schemaVersion: GOAL_STATE_VERSION,
+    };
+  }
+
+  function requireAmount(amount: number): void {
+    if (!Number.isInteger(amount) || amount <= 0) {
+      throw new RangeError(`montant d'ajustement invalide : ${String(amount)}`);
+    }
+  }
+
   function emptyState(): GoalState {
     return { subs: 0, reached: [], updatedAt: clock.now(), schemaVersion: GOAL_STATE_VERSION };
   }
@@ -142,42 +182,20 @@ export function createGoalService(options: GoalServiceOptions): GoalService {
         return { snapshot: snapshotOf(previous), crossed: [] };
       }
 
-      const subs = previous.subs + gained;
-      const reachedAt = clock.now();
-      const crossed = tiersCrossed(previous.subs, subs, ladder());
-
-      const next: GoalState = {
-        subs,
-        reached: [
-          ...previous.reached,
-          ...crossed.map((tier) => ({ target: tier.target, reachedAt })),
-        ],
-        updatedAt: reachedAt,
-        schemaVersion: GOAL_STATE_VERSION,
-      };
+      const outcome = await advance(previous, gained);
 
       logger.info('progression des objectifs', {
         type: event.type,
         gained,
-        subs,
-        crossed: crossed.length,
+        subs: outcome.snapshot.subs,
+        crossed: outcome.crossed.length,
       });
 
-      return { snapshot: await commit(next, crossed), crossed };
+      return outcome;
     },
 
     async setSubs(count: number): Promise<GoalState> {
-      const previous = requireState();
-
-      const next: GoalState = {
-        subs: count,
-        // Aucun franchissement fabriqué : `reached` n'enregistre que ce qui a été vécu en direct.
-        // Ceux que la nouvelle valeur laisse derrière elle s'en vont, faute de quoi un compte
-        // abaissé traînerait un historique qui le contredit.
-        reached: previous.reached.filter((entry) => entry.target <= count),
-        updatedAt: clock.now(),
-        schemaVersion: GOAL_STATE_VERSION,
-      };
+      const next = lowered(requireState(), count);
 
       // Émis sans palier franchi : écrire quatre-vingts abonnements sur une échelle de douze
       // paliers ne doit pas jeter douze annonces à la suite sur la page des spectateurs.
@@ -185,6 +203,30 @@ export function createGoalService(options: GoalServiceOptions): GoalService {
       logger.info('compte des objectifs écrit', { subs: count });
 
       return next;
+    },
+
+    async addSubs(amount: number): Promise<GoalOutcome> {
+      const previous = requireState();
+      requireAmount(amount);
+
+      const outcome = await advance(previous, amount);
+      logger.info('ajout manuel aux objectifs', {
+        amount,
+        subs: outcome.snapshot.subs,
+        crossed: outcome.crossed.length,
+      });
+
+      return outcome;
+    },
+
+    async removeSubs(amount: number): Promise<GoalOutcome> {
+      const previous = requireState();
+      requireAmount(amount);
+
+      const snapshot = await commit(lowered(previous, Math.max(0, previous.subs - amount)), []);
+      logger.info('retrait manuel des objectifs', { amount, subs: snapshot.subs });
+
+      return { snapshot, crossed: [] };
     },
 
     async reset(): Promise<GoalState> {

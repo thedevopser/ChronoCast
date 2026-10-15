@@ -361,6 +361,37 @@ describe('vue Objectifs', () => {
   });
 });
 
+describe('ajustement manuel de la barre dans la vue Objectifs', () => {
+  const adjustRequests = (): typeof requests =>
+    requests.filter((request) => request.url.startsWith('/api/goals/add') || request.url.startsWith('/api/goals/remove'));
+
+  it.each([
+    ['#goal-add', '/api/goals/add'],
+    ['#goal-remove', '/api/goals/remove'],
+  ])('%s envoie le montant saisi à %s', async (selector, url) => {
+    const before = adjustRequests().length;
+    field('#goal-adjust-amount').value = ' 250 ';
+
+    element(selector).click();
+    await settle();
+
+    const sent = adjustRequests().slice(before);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.url).toBe(url);
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({ amount: 250 });
+  });
+
+  it('n’envoie rien pour un montant nul', async () => {
+    const before = adjustRequests().length;
+    field('#goal-adjust-amount').value = '0';
+
+    element('#goal-add').click();
+    await settle();
+
+    expect(adjustRequests()).toHaveLength(before);
+  });
+});
+
 describe('mode de la barre dans la vue Objectifs', () => {
   function shownGroups(): string[] {
     return [...document.querySelectorAll<HTMLElement>('#fields-goals .group')]

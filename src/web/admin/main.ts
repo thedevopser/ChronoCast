@@ -23,6 +23,7 @@ import {
   GOAL_LABEL_MAX_LENGTH,
   normalizeGoalTiers,
   goalThresholdLabel,
+  parseGoalAdjustment,
   parseGoalSubs,
   type GoalTierInput,
 } from './goal-tiers.js';
@@ -579,6 +580,24 @@ function start(): void {
       showBanner('Compte des objectifs enregistré.', 'banner--success');
     });
   });
+
+  for (const [selector, path] of [
+    ['#goal-add', '/api/goals/add'],
+    ['#goal-remove', '/api/goals/remove'],
+  ] as const) {
+    const control = button(selector);
+    control.addEventListener('click', () => {
+      void guarded(control, async () => {
+        const parsed = parseGoalAdjustment(input('#goal-adjust-amount').value);
+        if ('error' in parsed) {
+          showBanner(parsed.error, 'banner--error');
+          return;
+        }
+
+        await api.post(path, { amount: parsed.amount });
+      });
+    });
+  }
 
   for (const [selector, path] of [
     ['#pause', '/api/counter/pause'],
