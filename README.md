@@ -130,6 +130,6 @@ ChronoCast est publié par **TheDevOpser** sous [licence MIT](LICENSE) — © 20
 
 ## Soutenir le projet
 
-ChronoCast est gratuit, sans publicité, sans compte et sans collecte de données, et il le restera : **rien n'y est réservé à qui donne**. Si l'outil vous rend service, vous pouvez soutenir son développement sur [PayPal](https://paypal.me/Gothdroid).
+ChronoCast est gratuit, sans publicité, sans compte et sans collecte de données, et il le restera : **rien n'y est réservé à qui donne**. Si l'outil vous rend service, vous pouvez soutenir son développement sur [PayPal](https://paypal.me/thedevopser).
 
 Le lien est également accessible depuis l'application, dans la vue « À propos » du panneau d'administration. Il n'engendre aucune requête de la part de ChronoCast : c'est votre navigateur qui ouvre la page.

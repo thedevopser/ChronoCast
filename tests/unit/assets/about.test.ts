@@ -76,6 +76,10 @@ describe('mentions publiées dans les pages', () => {
     expect(await read(page)).toContain(DONATION_URL);
   });
 
+  it('renvoie à la page de soutien depuis le README', async () => {
+    expect(await read('README.md')).toContain(DONATION_URL);
+  });
+
   it('renvoie au dépôt depuis le panneau', async () => {
     expect(await read('src/web/admin/index.html')).toContain(REPOSITORY_URL);
   });

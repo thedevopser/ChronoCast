@@ -15,4 +15,4 @@ export const LICENSE_NAME = 'MIT';
 
 export const REPOSITORY_URL = 'https://github.com/thedevopser/ChronoCast';
 
-export const DONATION_URL = 'https://paypal.me/Gothdroid';
+export const DONATION_URL = 'https://paypal.me/thedevopser';
