@@ -94,6 +94,8 @@ La liste admet également `github.com` et `paypal.me`, pour le lien vers le code
 
 **Les outils de développement sont fermés dans une application packagée.** Ils donneraient accès au panneau et à tout ce qu'il peut faire.
 
+**Les demandes de permission sont refusées.** Electron accorde par défaut ce qu'une page demande — notifications, caméra, micro, géolocalisation. La fenêtre ne l'accorde qu'à une seule demande, l'écriture du presse-papiers par l'origine locale, dont ont besoin les boutons « Copier » ; tout le reste est refusé. La décision vit dans [permission-policy.ts](../src/main/permission-policy.ts).
+
 **Les fusibles Electron ferment l'exécutable signé à tout autre code.** `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` et `--inspect` sont ignorés, l'application ne se charge que depuis son `app.asar`, dont l'intégrité est contrôlée au démarrage. Sans eux, un processus local pourrait lancer ChronoCast pour exécuter son propre JavaScript sous l'identité du paquet signé. Ils sont déclarés dans [electron-builder.yml](../electron-builder.yml) et tenus par `packaging.test.ts`.
 
 ## 7. La chaîne d'approvisionnement
@@ -157,6 +159,7 @@ Le panneau n'a qu'un bouton qui y mène. **Aucune adresse ne traverse cette rout
 | `navigation-policy.test.ts` | Seuls l'origine locale, Twitch, le dépôt et la page de soutien sont admis — et tout ce qui n'est pas local part au navigateur |
 | `browser-opener.test.ts` | Seul `https:` est ouvert à l'extérieur |
 | `oauth-callback-forgery.test.ts` | Un rappel OAuth forgé par une page tierce ne fait pas échouer la connexion en cours |
+| `permission-policy.test.ts` | Seule l'origine locale obtient une permission, et seulement celle d'écrire dans le presse-papiers |
 | `twitch-endpoints.test.ts` | Une configuration ne peut pas détourner les adresses de Twitch |
 
 Ces tests emploient de vraies charges hostiles, et ils tournent dans un vrai parseur HTML : un faux `document` prouverait qu'on a appelé `textContent`, pas qu'aucun script n'a été exécuté.

@@ -1,6 +1,7 @@
 import { BrowserWindow, shell } from 'electron';
 
 import { decideNavigation } from './navigation-policy.js';
+import { decidePermission } from './permission-policy.js';
 
 export interface MainWindowOptions {
   readonly appOrigin: string;
@@ -39,6 +40,14 @@ export function createMainWindow(options: MainWindowOptions): BrowserWindow {
       devTools: options.devToolsEnabled,
     },
   });
+
+  const permissionPolicy = { appOrigin: options.appOrigin };
+  window.webContents.session.setPermissionRequestHandler((_contents, permission, callback, details) => {
+    callback(decidePermission(permission, details.requestingUrl, permissionPolicy));
+  });
+  window.webContents.session.setPermissionCheckHandler((_contents, permission, requestingOrigin) =>
+    decidePermission(permission, requestingOrigin, permissionPolicy),
+  );
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (decideNavigation(url, { appOrigin: options.appOrigin }) === 'external') {
