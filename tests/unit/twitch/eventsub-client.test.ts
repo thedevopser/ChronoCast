@@ -406,6 +406,20 @@ describe('createEventSubClient', () => {
 
       expect(sockets).toHaveLength(1);
     });
+
+    it('ignore une demande de migration vers un serveur qui n’est pas Twitch, et le signale', async () => {
+      const client = createClient();
+      await connect(client);
+
+      sockets[0]?.send({
+        metadata: { message_type: 'session_reconnect' },
+        payload: { session: { id: SESSION_ID, reconnect_url: 'wss://eventsub.example/ws' } },
+      });
+
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0]?.closed).toBe(false);
+      expect(sink.records.some((record) => record.level === 'warning')).toBe(true);
+    });
   });
 
   describe('révocation', () => {
