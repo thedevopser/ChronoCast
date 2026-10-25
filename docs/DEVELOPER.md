@@ -8,7 +8,7 @@ Lire [ARCHITECTURE.md](ARCHITECTURE.md) d'abord si le découpage du code n'est p
 
 ## 1. L'environnement tient en une dépendance : Docker
 
-**Le seul prérequis est Docker.** Toute la chaîne d'outillage — Node, npm, la Twitch CLI — vit dans le conteneur décrit par `docker/Dockerfile.dev`, et `./scripts/dc.sh` exécute chaque commande à l'intérieur. Rien n'a besoin d'être installé sur votre poste, et rien n'y est supposé.
+**Le seul prérequis est Docker.** Toute la chaîne d'outillage — Node et npm — vit dans le conteneur décrit par `docker/Dockerfile.dev`, et `./scripts/dc.sh` exécute chaque commande à l'intérieur. Rien n'a besoin d'être installé sur votre poste, et rien n'y est supposé.
 
 Ce n'est pas une préférence de confort : le conteneur part de `node:22-bookworm-slim`, la même version majeure que celle qu'utilise la CI et que déclare `engines` dans `package.json`. Un test qui passe chez vous passe sur le runner, et une divergence de version ne peut pas se glisser entre les deux.
 
@@ -28,7 +28,6 @@ Ce n'est pas une préférence de confort : le conteneur part de `node:22-bookwor
 | `audit` | `npm audit --audit-level=high` |
 | `verify` | Les quatre précédentes, dans l'ordre |
 | `build` | Compilation TypeScript et copie des ressources web |
-| `twitch` | Twitch CLI, pour simuler des événements |
 | `shell` | Un shell dans le conteneur |
 | `npm` | Une commande npm arbitraire |
 | `down` | Arrête et nettoie les conteneurs |

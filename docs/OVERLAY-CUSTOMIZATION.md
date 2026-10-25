@@ -188,4 +188,4 @@ Celles de la page `/goal` portent toutes le préfixe `--cc-goal-`, si bien qu'au
 
 ## 5. Tester sans attendre un sub
 
-La vue *Tableau de bord* permet d'ajouter du temps à la main, ce qui déclenche l'animation et la bulle. Pour un événement Twitch complet — pseudonyme, palier, montant — voir [TESTING-TWITCH-CLI.md](TESTING-TWITCH-CLI.md).
+La vue *Tableau de bord* permet d'ajouter du temps à la main, ce qui déclenche l'animation et la bulle.

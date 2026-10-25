@@ -56,7 +56,7 @@ describe('documentation livrée', () => {
     expect(broken).toEqual([]);
   });
 
-  it('livre les huit documents annoncés par le README', async () => {
+  it('livre les sept documents annoncés par le README', async () => {
     const expected = [
       'ARCHITECTURE.md',
       'CRASH-RECOVERY.md',
@@ -64,7 +64,6 @@ describe('documentation livrée', () => {
       'OVERLAY-CUSTOMIZATION.md',
       'PRIVACY.md',
       'SECURITY.md',
-      'TESTING-TWITCH-CLI.md',
       'USER-GUIDE.md',
     ];
 

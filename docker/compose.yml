@@ -14,14 +14,5 @@ services:
     init: true
     command: ["sleep", "infinity"]
 
-  twitch-cli:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.twitch-cli
-    ports:
-      - "127.0.0.1:8080:8080"
-    profiles: ["twitch"]
-    command: ["event", "websocket", "start-server", "--port", "8080", "--ssl=false"]
-
 volumes:
   node_modules:
