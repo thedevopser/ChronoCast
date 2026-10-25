@@ -78,7 +78,7 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Le gestionnaire de rappel ne voit jamais le `state` attendu.** Il ne reçoit qu'un `verifyState()` qui répond oui ou non : il ne peut donc ni le journaliser, ni le renvoyer dans une page.
 
-**Un `state` qui ne correspond pas ne consomme rien.** N'importe quelle page distante peut provoquer une navigation vers la boucle locale ; si un `state` erroné suffisait à clore le flux, le premier venu ferait échouer la connexion du streamer, à distance et en boucle.
+**Un `state` qui ne correspond pas ne consomme rien.** N'importe quelle page distante peut provoquer une navigation vers la boucle locale ; si un `state` erroné suffisait à clore le flux, le premier venu ferait échouer la connexion du streamer, à distance et en boucle. **La règle vaut aussi pour un refus** : un rappel `?error=` n'est pris en compte que s'il porte le `state` attendu, que Twitch renvoie dans ce cas comme dans l'autre.
 
 **La page de rappel ne montre qu'un code d'issue clos** — `ok`, `denied` ou `failed`. Ni le code d'autorisation, ni le message d'erreur de Twitch, qui est du texte contrôlé par un tiers.
 
@@ -154,6 +154,7 @@ Le panneau n'a qu'un bouton qui y mène. **Aucune adresse ne traverse cette rout
 | `api-hardening.test.ts` | Un import de configuration malveillant est refusé, les secrets n'apparaissent nulle part |
 | `navigation-policy.test.ts` | Seuls l'origine locale, Twitch, le dépôt et la page de soutien sont admis — et tout ce qui n'est pas local part au navigateur |
 | `browser-opener.test.ts` | Seul `https:` est ouvert à l'extérieur |
+| `oauth-callback-forgery.test.ts` | Un rappel OAuth forgé par une page tierce ne fait pas échouer la connexion en cours |
 | `twitch-endpoints.test.ts` | Une configuration ne peut pas détourner les adresses de Twitch |
 
 Ces tests emploient de vraies charges hostiles, et ils tournent dans un vrai parseur HTML : un faux `document` prouverait qu'on a appelé `textContent`, pas qu'aucun script n'a été exécuté.
