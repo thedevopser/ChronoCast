@@ -10,6 +10,7 @@ import {
   type EventSubSocket,
   type EventSubSocketFactory,
   type NotificationContext,
+  KEEPALIVE_TIMEOUT_SECONDS,
 } from '../../../src/core/twitch/eventsub-client.js';
 import type { HelixClient } from '../../../src/core/twitch/helix-client.js';
 
@@ -219,12 +220,14 @@ describe('createEventSubClient', () => {
       expect(sockets[0]?.socket.url).toContain('eventsub.wss.twitch.tv');
     });
 
-    it('négocie le délai de keepalive configuré', async () => {
-      const client = createClient(configSchema.parse({ twitch: { keepaliveTimeoutSeconds: 45 } }));
+    it('négocie le délai de keepalive', async () => {
+      const client = createClient();
 
       await client.start();
 
-      expect(sockets[0]?.socket.url).toContain('keepalive_timeout_seconds=45');
+      expect(sockets[0]?.socket.url).toContain(
+        `keepalive_timeout_seconds=${String(KEEPALIVE_TIMEOUT_SECONDS)}`,
+      );
     });
 
     it('crée les souscriptions dès réception de l\'accueil', async () => {
@@ -405,6 +408,20 @@ describe('createEventSubClient', () => {
       });
 
       expect(sockets).toHaveLength(1);
+    });
+
+    it('ignore une demande de migration vers un serveur qui n’est pas Twitch, et le signale', async () => {
+      const client = createClient();
+      await connect(client);
+
+      sockets[0]?.send({
+        metadata: { message_type: 'session_reconnect' },
+        payload: { session: { id: SESSION_ID, reconnect_url: 'wss://eventsub.example/ws' } },
+      });
+
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0]?.closed).toBe(false);
+      expect(sink.records.some((record) => record.level === 'warning')).toBe(true);
     });
   });
 

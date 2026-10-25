@@ -91,8 +91,8 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | **Twitch** | État de la connexion, souscriptions actives, reconnexion, révocation |
 | **Historique** | Tous les événements reçus, avec leur montant — **y compris ceux qui n'ont rien crédité**, et la raison |
 | **Journaux** | Ce que fait l'application, utile en cas de problème |
-| **Paramètres** | Port, journalisation, rétention, et un bouton vers les réglages de démarrage de Windows |
-| **Import / export** | Sauvegarder votre configuration dans un fichier, ou en recharger une |
+| **Paramètres** | Valeur de départ et plancher du compteur, reprise au démarrage, port, et un bouton vers les réglages de démarrage de Windows |
+| **Import / export** | Sauvegarder votre configuration dans un fichier, ou en recharger une. L'import ne touche jamais au réglage Twitch : un fichier partagé par un autre streamer ne change ni votre application Twitch, ni votre compte, ni la lecture de votre chat |
 | **À propos** | Version, licence, lien vers le code source |
 
 Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre réseau local, ni depuis Internet.
@@ -271,6 +271,8 @@ Désinstaller ChronoCast **ne supprime pas ce répertoire** : réinstaller vous 
 **Le navigateur affiche « Ce site est inaccessible ».** L'application est arrêtée, ou un autre logiciel occupe le port. Changez-le dans *Paramètres*, puis corrigez l'URL dans OBS.
 
 **Twitch refuse l'autorisation.** L'URL de redirection déclarée dans la console développeur doit être `http://localhost:37771/callback`, au caractère près — pas de barre oblique finale, pas de `127.0.0.1`.
+
+**Couper tout accès de ChronoCast à votre compte Twitch.** Le bouton *Révoquer l'accès* de la vue *Twitch* invalide le jeton d'accès auprès de Twitch et efface tous les identifiants de votre machine. Twitch ne permet pas à une application de révoquer elle-même le lien avec votre compte : pour le rompre, ouvrez `twitch.tv/settings/connections` et déconnectez ChronoCast. Si vous pensez que vos identifiants ont pu fuiter, faites-le, puis générez un nouveau secret client dans la console développeur de Twitch.
 
 **Après avoir changé de PC ou de compte Windows**, les jetons deviennent illisibles : Windows les a chiffrés pour l'ancien compte. ChronoCast rouvre alors son assistant. Vos réglages et votre compteur, eux, sont intacts.
 

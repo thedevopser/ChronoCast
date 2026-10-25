@@ -36,17 +36,14 @@ export interface HappyHourScheduleOptions {
   readonly logger: Logger;
 }
 
-const stateSchema = z
-  .object({
-    window: z
-      .object({
-        startAt: z.number().int().nonnegative(),
-        endAt: z.number().int().nonnegative(),
-      })
-      .strip(),
-    started: z.boolean(),
-  })
-  .strip();
+const stateSchema = z.object({
+  window: z
+    .object({
+      startAt: z.number().int().nonnegative(),
+      endAt: z.number().int().nonnegative(),
+    }),
+  started: z.boolean(),
+});
 
 export function parseScheduleState(raw: unknown): WindowState | null {
   const parsed = stateSchema.safeParse(raw);

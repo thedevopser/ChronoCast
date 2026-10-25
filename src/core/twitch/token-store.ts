@@ -96,12 +96,6 @@ export function createTokenStore(options: TokenStoreOptions): TokenStore {
     },
 
     async save(credentials: TwitchCredentials): Promise<void> {
-      if (!secretStore.isEncryptionAvailable()) {
-        logger.warning(
-          "le chiffrement du système n'est pas disponible : les identifiants Twitch seront moins bien protégés",
-        );
-      }
-
       await secretStore.write(STORAGE_KEY, JSON.stringify(credentials));
 
       registerSecrets(credentials);

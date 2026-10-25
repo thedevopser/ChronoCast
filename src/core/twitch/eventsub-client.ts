@@ -2,8 +2,11 @@ import type { AppEvents, TwitchConnectionStatus } from '../app/app-events.js';
 import type { EventBus } from '../app/event-bus.js';
 import type { ChronoCastConfig } from '../config/schema.js';
 import type { Logger } from '../logging/logger.js';
+import { isTwitchEventSubUrl, TWITCH_ENDPOINTS } from './endpoints.js';
 import type { HelixClient } from './helix-client.js';
 import { resolveSubscriptions, type SubscriptionContext } from './subscription-plan.js';
+
+export const KEEPALIVE_TIMEOUT_SECONDS = 30;
 
 const KEEPALIVE_GRACE_FACTOR = 1.2;
 
@@ -194,7 +197,7 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     const keepaliveSeconds =
       typeof session['keepalive_timeout_seconds'] === 'number'
         ? session['keepalive_timeout_seconds']
-        : getConfig().twitch.keepaliveTimeoutSeconds;
+        : KEEPALIVE_TIMEOUT_SECONDS;
 
     if (socket === migratingSocket) {
       logger.info('migration de session confirmée');
@@ -220,6 +223,11 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
 
     if (reconnectUrl === undefined) {
       logger.warning('demande de migration sans URL, ignorée');
+      return;
+    }
+
+    if (!isTwitchEventSubUrl(reconnectUrl)) {
+      logger.warning('demande de migration vers un serveur qui n’est pas Twitch, ignorée');
       return;
     }
 
@@ -270,8 +278,7 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     }
 
     if (socket === activeSocket) {
-      const keepaliveSeconds = getConfig().twitch.keepaliveTimeoutSeconds;
-      armKeepaliveWatchdog(keepaliveSeconds);
+      armKeepaliveWatchdog(KEEPALIVE_TIMEOUT_SECONDS);
     }
 
     switch (messageType) {
@@ -343,12 +350,8 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
   }
 
   function openConnection(): void {
-    const config = getConfig();
-    const url = new URL(config.twitch.eventsubUrl);
-    url.searchParams.set(
-      'keepalive_timeout_seconds',
-      String(config.twitch.keepaliveTimeoutSeconds),
-    );
+    const url = new URL(TWITCH_ENDPOINTS.eventsub);
+    url.searchParams.set('keepalive_timeout_seconds', String(KEEPALIVE_TIMEOUT_SECONDS));
 
     setStatus('connecting');
     activeSocket = openSocket(url.toString());

@@ -117,10 +117,6 @@ export function requiresRestart(previous: TwitchConfig, next: TwitchConfig): boo
     return true;
   }
 
-  if (previous.eventsubUrl !== next.eventsubUrl) {
-    return true;
-  }
-
   return enabledTypes(previous).join('|') !== enabledTypes(next).join('|');
 }
 

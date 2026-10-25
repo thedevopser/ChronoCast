@@ -11,8 +11,6 @@ export interface PathProvider {
 }
 
 export interface SecretStore {
-  isEncryptionAvailable(): boolean;
-
   read(key: string): Promise<string | null>;
 
   write(key: string, value: string): Promise<void>;

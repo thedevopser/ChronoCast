@@ -99,7 +99,6 @@ réservée au diffuseur et aux modérateurs, fait le travail. Voir
 | [docs/OVERLAY-CUSTOMIZATION.md](docs/OVERLAY-CUSTOMIZATION.md) | Personnalisation de l'overlay |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture, flux de données, choix techniques |
 | [docs/DEVELOPER.md](docs/DEVELOPER.md) | Guide développeur |
-| [docs/TESTING-TWITCH-CLI.md](docs/TESTING-TWITCH-CLI.md) | Tests avec la Twitch CLI |
 | [docs/CRASH-RECOVERY.md](docs/CRASH-RECOVERY.md) | Récupération après crash |
 | [docs/SECURITY.md](docs/SECURITY.md) | Modèle de menace et contrôles de sécurité |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | Politique de confidentialité |

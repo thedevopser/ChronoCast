@@ -16,6 +16,16 @@ files:
 
 asar: true
 
+# Interdit de détourner l'exécutable signé pour y exécuter un autre code.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  grantFileProtocolExtraPrivileges: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  enableCookieEncryption: true
+
 publish: null
 
 win:

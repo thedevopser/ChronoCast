@@ -141,13 +141,12 @@ export function channelOf(message: ServerMessage): Channel | null {
 }
 
 export const clientMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('ping') }).strip(),
+  z.object({ type: z.literal('ping') }),
   z
     .object({
       type: z.literal('subscribe'),
       channels: z.array(z.enum(CHANNELS)).min(1).max(CHANNELS.length),
-    })
-    .strip(),
+    }),
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;

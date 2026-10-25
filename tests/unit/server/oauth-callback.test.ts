@@ -139,6 +139,26 @@ describe('createOAuthCallbackRouter', () => {
 
       expect(JSON.stringify(response)).not.toContain('script');
     });
+
+    it('ne clôt pas le flux sur un refus sans state', async () => {
+      const harness = createHarness();
+
+      const response = await harness.router.handle(callback({ error: 'access_denied' }));
+
+      expect(response.status).toBe(400);
+      expect(harness.settled).toStrictEqual([]);
+    });
+
+    it('ne clôt pas le flux sur un refus dont le state ne correspond pas', async () => {
+      const harness = createHarness();
+
+      const response = await harness.router.handle(
+        callback({ error: 'access_denied', state: 'b'.repeat(64) }),
+      );
+
+      expect(response.status).toBe(403);
+      expect(harness.settled).toStrictEqual([]);
+    });
   });
 
   describe('state', () => {

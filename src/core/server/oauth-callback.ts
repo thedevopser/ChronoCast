@@ -73,21 +73,22 @@ export function createOAuthCallbackRouter(options: OAuthCallbackOptions): Router
         return textResponse(405, 'Méthode non autorisée.');
       }
 
-      if (request.query.has('error')) {
-        scoped.info('autorisation refusée par l’utilisateur');
-        return settle('denied');
-      }
-
+      const denied = request.query.has('error');
       const code = request.query.get('code');
       const state = request.query.get('state');
 
-      if (code === null || code === '' || state === null || state === '') {
+      if (state === null || state === '' || (!denied && (code === null || code === ''))) {
         return textResponse(400, 'Requête incomplète.');
       }
 
       if (!options.verifyState(state)) {
         scoped.warning('rappel OAuth refusé : state inattendu');
         return textResponse(403, 'Demande non reconnue.');
+      }
+
+      if (denied || code === null) {
+        scoped.info('autorisation refusée par l’utilisateur');
+        return settle('denied');
       }
 
       try {

@@ -223,7 +223,7 @@ describe('createConfigService', () => {
       await service.load();
 
       await expect(
-        service.import(JSON.stringify({ server: { host: '0.0.0.0' } })),
+        service.import(JSON.stringify({ server: { httpPort: 0 } })),
       ).rejects.toBeInstanceOf(ConfigImportError);
     });
 
@@ -255,6 +255,61 @@ describe('createConfigService', () => {
       await service.import('{"__proto__": {"compromis": true}}');
 
       expect(({} as Record<string, unknown>)['compromis']).toBeUndefined();
+    });
+  });
+
+  describe('import et réglage Twitch de l’utilisateur', () => {
+    const MINE = {
+      ...DEFAULT_CONFIG,
+      twitch: {
+        ...DEFAULT_CONFIG.twitch,
+        clientId: 'mon-application',
+        broadcasterUserId: '1337',
+        broadcasterLogin: 'moi',
+        enableChatCommands: true,
+      },
+    };
+
+    it('garde le réglage Twitch en place quand le fichier en apporte un autre', async () => {
+      const { service } = createService(MINE);
+      await service.load();
+      const shared = {
+        ...DEFAULT_CONFIG,
+        twitch: { ...DEFAULT_CONFIG.twitch, clientId: 'son-application', broadcasterUserId: '42' },
+      };
+
+      const imported = await service.import(JSON.stringify(shared));
+
+      expect(imported.twitch).toStrictEqual(MINE.twitch);
+    });
+
+    it('garde le réglage Twitch en place quand le fichier n’en apporte aucun', async () => {
+      const { service } = createService(MINE);
+      await service.load();
+      const { twitch: _omitted, ...withoutTwitch } = DEFAULT_CONFIG;
+
+      const imported = await service.import(JSON.stringify(withoutTwitch));
+
+      expect(imported.twitch).toStrictEqual(MINE.twitch);
+    });
+
+    it('n’est pas refusé pour un réglage Twitch invalide, qu’il ignore', async () => {
+      const { service } = createService(MINE);
+      await service.load();
+      const shared = { ...DEFAULT_CONFIG, twitch: { enableChatCommands: 'oui' } };
+
+      const imported = await service.import(JSON.stringify(shared));
+
+      expect(imported.twitch).toStrictEqual(MINE.twitch);
+    });
+
+    it('écrit sur le disque le réglage Twitch gardé', async () => {
+      const { service, double } = createService(MINE);
+      await service.load();
+
+      await service.import(JSON.stringify({ ...DEFAULT_CONFIG, twitch: { clientId: 'son-application' } }));
+
+      expect(double.persisted).toMatchObject({ twitch: MINE.twitch });
     });
   });
 

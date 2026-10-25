@@ -14,7 +14,6 @@
 #   ./scripts/dc.sh audit              npm audit (seuil : high)
 #   ./scripts/dc.sh verify             lint + typecheck + test + audit
 #   ./scripts/dc.sh build              compilation TypeScript
-#   ./scripts/dc.sh twitch <args...>   Twitch CLI (serveur EventSub factice)
 #   ./scripts/dc.sh shell              shell interactif dans le conteneur
 #   ./scripts/dc.sh npm <args...>      commande npm arbitraire
 #   ./scripts/dc.sh down               arrête et nettoie les conteneurs
@@ -99,18 +98,6 @@ cmd_install() {
   fi
 }
 
-# Twitch CLI, dans son conteneur.
-#
-# Le serveur EventSub factice écoute sur 127.0.0.1:8080 et se lance par
-# `./scripts/twitch-mock.sh serve` ; cette commande-ci sert à tout le reste,
-# `twitch event trigger …` en particulier. Voir docs/TESTING-TWITCH-CLI.md.
-cmd_twitch() {
-  local -a tty_flag=()
-  [[ -t 0 && -t 1 ]] || tty_flag=(-T)
-
-  compose --profile twitch run --rm --no-deps "${tty_flag[@]}" twitch-cli "$@"
-}
-
 main() {
   local command="${1:-help}"
   [[ $# -gt 0 ]] && shift
@@ -155,10 +142,6 @@ main() {
       require_docker && require_dependencies
       dev_run npm run build "$@"
       ;;
-    twitch)
-      require_docker
-      cmd_twitch "$@"
-      ;;
     shell)
       require_docker
       dev_run bash "$@"
@@ -169,7 +152,7 @@ main() {
       ;;
     down)
       require_docker
-      compose --profile twitch down --remove-orphans "$@"
+      compose down --remove-orphans "$@"
       ;;
     *)
       printf '\033[31merreur :\033[0m commande inconnue « %s »\n\n' "${command}" >&2

@@ -61,6 +61,7 @@ import {
   type NotificationContext,
   type Timers,
 } from '../twitch/eventsub-client.js';
+import { TWITCH_ENDPOINTS } from '../twitch/endpoints.js';
 import { createHelixClient, type HelixClient } from '../twitch/helix-client.js';
 import { createOAuthCompletion } from '../twitch/oauth-completion.js';
 import {
@@ -88,6 +89,21 @@ export const OAUTH_REDIRECT_URI = `http://${OAUTH_REDIRECT_HOST}:${String(OAUTH_
 const CLIENT_SECRET_KEY = 'twitch.clientSecret';
 
 const CONFIG_FILE = 'config.json';
+
+// `localhost` se résout parfois d'abord en `::1` sous Windows : l'URL donnée à OBS ne joindrait
+// plus un serveur qui n'écoute que sur IPv4.
+const SERVER_HOST = '127.0.0.1';
+
+const PORT_FALLBACK_ATTEMPTS = 10;
+
+const MAX_BODY_BYTES = 262_144;
+
+const DEDUP_CACHE_SIZE = 5_000;
+
+const MESSAGE_DEDUP_TTL_MS = 600_000;
+
+// Rapproche channel.subscribe et channel.chat.notification qui décrivent le même abonnement.
+const CROSS_SOURCE_WINDOW_MS = 10_000;
 
 const COUNTER_FILE = 'counter.json';
 
@@ -318,7 +334,7 @@ export function createApplication(options: ApplicationOptions): Application {
     getSettings: () => {
       const twitch = configService.get().twitch;
       return {
-        idBaseUrl: twitch.idBaseUrl,
+        idBaseUrl: TWITCH_ENDPOINTS.id,
         clientId: twitch.clientId,
         redirectUri: OAUTH_REDIRECT_URI,
         scopes: requiredScopes(twitch),
@@ -329,7 +345,7 @@ export function createApplication(options: ApplicationOptions): Application {
   const helix: HelixClient = createHelixClient({
     getSettings: () => {
       const twitch = configService.get().twitch;
-      return { helixBaseUrl: twitch.helixBaseUrl, clientId: twitch.clientId };
+      return { helixBaseUrl: TWITCH_ENDPOINTS.helix, clientId: twitch.clientId };
     },
     getAccessToken: () => oauth.getAccessToken(),
     logger: logger.child('helix'),
@@ -627,7 +643,7 @@ export function createApplication(options: ApplicationOptions): Application {
 
       return {
         authorizationUrl: buildAuthorizationUrl({
-          idBaseUrl: twitch.idBaseUrl,
+          idBaseUrl: TWITCH_ENDPOINTS.id,
           clientId: twitch.clientId,
           redirectUri: OAUTH_REDIRECT_URI,
           scopes: requiredScopes(twitch),
@@ -770,10 +786,7 @@ export function createApplication(options: ApplicationOptions): Application {
 
       await configService.update({});
 
-      logger.setLevel(config.logging.level);
-      if (config.logging.console) {
-        logger.addSink(createConsoleSink());
-      }
+      logger.addSink(createConsoleSink());
 
       logger.addSink({
         name: 'ws',
@@ -783,13 +796,13 @@ export function createApplication(options: ApplicationOptions): Application {
       });
 
       messageDedup = createDedupCache({
-        maxEntries: config.history.dedupCacheSize,
-        ttlMs: config.history.dedupTtlMs,
+        maxEntries: DEDUP_CACHE_SIZE,
+        ttlMs: MESSAGE_DEDUP_TTL_MS,
       });
 
       semanticDedup = createDedupCache({
-        maxEntries: config.history.dedupCacheSize,
-        ttlMs: config.history.crossSourceWindowMs,
+        maxEntries: DEDUP_CACHE_SIZE,
+        ttlMs: CROSS_SOURCE_WINDOW_MS,
       });
 
       // onChange ne reçoit que la configuration nouvelle : l'ancienne se conserve ici pour
@@ -798,7 +811,6 @@ export function createApplication(options: ApplicationOptions): Application {
       let previousHappyHour = configService.get().rewards.happyHour;
 
       configService.onChange(() => {
-        logger.setLevel(configService.get().logging.level);
         hub.publishConfig();
 
         const nextHappyHour = configService.get().rewards.happyHour;
@@ -824,10 +836,10 @@ export function createApplication(options: ApplicationOptions): Application {
 
       httpServer = createHttpServer({
         router,
-        host: config.server.host,
+        host: SERVER_HOST,
         port: config.server.httpPort,
-        portFallbackAttempts: config.server.portFallbackAttempts,
-        maxBodyBytes: config.server.maxBodyBytes,
+        portFallbackAttempts: PORT_FALLBACK_ATTEMPTS,
+        maxBodyBytes: MAX_BODY_BYTES,
         logger,
         onUpgrade: wsAdapter.handleUpgrade,
       });
@@ -840,7 +852,7 @@ export function createApplication(options: ApplicationOptions): Application {
 
       scoped.info('ChronoCast démarré', {
         port,
-        overlay: `http://${config.server.host}:${String(port)}/overlay`,
+        overlay: `http://${SERVER_HOST}:${String(port)}/overlay`,
       });
 
       return port;

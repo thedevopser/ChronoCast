@@ -14,11 +14,10 @@ const CREDENTIALS: TwitchCredentials = {
   scopes: ['channel:read:subscriptions', 'bits:read'],
 };
 
-function createSecretStoreDouble(options: { encryptionAvailable?: boolean } = {}) {
+function createSecretStoreDouble() {
   const values = new Map<string, string>();
 
   const secretStore: SecretStore = {
-    isEncryptionAvailable: () => options.encryptionAvailable ?? true,
     read: (key: string) => Promise.resolve(values.get(key) ?? null),
     write: (key: string, value: string) => {
       values.set(key, value);
@@ -44,8 +43,8 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
   };
 }
 
-function createStore(options: { encryptionAvailable?: boolean } = {}) {
-  const double = createSecretStoreDouble(options);
+function createStore() {
+  const double = createSecretStoreDouble();
   const redactor = createRedactor();
   const sink = createMemorySink();
   const logger = createLogger({ level: 'debug', sinks: [sink], redactor });
@@ -175,30 +174,14 @@ describe('createTokenStore', () => {
     });
   });
 
-  describe('disponibilité du chiffrement', () => {
-    it('avertit lorsque le chiffrement du système n\'est pas disponible', async () => {
-      const { store, sink } = createStore({ encryptionAvailable: false });
+  describe('magasin de secrets qui refuse d’écrire, faute de chiffrement', () => {
+    it('échoue sans annoncer un enregistrement moins protégé, qui n’a pas lieu', async () => {
+      const { store, sink, double } = createStore();
+      double.secretStore.write = () => Promise.reject(new Error('chiffrement indisponible'));
 
-      await store.save(CREDENTIALS);
+      await expect(store.save(CREDENTIALS)).rejects.toThrow('chiffrement indisponible');
 
-      const alerte = sink.records.find((record) => record.level === 'warning');
-      expect(alerte?.message).toContain('chiffrement');
-    });
-
-    it('enregistre malgré tout les identifiants', async () => {
-      const { store } = createStore({ encryptionAvailable: false });
-
-      await store.save(CREDENTIALS);
-
-      await expect(store.load()).resolves.toEqual(CREDENTIALS);
-    });
-
-    it('n\'avertit pas lorsque le chiffrement est disponible', async () => {
-      const { store, sink } = createStore({ encryptionAvailable: true });
-
-      await store.save(CREDENTIALS);
-
-      expect(sink.records.some((record) => record.level === 'warning')).toBe(false);
+      expect(sink.records.filter((record) => record.level === 'warning')).toStrictEqual([]);
     });
   });
 });

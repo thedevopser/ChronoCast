@@ -1,6 +1,6 @@
 {
   "name": "chronocast",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Compteur subathon Twitch pour OBS : overlay temps réel et panneau d'administration, entièrement local.",
   "private": true,
   "license": "MIT",
@@ -25,19 +25,19 @@
   },
   "dependencies": {
     "ws": "^8.22.0",
-    "zod": "^3.24.1"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@types/node": "^22.10.5",
     "@types/ws": "^8.5.13",
-    "@vitest/coverage-v8": "^4.1.10",
-    "electron": "43.7.9",
+    "@vitest/coverage-v8": "^4.1.12",
+    "electron": "43.8.3",
     "electron-builder": "26.15.3",
     "eslint": "^9.17.0",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^21.0.4",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   }
 }

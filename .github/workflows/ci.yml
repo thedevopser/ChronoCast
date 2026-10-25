@@ -18,12 +18,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '22'
           cache: npm
+
+      # Même npm que docker/Dockerfile.dev : celui de Node 22 ne sait pas résoudre l'arbre de vitest.
+      - name: Aligner npm sur le conteneur de développement
+        run: npm install --global npm@11.6.2
 
       - name: Installer les dépendances
         run: npm ci --ignore-scripts

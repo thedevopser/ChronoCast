@@ -52,6 +52,10 @@ Dans les journaux, les retours à la ligne et les séquences ANSI sont échappé
 
 **Jamais diffusés sur le WebSocket.** Les canaux sont en lecture seule et ne transportent que l'état du compteur, les événements, la configuration d'apparence et la progression des objectifs — un entier, un libellé et deux bornes, sans aucun secret ni pseudo.
 
+**La révocation a une limite posée par Twitch.** Le bouton *Révoquer l'accès* invalide le jeton d'accès auprès de Twitch, puis efface tous les identifiants locaux, refresh token compris, même si Twitch n'a pas répondu. Twitch n'offre en revanche aucune révocation du refresh token ni du lien entre l'application et le compte : seule la déconnexion depuis `twitch.tv/settings/connections` le rompt. Le guide utilisateur le dit, et recommande aussi de générer un nouveau secret client en cas de doute.
+
+**Envoyés à Twitch, et nulle part ailleurs.** Les adresses du service d'identité, de l'API Helix et d'EventSub sont des constantes de [endpoints.ts](../src/core/twitch/endpoints.ts), jamais des réglages : ni le panneau ni un fichier de configuration ne peuvent les changer. Une adresse réglable suffirait à faire partir le refresh token et le secret client chez un tiers, puisque c'est à elle qu'ils sont présentés à chaque renouvellement. La seule adresse qui vienne de l'extérieur, celle que Twitch fournit pour migrer une session EventSub, n'est suivie que si elle est en `wss:` sur `twitch.tv` ou l'un de ses sous-domaines.
+
 **Systématiquement rédigés dans les journaux.** Les secrets sont déclarés à un rédacteur au moment où ils sont chargés ; ils sont masqués partout ensuite, **y compris s'ils se retrouvent au milieu d'un message d'erreur**.
 
 ## 4. Le serveur local
@@ -76,7 +80,7 @@ Un serveur qui écoute sur une machine de bureau est à portée de n'importe que
 
 **Le gestionnaire de rappel ne voit jamais le `state` attendu.** Il ne reçoit qu'un `verifyState()` qui répond oui ou non : il ne peut donc ni le journaliser, ni le renvoyer dans une page.
 
-**Un `state` qui ne correspond pas ne consomme rien.** N'importe quelle page distante peut provoquer une navigation vers la boucle locale ; si un `state` erroné suffisait à clore le flux, le premier venu ferait échouer la connexion du streamer, à distance et en boucle.
+**Un `state` qui ne correspond pas ne consomme rien.** N'importe quelle page distante peut provoquer une navigation vers la boucle locale ; si un `state` erroné suffisait à clore le flux, le premier venu ferait échouer la connexion du streamer, à distance et en boucle. **La règle vaut aussi pour un refus** : un rappel `?error=` n'est pris en compte que s'il porte le `state` attendu, que Twitch renvoie dans ce cas comme dans l'autre.
 
 **La page de rappel ne montre qu'un code d'issue clos** — `ok`, `denied` ou `failed`. Ni le code d'autorisation, ni le message d'erreur de Twitch, qui est du texte contrôlé par un tiers.
 
@@ -92,13 +96,19 @@ La liste admet également `github.com` et `paypal.me`, pour le lien vers le code
 
 **Les outils de développement sont fermés dans une application packagée.** Ils donneraient accès au panneau et à tout ce qu'il peut faire.
 
+**Les demandes de permission sont refusées.** Electron accorde par défaut ce qu'une page demande — notifications, caméra, micro, géolocalisation. La fenêtre ne l'accorde qu'à une seule demande, l'écriture du presse-papiers par l'origine locale, dont ont besoin les boutons « Copier » ; tout le reste est refusé. La décision vit dans [permission-policy.ts](../src/main/permission-policy.ts).
+
+**Les fusibles Electron ferment l'exécutable signé à tout autre code.** `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` et `--inspect` sont ignorés, l'application ne se charge que depuis son `app.asar`, dont l'intégrité est contrôlée au démarrage. Sans eux, un processus local pourrait lancer ChronoCast pour exécuter son propre JavaScript sous l'identité du paquet signé. Ils sont déclarés dans [electron-builder.yml](../electron-builder.yml) et tenus par `packaging.test.ts`.
+
 ## 7. La chaîne d'approvisionnement
 
 **Trois dépendances de production** : `electron`, `ws`, `zod`. C'est peu, et c'est délibéré.
 
 **`npm ci --ignore-scripts`.** Aucun script post-install de dépendance tierce ne s'exécute, ce qui ferme une voie d'attaque classique. Aucune dépendance de production n'en a besoin.
 
-**`npm audit --audit-level=high` est bloquant en CI**, avec droit de veto sur chaque PR.
+**`npm audit --audit-level=high` est bloquant en CI**, avec droit de veto sur chaque PR, et **le workflow de publication le relance** avant de produire le paquet : une alerte publiée entre la fusion et le tag arrête la publication.
+
+**Les actions GitHub sont épinglées sur un commit**, le tag restant en commentaire. Un tag se déplace, un SHA non : une action compromise ne peut pas s'introduire en silence dans le pipeline qui produit le paquet. `workflows.test.ts` refuse une action épinglée autrement.
 
 **Les scripts d'outillage sont sans dépendance.** La préparation des icônes décode et réencode le PNG en une centaine de lignes de bibliothèque standard plutôt que de tirer une bibliothèque d'images, son arbre transitif et ses binaires natifs — pour un travail qu'on fait trois fois dans la vie du projet.
 
@@ -152,6 +162,9 @@ Le panneau n'a qu'un bouton qui y mène. **Aucune adresse ne traverse cette rout
 | `api-hardening.test.ts` | Un import de configuration malveillant est refusé, les secrets n'apparaissent nulle part |
 | `navigation-policy.test.ts` | Seuls l'origine locale, Twitch, le dépôt et la page de soutien sont admis — et tout ce qui n'est pas local part au navigateur |
 | `browser-opener.test.ts` | Seul `https:` est ouvert à l'extérieur |
+| `oauth-callback-forgery.test.ts` | Un rappel OAuth forgé par une page tierce ne fait pas échouer la connexion en cours |
+| `permission-policy.test.ts` | Seule l'origine locale obtient une permission, et seulement celle d'écrire dans le presse-papiers |
+| `twitch-endpoints.test.ts` | Une configuration ne peut pas détourner les adresses de Twitch |
 
 Ces tests emploient de vraies charges hostiles, et ils tournent dans un vrai parseur HTML : un faux `document` prouverait qu'on a appelé `textContent`, pas qu'aucun script n'a été exécuté.
 

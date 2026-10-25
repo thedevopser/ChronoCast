@@ -472,6 +472,10 @@
               </p>
               <p class="card__hint" id="twitch-scopes"></p>
               <ul class="scopes" id="twitch-missing-scopes"></ul>
+              <p class="card__hint">
+                Révoquer efface vos identifiants de cette machine. Pour rompre aussi le lien avec
+                votre compte, déconnectez ChronoCast sur twitch.tv/settings/connections.
+              </p>
               <div class="actions">
                 <button class="button" type="button" id="twitch-reconnect">
                   Refaire la connexion
@@ -628,8 +632,7 @@
           <header class="view__head">
             <h1 class="view__title">Paramètres</h1>
             <p class="view__subtitle">
-              Compteur, serveur local, journalisation et historique. Les réglages de port ne
-              prennent effet qu'au prochain démarrage.
+              Compteur et serveur local. Le port ne prend effet qu'au prochain démarrage.
             </p>
           </header>
 
@@ -680,6 +683,8 @@
               <p class="card__hint">
                 Les réglages inconnus sont écartés en silence plutôt que de faire échouer le
                 fichier entier : une configuration d'une version antérieure reste importable.
+                Le réglage Twitch n'est jamais importé : votre application Twitch, votre compte
+                et la lecture du chat restent ceux de cette installation.
               </p>
               <label class="field">
                 <span class="field__label">Fichier de configuration</span>
