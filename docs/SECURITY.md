@@ -104,7 +104,9 @@ La liste admet également `github.com` et `paypal.me`, pour le lien vers le code
 
 **`npm ci --ignore-scripts`.** Aucun script post-install de dépendance tierce ne s'exécute, ce qui ferme une voie d'attaque classique. Aucune dépendance de production n'en a besoin.
 
-**`npm audit --audit-level=high` est bloquant en CI**, avec droit de veto sur chaque PR.
+**`npm audit --audit-level=high` est bloquant en CI**, avec droit de veto sur chaque PR, et **le workflow de publication le relance** avant de produire le paquet : une alerte publiée entre la fusion et le tag arrête la publication.
+
+**Les actions GitHub sont épinglées sur un commit**, le tag restant en commentaire. Un tag se déplace, un SHA non : une action compromise ne peut pas s'introduire en silence dans le pipeline qui produit le paquet. `workflows.test.ts` refuse une action épinglée autrement.
 
 **Les scripts d'outillage sont sans dépendance.** La préparation des icônes décode et réencode le PNG en une centaine de lignes de bibliothèque standard plutôt que de tirer une bibliothèque d'images, son arbre transitif et ses binaires natifs — pour un travail qu'on fait trois fois dans la vie du projet.
 
