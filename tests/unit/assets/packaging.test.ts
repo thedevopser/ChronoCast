@@ -11,6 +11,29 @@ const read = (relative: string): Promise<string> => readFile(resolve(ROOT, relat
 const IDENTITY_PLACEHOLDER = 'IDENTITE-PARTNER-CENTER';
 
 describe('electron-builder.yml', () => {
+  describe('fusibles Electron', () => {
+    async function fuses(): Promise<string> {
+      const config = await read('electron-builder.yml');
+      return /^electronFuses:\n((?: {2}.+\n?)+)/m.exec(config)?.[1] ?? '';
+    }
+
+    it.each([
+      ['runAsNode', false],
+      ['enableNodeOptionsEnvironmentVariable', false],
+      ['enableNodeCliInspectArguments', false],
+      ['grantFileProtocolExtraPrivileges', false],
+      ['enableEmbeddedAsarIntegrityValidation', true],
+      ['onlyLoadAppFromAsar', true],
+      ['enableCookieEncryption', true],
+    ])('règle %s à %s, pour qu’on ne puisse pas détourner l’exécutable signé', async (fuse, value) => {
+      expect(await fuses()).toMatch(new RegExp(`^ {2}${fuse}: ${String(value)}$`, 'm'));
+    });
+
+    it('empaquette l’application en asar, sans quoi le contrôle d’intégrité ne vérifie rien', async () => {
+      expect(await read('electron-builder.yml')).toMatch(/^asar: true$/m);
+    });
+  });
+
   it('nomme le produit exactement comme `app.setName`', async () => {
     const [config, main] = await Promise.all([
       read('electron-builder.yml'),

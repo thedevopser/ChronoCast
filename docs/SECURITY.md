@@ -94,6 +94,8 @@ La liste admet également `github.com` et `paypal.me`, pour le lien vers le code
 
 **Les outils de développement sont fermés dans une application packagée.** Ils donneraient accès au panneau et à tout ce qu'il peut faire.
 
+**Les fusibles Electron ferment l'exécutable signé à tout autre code.** `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` et `--inspect` sont ignorés, l'application ne se charge que depuis son `app.asar`, dont l'intégrité est contrôlée au démarrage. Sans eux, un processus local pourrait lancer ChronoCast pour exécuter son propre JavaScript sous l'identité du paquet signé. Ils sont déclarés dans [electron-builder.yml](../electron-builder.yml) et tenus par `packaging.test.ts`.
+
 ## 7. La chaîne d'approvisionnement
 
 **Trois dépendances de production** : `electron`, `ws`, `zod`. C'est peu, et c'est délibéré.
