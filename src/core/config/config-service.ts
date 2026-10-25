@@ -83,6 +83,17 @@ function sanitize(value: unknown): unknown {
   return { ...result };
 }
 
+// Le réglage Twitch est propre à chaque streamer : un fichier partagé ne doit ni changer
+// son application ou son compte, ni ce que ChronoCast lit dans son chat.
+function withoutTwitchSection(value: unknown): unknown {
+  if (!isPlainObject(value)) {
+    return value;
+  }
+
+  const { twitch: _ignored, ...rest } = value;
+  return rest;
+}
+
 function deepMerge(base: unknown, patch: unknown): unknown {
   if (!isPlainObject(patch)) {
     return patch;
@@ -211,7 +222,7 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
     },
 
     async import(serialized: string): Promise<ChronoCastConfig> {
-      requireLoaded();
+      const loaded = requireLoaded();
 
       let decoded: unknown;
       try {
@@ -220,7 +231,7 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
         throw new ConfigImportError('fichier JSON illisible', [], error);
       }
 
-      const prepared = prepareRawConfig(sanitize(decoded));
+      const prepared = prepareRawConfig(withoutTwitchSection(sanitize(decoded)));
       const parsed = configSchema.safeParse(prepared.raw);
       if (!parsed.success) {
         const details = describeIssues(parsed.error);
@@ -230,6 +241,7 @@ export function createConfigService(options: ConfigServiceOptions): ConfigServic
 
       const imported: ChronoCastConfig = {
         ...withDerivedHappyHourRewards(prepared.raw, parsed.data),
+        twitch: loaded.twitch,
         schemaVersion: CONFIG_SCHEMA_VERSION,
       };
       await store.write(imported);

@@ -92,7 +92,7 @@ Il s'ouvre depuis la fenêtre de ChronoCast, ou dans un navigateur à l'adresse 
 | **Historique** | Tous les événements reçus, avec leur montant — **y compris ceux qui n'ont rien crédité**, et la raison |
 | **Journaux** | Ce que fait l'application, utile en cas de problème |
 | **Paramètres** | Port, journalisation, rétention, et un bouton vers les réglages de démarrage de Windows |
-| **Import / export** | Sauvegarder votre configuration dans un fichier, ou en recharger une |
+| **Import / export** | Sauvegarder votre configuration dans un fichier, ou en recharger une. L'import ne touche jamais au réglage Twitch : un fichier partagé par un autre streamer ne change ni votre application Twitch, ni votre compte, ni la lecture de votre chat |
 | **À propos** | Version, licence, lien vers le code source |
 
 Le panneau n'écoute que sur votre machine. Il n'est accessible ni depuis votre réseau local, ni depuis Internet.
