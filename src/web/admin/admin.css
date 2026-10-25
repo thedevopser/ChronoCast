@@ -275,7 +275,19 @@
 
 .field--compact {
   margin-bottom: 0;
+  min-width: 8rem;
   max-width: 14rem;
+}
+
+/* Alignés par le bas, les champs d'une rangée doivent tous perdre la marge basse de .field,
+   sinon celui qui la garde remonte d'autant, libellé compris. */
+.row > .field {
+  margin-bottom: 0;
+}
+
+.row .field__input {
+  box-sizing: border-box;
+  height: 2.5rem;
 }
 
 .field__label {
