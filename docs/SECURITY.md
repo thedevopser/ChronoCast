@@ -52,6 +52,8 @@ Dans les journaux, les retours à la ligne et les séquences ANSI sont échappé
 
 **Jamais diffusés sur le WebSocket.** Les canaux sont en lecture seule et ne transportent que l'état du compteur, les événements, la configuration d'apparence et la progression des objectifs — un entier, un libellé et deux bornes, sans aucun secret ni pseudo.
 
+**La révocation a une limite posée par Twitch.** Le bouton *Révoquer l'accès* invalide le jeton d'accès auprès de Twitch, puis efface tous les identifiants locaux, refresh token compris, même si Twitch n'a pas répondu. Twitch n'offre en revanche aucune révocation du refresh token ni du lien entre l'application et le compte : seule la déconnexion depuis `twitch.tv/settings/connections` le rompt. Le guide utilisateur le dit, et recommande aussi de générer un nouveau secret client en cas de doute.
+
 **Envoyés à Twitch, et nulle part ailleurs.** Les adresses du service d'identité, de l'API Helix et d'EventSub sont des constantes de [endpoints.ts](../src/core/twitch/endpoints.ts), jamais des réglages : ni le panneau ni un fichier de configuration ne peuvent les changer. Une adresse réglable suffirait à faire partir le refresh token et le secret client chez un tiers, puisque c'est à elle qu'ils sont présentés à chaque renouvellement. La seule adresse qui vienne de l'extérieur, celle que Twitch fournit pour migrer une session EventSub, n'est suivie que si elle est en `wss:` sur `twitch.tv` ou l'un de ses sous-domaines.
 
 **Systématiquement rédigés dans les journaux.** Les secrets sont déclarés à un rédacteur au moment où ils sont chargés ; ils sont masqués partout ensuite, **y compris s'ils se retrouvent au milieu d'un message d'erreur**.

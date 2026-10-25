@@ -187,10 +187,6 @@ describe('createSafeStorageSecretStore', () => {
       });
     });
 
-    it('l’annonce', () => {
-      expect(indisponible.isEncryptionAvailable()).toBe(false);
-    });
-
     it('refuse d’écrire plutôt que d’écrire en clair', async () => {
       await expect(indisponible.write('twitch.accessToken', 'jeton')).rejects.toThrow(
         /chiffrement/i,
@@ -272,7 +268,7 @@ describe('createSafeStorageSecretStore', () => {
       expect(tardif.calls.available).toBe(0);
     });
 
-    it('reflète la disponibilité à chaque interrogation', () => {
+    it('relit la disponibilité à chaque écriture', async () => {
       let disponible = false;
       const changeant: SafeStorageLike = {
         isEncryptionAvailable: () => disponible,
@@ -285,9 +281,9 @@ describe('createSafeStorageSecretStore', () => {
         logger: createLogger({ level: 'debug', sinks: [sink] }),
       });
 
-      expect(suiveur.isEncryptionAvailable()).toBe(false);
+      await expect(suiveur.write('clé', 'valeur')).rejects.toThrow();
       disponible = true;
-      expect(suiveur.isEncryptionAvailable()).toBe(true);
+      await expect(suiveur.write('clé', 'valeur')).resolves.toBeUndefined();
     });
   });
 

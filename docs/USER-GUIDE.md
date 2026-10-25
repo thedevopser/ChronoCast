@@ -272,6 +272,8 @@ Désinstaller ChronoCast **ne supprime pas ce répertoire** : réinstaller vous 
 
 **Twitch refuse l'autorisation.** L'URL de redirection déclarée dans la console développeur doit être `http://localhost:37771/callback`, au caractère près — pas de barre oblique finale, pas de `127.0.0.1`.
 
+**Couper tout accès de ChronoCast à votre compte Twitch.** Le bouton *Révoquer l'accès* de la vue *Twitch* invalide le jeton d'accès auprès de Twitch et efface tous les identifiants de votre machine. Twitch ne permet pas à une application de révoquer elle-même le lien avec votre compte : pour le rompre, ouvrez `twitch.tv/settings/connections` et déconnectez ChronoCast. Si vous pensez que vos identifiants ont pu fuiter, faites-le, puis générez un nouveau secret client dans la console développeur de Twitch.
+
 **Après avoir changé de PC ou de compte Windows**, les jetons deviennent illisibles : Windows les a chiffrés pour l'ancien compte. ChronoCast rouvre alors son assistant. Vos réglages et votre compteur, eux, sont intacts.
 
 Pour tout le reste, la vue *Journaux* dit ce qui s'est passé. Les secrets y sont masqués : vous pouvez la copier telle quelle dans un rapport de bug.

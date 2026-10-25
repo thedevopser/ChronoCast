@@ -61,7 +61,6 @@ function createManualTicker(): Ticker & { tick(): void } {
 function createMemorySecretStore(seed: ReadonlyMap<string, string>): SecretStore {
   const entries = new Map<string, string>(seed);
   return {
-    isEncryptionAvailable: () => false,
     read: (key) => Promise.resolve(entries.get(key) ?? null),
     write: (key, value) => {
       entries.set(key, value);

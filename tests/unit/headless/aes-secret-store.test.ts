@@ -40,10 +40,6 @@ describe('createAesSecretStore', () => {
   });
 
   describe('honnêteté', () => {
-    it('annonce que le chiffrement n’est pas de niveau coffre-fort', () => {
-      expect(store.isEncryptionAvailable()).toBe(false);
-    });
-
     it('avertit explicitement dans les journaux', async () => {
       await store.write('twitch', 'jeton');
 

@@ -44,7 +44,6 @@ function createMemorySink(): LogSink & { readonly records: LogRecord[] } {
 function createSecretStoreDouble(): SecretStore {
   const values = new Map<string, string>();
   return {
-    isEncryptionAvailable: () => true,
     read: (key) => Promise.resolve(values.get(key) ?? null),
     write: (key, value) => {
       values.set(key, value);

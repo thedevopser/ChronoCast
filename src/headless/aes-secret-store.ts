@@ -120,10 +120,6 @@ export function createAesSecretStore(options: AesSecretStoreOptions): SecretStor
   }
 
   return {
-    isEncryptionAvailable(): boolean {
-      return false;
-    },
-
     async read(key_: string): Promise<string | null> {
       const entries = await readAll();
       const payload = entries[key_];

@@ -44,10 +44,6 @@ export function createSafeStorageSecretStore(
   }
 
   return {
-    isEncryptionAvailable(): boolean {
-      return safeStorage.isEncryptionAvailable();
-    },
-
     async read(key: string): Promise<string | null> {
       if (!safeStorage.isEncryptionAvailable()) {
         scoped.warning('chiffrement indisponible : aucun secret ne peut être relu');
