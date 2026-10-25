@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
@@ -580,5 +582,43 @@ describe('mode de la barre d’objectif', () => {
 
   it.each([-1, 1.5])('refuse un poids de %d en mode subs', (tier1) => {
     expect(() => configSchema.parse({ goals: { subWeights: { gift: { tier1 } } } })).toThrow();
+  });
+});
+
+describe('valeurs par défaut des sections absentes ou vides', () => {
+  async function expectedDefaults(): Promise<unknown> {
+    return JSON.parse(
+      await readFile(new URL('../../fixtures/default-config.json', import.meta.url), 'utf8'),
+    ) as unknown;
+  }
+
+  function objectPaths(value: unknown, prefix: readonly string[] = []): string[][] {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return [];
+    }
+    return Object.entries(value).flatMap(([key, entry]) => {
+      const path = [...prefix, key];
+      return typeof entry === 'object' && entry !== null && !Array.isArray(entry)
+        ? [path, ...objectPaths(entry, path)]
+        : [];
+    });
+  }
+
+  function nest(path: readonly string[], leaf: unknown): unknown {
+    return path.reduceRight<unknown>((inner, key) => ({ [key]: inner }), leaf);
+  }
+
+  it('produit la configuration par défaut de référence à partir d’un objet vide', async () => {
+    expect(configSchema.parse({})).toStrictEqual(await expectedDefaults());
+  });
+
+  it('complète chaque sous-objet vide avec les valeurs par défaut de ses champs', async () => {
+    const expected = await expectedDefaults();
+    const paths = objectPaths(expected);
+
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) {
+      expect(configSchema.parse(nest(path, {})), path.join('.')).toStrictEqual(expected);
+    }
   });
 });

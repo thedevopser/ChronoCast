@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 11,
+  "counter": {
+    "initialSeconds": 43200,
+    "minRemainingSeconds": 0,
+    "tickIntervalMs": 250,
+    "persistIntervalMs": 5000,
+    "resumeOnStartup": true
+  },
+  "rewards": {
+    "happyHour": false,
+    "happyHourRewards": {
+      "sub": {
+        "tier1": 360,
+        "tier2": 480,
+        "tier3": 600,
+        "prime": 360
+      },
+      "resub": {
+        "tier1": 360,
+        "tier2": 480,
+        "tier3": 600,
+        "prime": 360
+      },
+      "gift": {
+        "tier1": 360,
+        "tier2": 480,
+        "tier3": 600
+      },
+      "bits": {
+        "unit": 100,
+        "seconds": 120
+      }
+    },
+    "chatCommand": {
+      "name": "addtime",
+      "maxSeconds": 3600,
+      "overlayText": "Temps ajouté"
+    },
+    "sub": {
+      "tier1": 180,
+      "tier2": 240,
+      "tier3": 300,
+      "prime": 180
+    },
+    "resub": {
+      "tier1": 180,
+      "tier2": 240,
+      "tier3": 300,
+      "prime": 180
+    },
+    "gift": {
+      "tier1": 180,
+      "tier2": 240,
+      "tier3": 300
+    },
+    "bits": {
+      "unit": 100,
+      "seconds": 60
+    }
+  },
+  "goals": {
+    "mode": "points",
+    "points": {
+      "sub": {
+        "tier1": 500,
+        "tier2": 1000,
+        "tier3": 2500,
+        "prime": 500
+      },
+      "resub": {
+        "tier1": 500,
+        "tier2": 1000,
+        "tier3": 2500,
+        "prime": 500
+      },
+      "gift": {
+        "tier1": 500,
+        "tier2": 1000,
+        "tier3": 2500
+      }
+    },
+    "subWeights": {
+      "sub": {
+        "tier1": 1,
+        "tier2": 1,
+        "tier3": 1,
+        "prime": 1
+      },
+      "resub": {
+        "tier1": 1,
+        "tier2": 1,
+        "tier3": 1,
+        "prime": 1
+      },
+      "gift": {
+        "tier1": 1,
+        "tier2": 1,
+        "tier3": 1
+      }
+    },
+    "unitLabel": "points",
+    "tiers": [
+      {
+        "target": 1000,
+        "label": "Objectif"
+      }
+    ],
+    "overlay": {
+      "fontFamily": "Inter, Segoe UI, system-ui, sans-serif",
+      "fontSize": 28,
+      "fontWeight": 700,
+      "letterSpacing": 0,
+      "color": "#FFFFFF",
+      "textAlign": "center",
+      "showCount": true,
+      "bar": {
+        "width": 0,
+        "height": 48,
+        "radius": 24,
+        "fillColor": "#9146FF",
+        "trackColor": "#000000",
+        "trackOpacity": 0.5,
+        "borderWidth": 0,
+        "borderColor": "#9146FF"
+      },
+      "shadow": {
+        "enabled": true,
+        "color": "#000000CC",
+        "blur": 12,
+        "offsetX": 0,
+        "offsetY": 4
+      },
+      "outline": {
+        "enabled": false,
+        "color": "#000000",
+        "width": 2
+      },
+      "glow": {
+        "enabled": false,
+        "color": "#9146FF",
+        "radius": 20
+      },
+      "gradient": {
+        "onText": false,
+        "onBar": false,
+        "from": "#FF3D7F",
+        "to": "#FF9A3D",
+        "angleDeg": 100
+      },
+      "announce": {
+        "enabled": true,
+        "durationMs": 5000,
+        "color": "#FFCC00",
+        "text": "Palier atteint"
+      }
+    }
+  },
+  "twitch": {
+    "clientId": "",
+    "broadcasterUserId": "",
+    "broadcasterLogin": "",
+    "enableChatNotifications": true,
+    "enableChatCommands": false,
+    "keepaliveTimeoutSeconds": 30
+  },
+  "server": {
+    "httpPort": 3777,
+    "host": "127.0.0.1",
+    "websocket": {
+      "heartbeatIntervalMs": 30000,
+      "stateBroadcastIntervalMs": 1000,
+      "maxMessageBytes": 4096
+    },
+    "portFallbackAttempts": 10,
+    "maxBodyBytes": 262144
+  },
+  "overlay": {
+    "fontFamily": "Inter, Segoe UI, system-ui, sans-serif",
+    "fontSize": 96,
+    "fontWeight": 700,
+    "letterSpacing": 0,
+    "color": "#FFFFFF",
+    "showDays": true,
+    "hideEmptyHours": false,
+    "textAlign": "center",
+    "shadow": {
+      "enabled": true,
+      "color": "#000000CC",
+      "blur": 12,
+      "offsetX": 0,
+      "offsetY": 4
+    },
+    "outline": {
+      "enabled": false,
+      "color": "#000000",
+      "width": 2
+    },
+    "glow": {
+      "enabled": false,
+      "color": "#9146FF",
+      "radius": 20
+    },
+    "gradient": {
+      "onText": false,
+      "onFrame": false,
+      "from": "#FF3D7F",
+      "to": "#FF9A3D",
+      "angleDeg": 100
+    },
+    "frame": {
+      "enabled": false,
+      "color": "#9146FF",
+      "width": 4,
+      "radius": 18,
+      "paddingX": 24,
+      "paddingY": 12,
+      "fillColor": "#000000",
+      "fillOpacity": 0
+    },
+    "animation": {
+      "onAdd": "pulse",
+      "durationMs": 600
+    },
+    "toast": {
+      "enabled": true,
+      "durationMs": 4000,
+      "color": "#9146FF",
+      "fontSize": 28
+    },
+    "enableCustomCss": false
+  },
+  "logging": {
+    "level": "info",
+    "retentionDays": 14,
+    "ringBufferSize": 500,
+    "console": true
+  },
+  "history": {
+    "retentionDays": 90,
+    "dedupCacheSize": 5000,
+    "dedupTtlMs": 600000,
+    "crossSourceWindowMs": 10000
+  },
+  "setup": {
+    "completed": false
+  },
+  "app": {
+    "startMinimized": false
+  }
+}

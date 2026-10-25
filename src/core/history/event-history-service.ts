@@ -8,22 +8,20 @@ import { createJsonlStore, type JsonlStore } from '../storage/jsonl-store.js';
 
 const BASE_NAME = 'events';
 
-const historyEntrySchema = z
-  .object({
-    id: z.string(),
-    type: z.enum(['sub', 'resub', 'gift', 'bits', 'command']),
-    occurredAt: z.number(),
-    recordedAt: z.number(),
-    userId: z.string(),
-    userName: z.string(),
-    source: z.enum(['eventsub', 'chat-notification', 'manual', 'chat-command']),
-    detail: z.union([z.string(), z.number()]).nullable(),
-    rewardSeconds: z.number(),
-    applied: z.boolean(),
-    reason: z.string(),
-    remainingMsAfter: z.number(),
-  })
-  .strip();
+const historyEntrySchema = z.object({
+  id: z.string(),
+  type: z.enum(['sub', 'resub', 'gift', 'bits', 'command']),
+  occurredAt: z.number(),
+  recordedAt: z.number(),
+  userId: z.string(),
+  userName: z.string(),
+  source: z.enum(['eventsub', 'chat-notification', 'manual', 'chat-command']),
+  detail: z.union([z.string(), z.number()]).nullable(),
+  rewardSeconds: z.number(),
+  applied: z.boolean(),
+  reason: z.string(),
+  remainingMsAfter: z.number(),
+});
 
 export type HistoryEntry = z.infer<typeof historyEntrySchema>;
 

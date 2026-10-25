@@ -30,11 +30,9 @@ export interface UpdateNoticeOptions {
   readonly logger: Logger;
 }
 
-const stateSchema = z
-  .object({
-    goalsReset: z.object({ previousCount: z.number().int().nonnegative() }).strip(),
-  })
-  .strip();
+const stateSchema = z.object({
+  goalsReset: z.object({ previousCount: z.number().int().nonnegative() }),
+});
 
 export function parseUpdateNotice(raw: unknown): UpdateNoticeState | null {
   const parsed = stateSchema.safeParse(raw);

@@ -85,52 +85,41 @@ const MAX_GOAL_COUNT = 1_000_000_000;
 
 const secondsSchema = z.number().int().positive().max(MAX_ADJUSTMENT_SECONDS);
 
-const adjustmentSchema = z
-  .object({
-    seconds: secondsSchema,
-    reason: z.string().max(MAX_REASON_LENGTH).optional(),
-  })
-  .strip();
+const adjustmentSchema = z.object({
+  seconds: secondsSchema,
+  reason: z.string().max(MAX_REASON_LENGTH).optional(),
+});
 
 const initialSchema = z
-  .object({ seconds: z.number().int().positive().max(MAX_INITIAL_SECONDS) })
-  .strip();
+  .object({ seconds: z.number().int().positive().max(MAX_INITIAL_SECONDS) });
 
 const goalSubsSchema = z
-  .object({ subs: z.number().int().min(0).max(MAX_GOAL_COUNT) })
-  .strip();
+  .object({ subs: z.number().int().min(0).max(MAX_GOAL_COUNT) });
 
 const goalAdjustmentSchema = z
-  .object({ amount: z.number().int().positive().max(MAX_GOAL_COUNT) })
-  .strip();
+  .object({ amount: z.number().int().positive().max(MAX_GOAL_COUNT) });
 
-const goalModeSchema = z.object({ mode: z.enum(['points', 'subs']) }).strip();
+const goalModeSchema = z.object({ mode: z.enum(['points', 'subs']) });
 
 // Le libellé écrit après le compte suit le mode : un compte d'abonnements ne se lit pas en points.
 const GOAL_MODE_UNIT_LABELS = { points: 'points', subs: 'abo.' } as const;
 
-const scheduleSchema = z
-  .object({
-    startAt: z.number().int().nonnegative(),
-    endAt: z.number().int().nonnegative(),
-  })
-  .strip();
+const scheduleSchema = z.object({
+  startAt: z.number().int().nonnegative(),
+  endAt: z.number().int().nonnegative(),
+});
 
-const configPatchSchema = z
-  .object({
-    config: z.record(z.string(), z.unknown()).optional(),
-    clientSecret: z.string().min(1).max(200).optional(),
-  })
-  .strip();
+const configPatchSchema = z.object({
+  config: z.record(z.string(), z.unknown()).optional(),
+  clientSecret: z.string().min(1).max(200).optional(),
+});
 
-const importSchema = z.object({ content: z.string().min(1).max(1_048_576) }).strip();
+const importSchema = z.object({ content: z.string().min(1).max(1_048_576) });
 
-const overlayTestSchema = z
-  .object({
-    type: z.enum(['sub', 'resub', 'gift', 'bits', 'command']),
-    userName: z.string().min(1).optional(),
-  })
-  .strip();
+const overlayTestSchema = z.object({
+  type: z.enum(['sub', 'resub', 'gift', 'bits', 'command']),
+  userName: z.string().min(1).optional(),
+});
 
 const LOG_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warning', 'error'];
 
