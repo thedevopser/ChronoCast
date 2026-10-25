@@ -14,6 +14,11 @@ RUN apt-get update \
     && apt-get install --no-install-recommends --yes git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Le npm 10 livré avec Node 22 plante (« reading 'edgesOut' ») en résolvant les
+# dépendances pairs de vitest 4.1.12 ; npm 11 les résout, et le verrou obtenu
+# reste lisible par le `npm ci` de npm 10 qu'emploie la CI.
+RUN npm install --global npm@11.6.2
+
 WORKDIR /app
 
 # node_modules est un volume nommé (voir docker/compose.yml). Docker initialise un
