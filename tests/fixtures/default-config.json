@@ -3,8 +3,6 @@
   "counter": {
     "initialSeconds": 43200,
     "minRemainingSeconds": 0,
-    "tickIntervalMs": 250,
-    "persistIntervalMs": 5000,
     "resumeOnStartup": true
   },
   "rewards": {
@@ -161,19 +159,10 @@
     "broadcasterUserId": "",
     "broadcasterLogin": "",
     "enableChatNotifications": true,
-    "enableChatCommands": false,
-    "keepaliveTimeoutSeconds": 30
+    "enableChatCommands": false
   },
   "server": {
-    "httpPort": 3777,
-    "host": "127.0.0.1",
-    "websocket": {
-      "heartbeatIntervalMs": 30000,
-      "stateBroadcastIntervalMs": 1000,
-      "maxMessageBytes": 4096
-    },
-    "portFallbackAttempts": 10,
-    "maxBodyBytes": 262144
+    "httpPort": 3777
   },
   "overlay": {
     "fontFamily": "Inter, Segoe UI, system-ui, sans-serif",
@@ -229,18 +218,6 @@
       "fontSize": 28
     },
     "enableCustomCss": false
-  },
-  "logging": {
-    "level": "info",
-    "retentionDays": 14,
-    "ringBufferSize": 500,
-    "console": true
-  },
-  "history": {
-    "retentionDays": 90,
-    "dedupCacheSize": 5000,
-    "dedupTtlMs": 600000,
-    "crossSourceWindowMs": 10000
   },
   "setup": {
     "completed": false

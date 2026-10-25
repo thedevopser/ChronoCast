@@ -43,10 +43,6 @@ const counterSchema = z.object({
 
   minRemainingSeconds: seconds.default(0),
 
-  tickIntervalMs: millisecondsAboveZero.default(250),
-
-  persistIntervalMs: millisecondsAboveZero.default(5_000),
-
   resumeOnStartup: z.boolean().default(true),
 });
 
@@ -265,28 +261,10 @@ const twitchSchema = z.object({
   enableChatNotifications: z.boolean().default(true),
 
   enableChatCommands: z.boolean().default(false),
-
-  keepaliveTimeoutSeconds: z.number().int().min(10).max(600).default(30),
 });
 
 const serverSchema = z.object({
   httpPort: z.number().int().min(1).max(65_535).default(3_777),
-
-  host: z.enum(['127.0.0.1', 'localhost']).default('127.0.0.1'),
-
-  websocket: z
-    .object({
-      heartbeatIntervalMs: millisecondsAboveZero.default(30_000),
-
-      stateBroadcastIntervalMs: millisecondsAboveZero.default(1_000),
-
-      maxMessageBytes: z.number().int().positive().max(65_536).default(4_096),
-    })
-    .prefault({}),
-
-  portFallbackAttempts: z.number().int().min(0).max(50).default(10),
-
-  maxBodyBytes: z.number().int().positive().max(10_485_760).default(262_144),
 });
 
 const overlaySchema = z.object({
@@ -349,20 +327,6 @@ const overlaySchema = z.object({
   enableCustomCss: z.boolean().default(false),
 });
 
-const loggingSchema = z.object({
-  level: z.enum(['debug', 'info', 'warning', 'error']).default('info'),
-  retentionDays: z.number().int().min(1).max(365).default(14),
-  ringBufferSize: z.number().int().min(50).max(10_000).default(500),
-  console: z.boolean().default(true),
-});
-
-const historySchema = z.object({
-  retentionDays: z.number().int().min(1).max(365).default(90),
-  dedupCacheSize: z.number().int().min(100).max(100_000).default(5_000),
-  dedupTtlMs: millisecondsAboveZero.default(600_000),
-  crossSourceWindowMs: millisecondsAboveZero.default(10_000),
-});
-
 const setupSchema = z.object({
   completed: z.boolean().default(false),
 });
@@ -379,8 +343,6 @@ export const configSchema = z.object({
   twitch: twitchSchema.prefault({}),
   server: serverSchema.prefault({}),
   overlay: overlaySchema.prefault({}),
-  logging: loggingSchema.prefault({}),
-  history: historySchema.prefault({}),
   setup: setupSchema.prefault({}),
   app: appSchema.prefault({}),
 });
@@ -395,6 +357,4 @@ export type GoalOverlayConfig = GoalsConfig['overlay'];
 export type TwitchConfig = ChronoCastConfig['twitch'];
 export type ServerConfig = ChronoCastConfig['server'];
 export type OverlayConfig = ChronoCastConfig['overlay'];
-export type LoggingConfig = ChronoCastConfig['logging'];
-export type HistoryConfig = ChronoCastConfig['history'];
 export type SetupConfig = ChronoCastConfig['setup'];

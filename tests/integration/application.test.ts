@@ -1917,6 +1917,36 @@ describe('application complète', () => {
     });
   });
 
+  describe('plafonds relevés dans une configuration écrite à la main', () => {
+    beforeEach(async () => {
+      await application.stop();
+      await writeFile(
+        join(dataDirectory, 'config.json'),
+        JSON.stringify({
+          schemaVersion: 10,
+          server: { host: 'localhost', maxBodyBytes: 10_485_760, websocket: { maxMessageBytes: 65_536 } },
+        }),
+        'utf8',
+      );
+      application = build();
+      port = await application.start();
+    });
+
+    it('garde le plafond du corps d’une requête', async () => {
+      const response = await mutate('/api/counter/add', JSON.stringify({ seconds: 1, pad: 'x'.repeat(300_000) }));
+
+      expect(response.status).toBe(413);
+    });
+
+    it('retire les réglages techniques du fichier de configuration', async () => {
+      const written = JSON.parse(await readFile(join(dataDirectory, 'config.json'), 'utf8')) as {
+        server: Record<string, unknown>;
+      };
+
+      expect(Object.keys(written.server)).toStrictEqual(['httpPort']);
+    });
+  });
+
   describe('adresses Twitch écrites dans une configuration piégée', () => {
     const HOSTILE = {
       idBaseUrl: 'https://id-twitch.example',

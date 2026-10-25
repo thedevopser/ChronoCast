@@ -19,6 +19,10 @@ import {
 } from './counter-state.js';
 import { computeReward, type RewardComputation } from './reward-engine.js';
 
+export const TICK_INTERVAL_MS = 250;
+
+export const PERSIST_INTERVAL_MS = 5_000;
+
 export interface Ticker {
   start(intervalMs: number, onTick: () => void): void;
   stop(): void;
@@ -153,7 +157,7 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
 
     const shouldPersist =
       next.status === 'finished' ||
-      monotonic - lastPersistAt >= getConfig().counter.persistIntervalMs;
+      monotonic - lastPersistAt >= PERSIST_INTERVAL_MS;
 
     if (shouldPersist) {
       void persist(next);
@@ -181,7 +185,7 @@ export function createCounterService(options: CounterServiceOptions): CounterSer
       lastTickAt = clock.monotonicMs();
       lastPersistAt = clock.monotonicMs();
 
-      ticker.start(config.counter.tickIntervalMs, onTick);
+      ticker.start(TICK_INTERVAL_MS, onTick);
 
       logger.info('compteur démarré', {
         remainingMs: state.remainingMs,

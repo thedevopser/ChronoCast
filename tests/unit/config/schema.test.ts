@@ -28,10 +28,6 @@ describe('configSchema', () => {
       expect(DEFAULT_CONFIG.counter.initialSeconds).toBe(43_200);
     });
 
-    it('n\'écoute que la boucle locale', () => {
-      expect(DEFAULT_CONFIG.server.host).toBe('127.0.0.1');
-    });
-
     it('ne crédite que les événements payants', () => {
       expect(Object.keys(DEFAULT_CONFIG.rewards).sort()).toEqual([
         'bits',
@@ -73,23 +69,6 @@ describe('configSchema', () => {
       expect(DEFAULT_CONFIG.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
     });
 
-    it('diffuse le décompte une fois par seconde', () => {
-      expect(DEFAULT_CONFIG.server.websocket.stateBroadcastIntervalMs).toBe(1_000);
-    });
-
-    it('plafonne la taille des messages WebSocket entrants', () => {
-      expect(DEFAULT_CONFIG.server.websocket.maxMessageBytes).toBeGreaterThan(0);
-      expect(DEFAULT_CONFIG.server.websocket.maxMessageBytes).toBeLessThanOrEqual(64 * 1_024);
-    });
-
-    it('n’annonce aucun mode ni port propre au WebSocket', () => {
-      expect(DEFAULT_CONFIG.server.websocket).not.toHaveProperty('mode');
-      expect(DEFAULT_CONFIG.server.websocket).not.toHaveProperty('port');
-    });
-
-    it('plafonne la taille du corps des requêtes HTTP', () => {
-      expect(DEFAULT_CONFIG.server.maxBodyBytes).toBeGreaterThan(0);
-    });
   });
 
   describe('complétion des valeurs absentes', () => {
@@ -101,7 +80,7 @@ describe('configSchema', () => {
       const parsed = configSchema.parse({ counter: { initialSeconds: 3600 } });
 
       expect(parsed.counter.initialSeconds).toBe(3600);
-      expect(parsed.counter.tickIntervalMs).toBe(DEFAULT_CONFIG.counter.tickIntervalMs);
+      expect(parsed.counter.minRemainingSeconds).toBe(DEFAULT_CONFIG.counter.minRemainingSeconds);
       expect(parsed.rewards.sub.tier1).toBe(DEFAULT_CONFIG.rewards.sub.tier1);
     });
   });
@@ -114,14 +93,6 @@ describe('configSchema', () => {
     it('refuse un port hors de la plage autorisée', () => {
       expect(() => configSchema.parse({ server: { httpPort: 0 } })).toThrow();
       expect(() => configSchema.parse({ server: { httpPort: 70_000 } })).toThrow();
-    });
-
-    it('refuse une adresse d\'écoute autre que la boucle locale', () => {
-      expect(() => configSchema.parse({ server: { host: '0.0.0.0' } })).toThrow();
-    });
-
-    it('refuse un niveau de log inconnu', () => {
-      expect(() => configSchema.parse({ logging: { level: 'verbeux' } })).toThrow();
     });
 
     it('refuse un plancher négatif', () => {
@@ -169,10 +140,6 @@ describe('configSchema', () => {
     it('refuse une opacité de remplissage hors de [0, 1]', () => {
       expect(() => configSchema.parse({ overlay: { frame: { fillOpacity: 1.5 } } })).toThrow();
     });
-
-    it('refuse un intervalle de tick nul', () => {
-      expect(() => configSchema.parse({ counter: { tickIntervalMs: 0 } })).toThrow();
-    });
   });
 
   describe('protection contre les entrées hostiles', () => {
@@ -216,9 +183,7 @@ describe('configSchema', () => {
         server: { websocket: { mode: 'separate', port: 3778, heartbeatIntervalMs: 15_000 } },
       });
 
-      expect(parsed.server.websocket).not.toHaveProperty('mode');
-      expect(parsed.server.websocket).not.toHaveProperty('port');
-      expect(parsed.server.websocket.heartbeatIntervalMs).toBe(15_000);
+      expect(parsed.server).toStrictEqual(DEFAULT_CONFIG.server);
     });
 
   });
@@ -620,5 +585,32 @@ describe('valeurs par défaut des sections absentes ou vides', () => {
     for (const path of paths) {
       expect(configSchema.parse(nest(path, {})), path.join('.')).toStrictEqual(expected);
     }
+  });
+});
+
+describe('réglages techniques, hors de portée de la configuration', () => {
+  it.each([
+    ['twitch', 'keepaliveTimeoutSeconds', 45],
+    ['counter', 'tickIntervalMs', 100],
+    ['counter', 'persistIntervalMs', 1_000],
+    ['server', 'host', 'localhost'],
+    ['server', 'portFallbackAttempts', 3],
+    ['server', 'maxBodyBytes', 10_485_760],
+    ['server', 'websocket', { maxMessageBytes: 65_536 }],
+    ['logging', 'level', 'debug'],
+    ['logging', 'retentionDays', 365],
+    ['logging', 'ringBufferSize', 10_000],
+    ['logging', 'console', false],
+    ['history', 'retentionDays', 365],
+    ['history', 'dedupCacheSize', 100],
+    ['history', 'dedupTtlMs', 1],
+    ['history', 'crossSourceWindowMs', 1],
+  ])('ignore %s.%s', (section, key, value) => {
+    const parsed = configSchema.parse({ [section]: { [key]: value } }) as unknown as Record<
+      string,
+      Record<string, unknown> | undefined
+    >;
+
+    expect(parsed[section] ?? {}).not.toHaveProperty(key);
   });
 });

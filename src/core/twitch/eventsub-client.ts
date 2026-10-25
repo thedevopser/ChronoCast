@@ -6,6 +6,8 @@ import { isTwitchEventSubUrl, TWITCH_ENDPOINTS } from './endpoints.js';
 import type { HelixClient } from './helix-client.js';
 import { resolveSubscriptions, type SubscriptionContext } from './subscription-plan.js';
 
+export const KEEPALIVE_TIMEOUT_SECONDS = 30;
+
 const KEEPALIVE_GRACE_FACTOR = 1.2;
 
 const BASE_RECONNECT_DELAY_MS = 1_000;
@@ -195,7 +197,7 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     const keepaliveSeconds =
       typeof session['keepalive_timeout_seconds'] === 'number'
         ? session['keepalive_timeout_seconds']
-        : getConfig().twitch.keepaliveTimeoutSeconds;
+        : KEEPALIVE_TIMEOUT_SECONDS;
 
     if (socket === migratingSocket) {
       logger.info('migration de session confirmée');
@@ -276,8 +278,7 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
     }
 
     if (socket === activeSocket) {
-      const keepaliveSeconds = getConfig().twitch.keepaliveTimeoutSeconds;
-      armKeepaliveWatchdog(keepaliveSeconds);
+      armKeepaliveWatchdog(KEEPALIVE_TIMEOUT_SECONDS);
     }
 
     switch (messageType) {
@@ -349,12 +350,8 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
   }
 
   function openConnection(): void {
-    const config = getConfig();
     const url = new URL(TWITCH_ENDPOINTS.eventsub);
-    url.searchParams.set(
-      'keepalive_timeout_seconds',
-      String(config.twitch.keepaliveTimeoutSeconds),
-    );
+    url.searchParams.set('keepalive_timeout_seconds', String(KEEPALIVE_TIMEOUT_SECONDS));
 
     setStatus('connecting');
     activeSocket = openSocket(url.toString());

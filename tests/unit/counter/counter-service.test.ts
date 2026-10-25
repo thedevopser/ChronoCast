@@ -5,7 +5,11 @@ import { createEventBus, type EventBus } from '../../../src/core/app/event-bus.j
 import type { Clock } from '../../../src/core/app/ports.js';
 import { DEFAULT_CONFIG } from '../../../src/core/config/defaults.js';
 import { configSchema, type ChronoCastConfig } from '../../../src/core/config/schema.js';
-import { createCounterService } from '../../../src/core/counter/counter-service.js';
+import {
+  createCounterService,
+  PERSIST_INTERVAL_MS,
+  TICK_INTERVAL_MS,
+} from '../../../src/core/counter/counter-service.js';
 import type { CounterState } from '../../../src/core/counter/counter-state.js';
 import type { GiftEvent, SubEvent } from '../../../src/core/events/domain-event.js';
 import { createLogger, type LogRecord, type LogSink } from '../../../src/core/logging/logger.js';
@@ -198,13 +202,13 @@ describe('createCounterService', () => {
       expect(service.getState().remainingMs).toBe(3_600_000);
     });
 
-    it('démarre le cadenceur à la période configurée', async () => {
+    it('démarre le cadenceur à sa période', async () => {
       const { service } = createService();
 
       await service.start();
 
       expect(ticker.running).toBe(true);
-      expect(ticker.intervalMs).toBe(DEFAULT_CONFIG.counter.tickIntervalMs);
+      expect(ticker.intervalMs).toBe(TICK_INTERVAL_MS);
     });
 
     it('met en pause au démarrage lorsque la reprise automatique est désactivée', async () => {
@@ -266,13 +270,13 @@ describe('createCounterService', () => {
       expect(double.writes.length).toBe(avant);
     });
 
-    it('écrit périodiquement selon l\'intervalle configuré', async () => {
+    it('écrit périodiquement, à la période de sauvegarde', async () => {
       const { service, double } = createService();
       await service.start();
       await service.resume();
       const avant = double.writes.length;
 
-      clock.advance(DEFAULT_CONFIG.counter.persistIntervalMs + 1);
+      clock.advance(PERSIST_INTERVAL_MS + 1);
       ticker.fire();
 
       expect(double.writes.length).toBe(avant + 1);

@@ -164,7 +164,7 @@ describe('durcissement de l’API', () => {
       { content: '{ tronqué' },
       { content: '[]' },
       { content: 'null' },
-      { content: JSON.stringify({ server: { host: '0.0.0.0' } }) },
+      { content: JSON.stringify({ server: { httpPort: 0 } }) },
       { content: JSON.stringify({ counter: { initialSeconds: -1 } }) },
     ])('refuse %j en 400', async (payload) => {
       const response = await authorized('POST', '/api/config/import', JSON.stringify(payload));
@@ -172,14 +172,14 @@ describe('durcissement de l’API', () => {
       expect(response.status).toBe(400);
     });
 
-    it("n'autorise jamais une écoute hors de la boucle locale", async () => {
+    it("ne laisse aucune adresse d'écoute entrer dans la configuration", async () => {
       await authorized(
         'PATCH',
         '/api/config',
         JSON.stringify({ config: { server: { host: '0.0.0.0', httpPort: 3_777 } } }),
       );
 
-      expect(doubles.config.server.host).toBe('127.0.0.1');
+      expect(doubles.config.server).not.toHaveProperty('host');
     });
   });
 

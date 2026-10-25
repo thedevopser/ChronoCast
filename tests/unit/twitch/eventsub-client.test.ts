@@ -10,6 +10,7 @@ import {
   type EventSubSocket,
   type EventSubSocketFactory,
   type NotificationContext,
+  KEEPALIVE_TIMEOUT_SECONDS,
 } from '../../../src/core/twitch/eventsub-client.js';
 import type { HelixClient } from '../../../src/core/twitch/helix-client.js';
 
@@ -219,12 +220,14 @@ describe('createEventSubClient', () => {
       expect(sockets[0]?.socket.url).toContain('eventsub.wss.twitch.tv');
     });
 
-    it('négocie le délai de keepalive configuré', async () => {
-      const client = createClient(configSchema.parse({ twitch: { keepaliveTimeoutSeconds: 45 } }));
+    it('négocie le délai de keepalive', async () => {
+      const client = createClient();
 
       await client.start();
 
-      expect(sockets[0]?.socket.url).toContain('keepalive_timeout_seconds=45');
+      expect(sockets[0]?.socket.url).toContain(
+        `keepalive_timeout_seconds=${String(KEEPALIVE_TIMEOUT_SECONDS)}`,
+      );
     });
 
     it('crée les souscriptions dès réception de l\'accueil', async () => {

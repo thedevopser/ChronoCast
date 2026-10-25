@@ -223,7 +223,7 @@ describe('createConfigService', () => {
       await service.load();
 
       await expect(
-        service.import(JSON.stringify({ server: { host: '0.0.0.0' } })),
+        service.import(JSON.stringify({ server: { httpPort: 0 } })),
       ).rejects.toBeInstanceOf(ConfigImportError);
     });
 
@@ -267,7 +267,6 @@ describe('createConfigService', () => {
         broadcasterUserId: '1337',
         broadcasterLogin: 'moi',
         enableChatCommands: true,
-        keepaliveTimeoutSeconds: 45,
       },
     };
 
@@ -297,7 +296,7 @@ describe('createConfigService', () => {
     it('n’est pas refusé pour un réglage Twitch invalide, qu’il ignore', async () => {
       const { service } = createService(MINE);
       await service.load();
-      const shared = { ...DEFAULT_CONFIG, twitch: { keepaliveTimeoutSeconds: 1 } };
+      const shared = { ...DEFAULT_CONFIG, twitch: { enableChatCommands: 'oui' } };
 
       const imported = await service.import(JSON.stringify(shared));
 

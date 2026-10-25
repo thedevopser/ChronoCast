@@ -12,7 +12,7 @@ Deux natures d'écriture cohabitent, et cette distinction est tout le mécanisme
 
 **Les mutations sont écrites immédiatement.** Un sub qui crédite, un ajout manuel, une pause : l'état part sur le disque au moment même. Aucun événement Twitch ne peut être perdu par un crash.
 
-**L'érosion du temps qui passe est écrite périodiquement**, toutes les cinq secondes par défaut (`counter.persistIntervalMs`). Écrire à chaque battement — quatre fois par seconde — userait le disque pour rien.
+**L'érosion du temps qui passe est écrite périodiquement**, toutes les cinq secondes. Écrire à chaque battement — quatre fois par seconde — userait le disque pour rien.
 
 Conséquence : un crash vous fait perdre au maximum le dernier intervalle de décompte, **et toujours en votre faveur**. L'état retrouvé est celui d'il y a cinq secondes, donc légèrement plus généreux que la réalité. Jamais l'inverse.
 

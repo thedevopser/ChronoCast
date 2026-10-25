@@ -81,6 +81,13 @@ export interface WsHubOptions {
   readonly logger: Logger;
 }
 
+export const HEARTBEAT_INTERVAL_MS = 30_000;
+
+// Diffuser plus souvent réveillerait la Browser Source d'OBS sans rien améliorer.
+export const STATE_BROADCAST_INTERVAL_MS = 1_000;
+
+export const MAX_MESSAGE_BYTES = 4_096;
+
 const POLICY_VIOLATION = 1008;
 
 const GOING_AWAY = 1001;
@@ -169,9 +176,8 @@ export function createWsHub(options: WsHubOptions): WsHub {
       drop(client);
     }
 
-    const maxMessageBytes = getConfig().server.websocket.maxMessageBytes;
-    if (Buffer.byteLength(raw, 'utf8') > maxMessageBytes) {
-      scoped.warning('message WebSocket refusé : plafond dépassé', { maxMessageBytes });
+    if (Buffer.byteLength(raw, 'utf8') > MAX_MESSAGE_BYTES) {
+      scoped.warning('message WebSocket refusé : plafond dépassé', { maxMessageBytes: MAX_MESSAGE_BYTES });
       reject('message_too_large', 'Message trop volumineux.');
       return;
     }
@@ -229,8 +235,7 @@ export function createWsHub(options: WsHubOptions): WsHub {
         bus.on('counter:changed', (payload) => {
           if (payload.origin === 'tick') {
             const now = clock.monotonicMs();
-            const interval = getConfig().server.websocket.stateBroadcastIntervalMs;
-            if (now - lastTickBroadcastAt < interval) {
+            if (now - lastTickBroadcastAt < STATE_BROADCAST_INTERVAL_MS) {
               return;
             }
             lastTickBroadcastAt = now;
@@ -280,10 +285,7 @@ export function createWsHub(options: WsHubOptions): WsHub {
         }),
       );
 
-      heartbeatId = timers.setInterval(
-        onHeartbeat,
-        getConfig().server.websocket.heartbeatIntervalMs,
-      );
+      heartbeatId = timers.setInterval(onHeartbeat, HEARTBEAT_INTERVAL_MS);
     },
 
     stop(): void {
