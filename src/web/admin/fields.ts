@@ -597,16 +597,6 @@ const TWITCH_FIELDS: readonly AdminField[] = [
     min: 10,
     max: 600,
   },
-  {
-    selector: '#twitch-eventsub-url',
-    path: 'twitch.eventsubUrl',
-    label: 'Point d’entrée EventSub',
-    hint: 'À surcharger pour viser le serveur factice de la Twitch CLI.',
-    view: 'twitch',
-    kind: 'text',
-  },
-  { selector: '#twitch-helix-url', path: 'twitch.helixBaseUrl', label: 'API Helix', view: 'twitch', kind: 'text' },
-  { selector: '#twitch-id-url', path: 'twitch.idBaseUrl', label: 'Service d’identité', view: 'twitch', kind: 'text' },
 ];
 
 const MAX_INITIAL_SECONDS = 2_592_000;

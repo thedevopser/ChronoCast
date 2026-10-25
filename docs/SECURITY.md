@@ -52,6 +52,8 @@ Dans les journaux, les retours à la ligne et les séquences ANSI sont échappé
 
 **Jamais diffusés sur le WebSocket.** Les canaux sont en lecture seule et ne transportent que l'état du compteur, les événements, la configuration d'apparence et la progression des objectifs — un entier, un libellé et deux bornes, sans aucun secret ni pseudo.
 
+**Envoyés à Twitch, et nulle part ailleurs.** Les adresses du service d'identité, de l'API Helix et d'EventSub sont des constantes de [endpoints.ts](../src/core/twitch/endpoints.ts), jamais des réglages : ni le panneau ni un fichier de configuration ne peuvent les changer. Une adresse réglable suffirait à faire partir le refresh token et le secret client chez un tiers, puisque c'est à elle qu'ils sont présentés à chaque renouvellement.
+
 **Systématiquement rédigés dans les journaux.** Les secrets sont déclarés à un rédacteur au moment où ils sont chargés ; ils sont masqués partout ensuite, **y compris s'ils se retrouvent au milieu d'un message d'erreur**.
 
 ## 4. Le serveur local
@@ -152,6 +154,7 @@ Le panneau n'a qu'un bouton qui y mène. **Aucune adresse ne traverse cette rout
 | `api-hardening.test.ts` | Un import de configuration malveillant est refusé, les secrets n'apparaissent nulle part |
 | `navigation-policy.test.ts` | Seuls l'origine locale, Twitch, le dépôt et la page de soutien sont admis — et tout ce qui n'est pas local part au navigateur |
 | `browser-opener.test.ts` | Seul `https:` est ouvert à l'extérieur |
+| `twitch-endpoints.test.ts` | Une configuration ne peut pas détourner les adresses de Twitch |
 
 Ces tests emploient de vraies charges hostiles, et ils tournent dans un vrai parseur HTML : un faux `document` prouverait qu'on a appelé `textContent`, pas qu'aucun script n'a été exécuté.
 

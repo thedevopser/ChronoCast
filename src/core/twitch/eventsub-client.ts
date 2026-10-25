@@ -2,6 +2,7 @@ import type { AppEvents, TwitchConnectionStatus } from '../app/app-events.js';
 import type { EventBus } from '../app/event-bus.js';
 import type { ChronoCastConfig } from '../config/schema.js';
 import type { Logger } from '../logging/logger.js';
+import { TWITCH_ENDPOINTS } from './endpoints.js';
 import type { HelixClient } from './helix-client.js';
 import { resolveSubscriptions, type SubscriptionContext } from './subscription-plan.js';
 
@@ -344,7 +345,7 @@ export function createEventSubClient(options: EventSubClientOptions): EventSubCl
 
   function openConnection(): void {
     const config = getConfig();
-    const url = new URL(config.twitch.eventsubUrl);
+    const url = new URL(TWITCH_ENDPOINTS.eventsub);
     url.searchParams.set(
       'keepalive_timeout_seconds',
       String(config.twitch.keepaliveTimeoutSeconds),

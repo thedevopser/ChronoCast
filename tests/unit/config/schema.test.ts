@@ -548,8 +548,8 @@ describe('valeurs de départ de la barre d’objectif, comptée en points', () =
     expect(configSchema.parse({ goals: { tiers: [] } }).goals.tiers).toStrictEqual([]);
   });
 
-  it('passe le schéma en version 10, pour que le nombre de bits par point soit retiré du fichier', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(10);
+  it('passe le schéma en version 11, pour que les adresses Twitch soient retirées du fichier', () => {
+    expect(CONFIG_SCHEMA_VERSION).toBe(11);
   });
 });
 

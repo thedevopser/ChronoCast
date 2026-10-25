@@ -61,6 +61,7 @@ import {
   type NotificationContext,
   type Timers,
 } from '../twitch/eventsub-client.js';
+import { TWITCH_ENDPOINTS } from '../twitch/endpoints.js';
 import { createHelixClient, type HelixClient } from '../twitch/helix-client.js';
 import { createOAuthCompletion } from '../twitch/oauth-completion.js';
 import {
@@ -318,7 +319,7 @@ export function createApplication(options: ApplicationOptions): Application {
     getSettings: () => {
       const twitch = configService.get().twitch;
       return {
-        idBaseUrl: twitch.idBaseUrl,
+        idBaseUrl: TWITCH_ENDPOINTS.id,
         clientId: twitch.clientId,
         redirectUri: OAUTH_REDIRECT_URI,
         scopes: requiredScopes(twitch),
@@ -329,7 +330,7 @@ export function createApplication(options: ApplicationOptions): Application {
   const helix: HelixClient = createHelixClient({
     getSettings: () => {
       const twitch = configService.get().twitch;
-      return { helixBaseUrl: twitch.helixBaseUrl, clientId: twitch.clientId };
+      return { helixBaseUrl: TWITCH_ENDPOINTS.helix, clientId: twitch.clientId };
     },
     getAccessToken: () => oauth.getAccessToken(),
     logger: logger.child('helix'),
@@ -627,7 +628,7 @@ export function createApplication(options: ApplicationOptions): Application {
 
       return {
         authorizationUrl: buildAuthorizationUrl({
-          idBaseUrl: twitch.idBaseUrl,
+          idBaseUrl: TWITCH_ENDPOINTS.id,
           clientId: twitch.clientId,
           redirectUri: OAUTH_REDIRECT_URI,
           scopes: requiredScopes(twitch),

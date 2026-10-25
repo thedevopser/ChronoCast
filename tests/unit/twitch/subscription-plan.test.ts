@@ -243,13 +243,6 @@ describe('requiresRestart', () => {
     expect(requiresRestart(previous, next)).toBe(true);
   });
 
-  it('demande un redémarrage quand l’URL EventSub change', () => {
-    const previous = twitchConfig({ broadcasterUserId: '1337' });
-    const next = twitchConfig({ broadcasterUserId: '1337', eventsubUrl: 'wss://127.0.0.1:8080/ws' });
-
-    expect(requiresRestart(previous, next)).toBe(true);
-  });
-
   it('ne demande rien pour un réglage sans effet sur les souscriptions', () => {
     const previous = twitchConfig({ broadcasterUserId: '1337', broadcasterLogin: 'ancien' });
     const next = twitchConfig({ broadcasterUserId: '1337', broadcasterLogin: 'nouveau' });

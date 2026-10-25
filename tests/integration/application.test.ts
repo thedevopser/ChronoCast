@@ -1917,4 +1917,82 @@ describe('application complète', () => {
       port = await application.start();
     });
   });
+
+  describe('adresses Twitch écrites dans une configuration piégée', () => {
+    const HOSTILE = {
+      idBaseUrl: 'https://id-twitch.example',
+      helixBaseUrl: 'https://helix.example/helix',
+      eventsubUrl: 'wss://eventsub.example/ws',
+    };
+
+    let fetchedUrls: string[];
+
+    beforeEach(async () => {
+      await application.stop();
+
+      await writeFile(
+        join(dataDirectory, 'config.json'),
+        JSON.stringify({
+          schemaVersion: 10,
+          twitch: { broadcasterUserId: '1337', clientId: 'client-de-test', ...HOSTILE },
+        }),
+        'utf8',
+      );
+
+      seededSecrets = new Map([
+        [
+          'twitch-credentials',
+          JSON.stringify({
+            clientSecret: 'secret-de-test',
+            accessToken: 'jeton-de-test',
+            refreshToken: 'rafraichissement-de-test',
+            expiresAt: Date.now() + 3_600_000,
+            scopes: ['user:read:chat', 'user:bot', 'channel:read:subscriptions', 'bits:read'],
+          }),
+        ],
+      ]);
+
+      fetchedUrls = [];
+      appFetch = (input) => {
+        fetchedUrls.push(input instanceof Request ? input.url : String(input));
+        return Promise.reject(new Error('aucun accès réseau dans ces tests'));
+      };
+      socketFactory = (url) => ({
+        url,
+        onOpen: () => undefined,
+        onMessage: () => undefined,
+        onClose: () => undefined,
+        onError: () => undefined,
+        close: () => undefined,
+      });
+
+      application = build();
+      port = await application.start();
+    });
+
+    it('ouvre EventSub chez Twitch', () => {
+      expect(openedSocketUrls).toHaveLength(1);
+      expect(new URL(openedSocketUrls[0] ?? '').origin).toBe('wss://eventsub.wss.twitch.tv');
+    });
+
+    it('n’envoie les jetons qu’au service d’identité de Twitch', () => {
+      expect(fetchedUrls.length).toBeGreaterThan(0);
+      for (const url of fetchedUrls) {
+        expect(['https://id.twitch.tv', 'https://api.twitch.tv']).toContain(new URL(url).origin);
+      }
+    });
+
+    it('retire les adresses du fichier de configuration', async () => {
+      const written = JSON.parse(await readFile(join(dataDirectory, 'config.json'), 'utf8')) as {
+        schemaVersion: number;
+        twitch: Record<string, unknown>;
+      };
+
+      expect(written.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
+      expect(written.twitch).not.toHaveProperty('idBaseUrl');
+      expect(written.twitch).not.toHaveProperty('helixBaseUrl');
+      expect(written.twitch).not.toHaveProperty('eventsubUrl');
+      expect(written.twitch['clientId']).toBe('client-de-test');
+    });
+  });
 });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CONFIG_SCHEMA_VERSION = 10;
+export const CONFIG_SCHEMA_VERSION = 11;
 
 export const GOAL_LABEL_MAX_LENGTH = 40;
 
@@ -301,10 +301,6 @@ const twitchSchema = z
     enableChatNotifications: z.boolean().default(true),
 
     enableChatCommands: z.boolean().default(false),
-
-    eventsubUrl: z.string().url().default('wss://eventsub.wss.twitch.tv/ws'),
-    helixBaseUrl: z.string().url().default('https://api.twitch.tv/helix'),
-    idBaseUrl: z.string().url().default('https://id.twitch.tv'),
 
     keepaliveTimeoutSeconds: z.number().int().min(10).max(600).default(30),
   })
